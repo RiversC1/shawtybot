@@ -1,0 +1,15 @@
+# Secrets — never commit these
+.env
+lavalink/application.yml
+
+# Lavalink binaries — download separately on the server
+lavalink/Lavalink.jar
+lavalink/plugins/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Spotipy token cache
+.cache

@@ -1,0 +1,6 @@
+discord.py[voice]
+python-dotenv
+spotipy
+wavelink
+syncedlyrics
+watchfiles
