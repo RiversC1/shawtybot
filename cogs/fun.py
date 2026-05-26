@@ -11,10 +11,15 @@ class Fun(commands.Cog):
     @app_commands.command(name="kiss", description="Kiss another user!")
     @app_commands.describe(user="The user you want to kiss")
     async def kiss(self, interaction: discord.Interaction, user: discord.Member):
-        async with aiohttp.ClientSession() as session:
-            async with session.get("https://api.waifu.pics/sfw/kiss") as resp:
-                data = await resp.json()
-        gif_url = data["url"]
+        headers = {"User-Agent": "ShawtyBot/1.0"}
+        try:
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.get("https://nekos.best/api/v2/kiss") as resp:
+                    data = await resp.json()
+            gif_url = data["results"][0]["url"]
+        except Exception:
+            await interaction.response.send_message("Couldn't fetch a GIF right now, try again!", ephemeral=True)
+            return
         embed = discord.Embed(
             description=f"**{interaction.user.display_name}** kissed **{user.display_name}**! 💋",
             color=discord.Color.pink()
