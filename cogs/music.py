@@ -79,7 +79,7 @@ class Music(commands.Cog):
         if not current or len(current) < 2 or current.startswith("http"):
             return []
         try:
-            tracks = await wavelink.Playable.search(current, source=wavelink.TrackSource.SoundCloud)
+            tracks = await wavelink.Playable.search(current, source=wavelink.TrackSource.YouTube)
             return [
                 app_commands.Choice(name=t.title[:100], value=t.title)
                 for t in tracks[:5]
@@ -117,7 +117,7 @@ class Music(commands.Cog):
             added = 0
             first_track = None
             for q in queries:
-                results = await wavelink.Playable.search(q, source=wavelink.TrackSource.SoundCloud)
+                results = await wavelink.Playable.search(q, source=wavelink.TrackSource.YouTube)
                 if results:
                     track = results[0]
                     await player.queue.put_wait(track)
@@ -131,7 +131,7 @@ class Music(commands.Cog):
             msg = f"Added **{added}** track(s) from Spotify to the queue."
 
         else:
-            tracks = await wavelink.Playable.search(query, source=wavelink.TrackSource.SoundCloud)
+            tracks = await wavelink.Playable.search(query, source=wavelink.TrackSource.YouTube)
             if not tracks:
                 await interaction.followup.send("No results found!")
                 return
