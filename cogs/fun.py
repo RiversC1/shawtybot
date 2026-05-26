@@ -1,10 +1,26 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
+import aiohttp
 
 
 class Fun(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    @app_commands.command(name="kiss", description="Kiss another user!")
+    @app_commands.describe(user="The user you want to kiss")
+    async def kiss(self, interaction: discord.Interaction, user: discord.Member):
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://api.waifu.pics/sfw/kiss") as resp:
+                data = await resp.json()
+        gif_url = data["url"]
+        embed = discord.Embed(
+            description=f"**{interaction.user.display_name}** kissed **{user.display_name}**! 💋",
+            color=discord.Color.pink()
+        )
+        embed.set_image(url=gif_url)
+        await interaction.response.send_message(embed=embed)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
