@@ -61,7 +61,7 @@ class Music(commands.Cog):
             t = await loop.run_in_executor(None, lambda: self.sp.track(spotify_id))
             queries.append(f"{t['artists'][0]['name']} - {t['name']}")
         elif kind == "playlist":
-            results = await loop.run_in_executor(None, lambda: self.sp.playlist_tracks(spotify_id))
+            results = await loop.run_in_executor(None, lambda: self.sp.playlist_tracks(spotify_id, market="US"))
             while results:
                 for item in results["items"]:
                     t = item.get("track")
