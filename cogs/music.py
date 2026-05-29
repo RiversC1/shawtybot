@@ -105,30 +105,27 @@ class Music(commands.Cog):
 
         if "spotify.com" in query:
             try:
-                queries = await self.resolve_spotify(query)
+                tracks = await wavelink.Playable.search(query)
             except Exception as e:
                 log.error(f"Spotify error: {e}")
                 await interaction.followup.send("Failed to fetch from Spotify.", ephemeral=True)
                 return
-            if not queries:
+            if not tracks:
                 await interaction.followup.send("Couldn't find anything on Spotify for that link.")
                 return
 
-            added = 0
-            first_track = None
-            for q in queries:
-                results = await wavelink.Playable.search(q, source=wavelink.TrackSource.YouTube)
-                if results:
-                    track = results[0]
+            if isinstance(tracks, wavelink.Playlist):
+                added = len(tracks)
+                for track in tracks:
                     await player.queue.put_wait(track)
-                    added += 1
-                    if first_track is None:
-                        first_track = track
+                msg = f"Added **{added}** tracks from **{tracks.name}** to the queue."
+            else:
+                track = tracks[0]
+                await player.queue.put_wait(track)
+                msg = f"Added **{track.title}** to the queue."
 
-            if not player.playing and first_track:
+            if not player.playing:
                 await player.play(player.queue.get())
-
-            msg = f"Added **{added}** track(s) from Spotify to the queue."
 
         else:
             tracks = await wavelink.Playable.search(query, source=wavelink.TrackSource.YouTube)
