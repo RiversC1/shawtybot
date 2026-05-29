@@ -105,27 +105,36 @@ class Music(commands.Cog):
 
         if "spotify.com" in query:
             try:
-                tracks = await wavelink.Playable.search(query)
+                queries = await self.resolve_spotify(query)
             except Exception as e:
                 log.error(f"Spotify error: {e}")
-                await interaction.followup.send("Failed to fetch from Spotify.", ephemeral=True)
+                if "404" in str(e):
+                    await interaction.followup.send(
+                        "Spotify couldn't find that playlist. Spotify-curated playlists (like 'This Is...', 'Daily Mix') are restricted by Spotify's API. Try a regular playlist instead.",
+                        ephemeral=True
+                    )
+                else:
+                    await interaction.followup.send("Failed to fetch from Spotify.", ephemeral=True)
                 return
-            if not tracks:
+            if not queries:
                 await interaction.followup.send("Couldn't find anything on Spotify for that link.")
                 return
 
-            if isinstance(tracks, wavelink.Playlist):
-                added = len(tracks)
-                for track in tracks:
+            added = 0
+            first_track = None
+            for q in queries:
+                results = await wavelink.Playable.search(q, source=wavelink.TrackSource.YouTube)
+                if results:
+                    track = results[0]
                     await player.queue.put_wait(track)
-                msg = f"Added **{added}** tracks from **{tracks.name}** to the queue."
-            else:
-                track = tracks[0]
-                await player.queue.put_wait(track)
-                msg = f"Added **{track.title}** to the queue."
+                    added += 1
+                    if first_track is None:
+                        first_track = track
 
-            if not player.playing:
+            if not player.playing and first_track:
                 await player.play(player.queue.get())
+
+            msg = f"Added **{added}** track(s) from Spotify to the queue."
 
         else:
             tracks = await wavelink.Playable.search(query, source=wavelink.TrackSource.YouTube)
