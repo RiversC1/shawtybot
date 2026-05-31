@@ -80,7 +80,7 @@ class Birthday(commands.Cog):
                     channel = guild.get_channel(channel_id)
                     if channel:
                         await channel.send(
-                            f"🎂 Happy Birthday {member.mention}! Wishing you an amazing day! 🎉"
+                            f"SQUEAK Happy birthday {member.mention}! Have an amazing day. Best wishes from the rivers casita ❤️"
                         )
 
             if birthday_role:
