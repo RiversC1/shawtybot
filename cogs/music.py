@@ -15,12 +15,15 @@ log = logging.getLogger("bot")
 
 SPOTIFY_URL_RE = re.compile(r"https?://open\.spotify\.com/(track|playlist|album)/([A-Za-z0-9]+)")
 
+_COOKIES = "/home/ubuntu/shawtybot/cookies.txt"
+
 YDL_OPTS = {
     "format": "bestaudio[ext=webm]/bestaudio/best",
     "noplaylist": True,
     "quiet": True,
     "no_warnings": True,
     "default_search": "ytsearch",
+    **({"cookiefile": _COOKIES} if os.path.exists(_COOKIES) else {}),
 }
 
 FFMPEG_OPTS = {
