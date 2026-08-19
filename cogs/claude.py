@@ -27,7 +27,7 @@ class Claude(commands.Cog):
         try:
             response = await self.client.messages.create(
                 model="claude-opus-5",
-                max_tokens=1024,
+                max_tokens=4096,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt}],
             )
