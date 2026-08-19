@@ -1,7 +1,7 @@
 discord.py[voice]
 python-dotenv
 spotipy
-wavelink
+yt-dlp
 syncedlyrics
 watchfiles
 anthropic
