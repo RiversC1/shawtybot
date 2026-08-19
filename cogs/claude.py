@@ -32,6 +32,8 @@ class Claude(commands.Cog):
                 messages=[{"role": "user", "content": prompt}],
             )
 
+            log.info(f"Claude stop_reason={response.stop_reason} blocks={[b.type for b in response.content]}")
+
             answer = "".join(
                 block.text for block in response.content if block.type == "text"
             ).strip()
