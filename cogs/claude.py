@@ -32,9 +32,13 @@ class Claude(commands.Cog):
                 messages=[{"role": "user", "content": prompt}],
             )
 
-            answer = next(
-                (block.text for block in response.content if block.type == "text"), ""
-            )
+            answer = "".join(
+                block.text for block in response.content if block.type == "text"
+            ).strip()
+
+            if not answer:
+                await interaction.followup.send("I couldn't generate a response. Please try again.", ephemeral=True)
+                return
 
             # Discord message limit is 2000 chars
             if len(answer) > 1990:
