@@ -23,7 +23,6 @@ YDL_OPTS = {
     "quiet": True,
     "no_warnings": True,
     "default_search": "ytsearch",
-    "extractor_args": {"youtube": {"player_client": ["ios"]}},
     **({"cookiefile": _COOKIES} if os.path.exists(_COOKIES) else {}),
 }
 
