@@ -18,11 +18,12 @@ SPOTIFY_URL_RE = re.compile(r"https?://open\.spotify\.com/(track|playlist|album)
 _COOKIES = "/home/ubuntu/shawtybot/cookies.txt"
 
 YDL_OPTS = {
-    "format": "bestaudio[ext=webm]/bestaudio/best",
+    "format": "bestaudio/best",
     "noplaylist": True,
     "quiet": True,
     "no_warnings": True,
     "default_search": "ytsearch",
+    "extractor_args": {"youtube": {"player_client": ["ios"]}},
     **({"cookiefile": _COOKIES} if os.path.exists(_COOKIES) else {}),
 }
 
