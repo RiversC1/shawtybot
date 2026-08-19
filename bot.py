@@ -38,7 +38,7 @@ async def hi(interaction: discord.Interaction):
 
 async def main():
     async with bot:
-        for cog in ["cogs.music", "cogs.roles", "cogs.fun", "cogs.birthday", "cogs.gw2"]:
+        for cog in ["cogs.music", "cogs.roles", "cogs.fun", "cogs.birthday", "cogs.gw2", "cogs.claude"]:
             try:
                 await bot.load_extension(cog)
                 log.info(f"Loaded {cog}")

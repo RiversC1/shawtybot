@@ -4,3 +4,4 @@ spotipy
 wavelink
 syncedlyrics
 watchfiles
+anthropic
