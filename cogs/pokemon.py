@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+import aiohttp
 import sqlite3
 import json
 import os
@@ -22,11 +23,19 @@ STARTERS = [
     "Chimchar", "Turtwig", "Piplup",
 ]
 
+# Base catch rates before rarity/summoner adjustments. Master Ball always succeeds.
 BALLS = {
-    "pokeball": {"label": "Poké Ball", "catch_rate": 0.50},
-    "greatball": {"label": "Great Ball", "catch_rate": 0.65},
+    "pokeball": {"label": "Poké Ball", "catch_rate": 0.45},
+    "greatball": {"label": "Great Ball", "catch_rate": 0.60},
     "ultraball": {"label": "Ultra Ball", "catch_rate": 0.80},
     "masterball": {"label": "Master Ball", "catch_rate": 1.00},
+}
+
+BALL_SPRITES = {
+    "pokeball": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png",
+    "greatball": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/great-ball.png",
+    "ultraball": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ultra-ball.png",
+    "masterball": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png",
 }
 
 TYPE_EMOJIS = {
@@ -38,8 +47,15 @@ TYPE_EMOJIS = {
 
 SPAWN_LIMIT = 10
 SPAWN_WINDOW = timedelta(hours=5)
+SPAWN_FLEE_AFTER = timedelta(minutes=10)
 RANDOM_SPAWN_MIN_SECONDS = 60 * 60       # 1 hour
 RANDOM_SPAWN_MAX_SECONDS = 3 * 60 * 60   # 3 hours
+
+# Non-master balls are multiplied by this against legendary/mythical Pokémon,
+# so a handful of Poké Balls won't realistically land one.
+LEGENDARY_PENALTY = 0.15
+# The trainer who summoned the spawn (via /poke spawn-daily) gets a slight edge.
+SUMMONER_BONUS = 1.3
 
 
 def load_pokedex() -> dict[int, dict]:
@@ -57,61 +73,151 @@ def format_types(types: list[str]) -> str:
     return " / ".join(f"{TYPE_EMOJIS.get(t, '')} {t.capitalize()}".strip() for t in types)
 
 
-class BallSelect(discord.ui.Select):
-    def __init__(self, options: list[discord.SelectOption]):
-        super().__init__(placeholder="Choose a ball to throw...", options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        view: "BallSelectView" = self.view
-        await view.handle_choice(interaction, self.values[0])
+def is_rare(mon: dict) -> bool:
+    return bool(mon.get("is_legendary") or mon.get("is_mythical"))
 
 
-class BallSelectView(discord.ui.View):
-    def __init__(self, cog: "Pokemon", catcher_id: int, mon: dict, spawn_view: "SpawnView", items: dict[str, int]):
-        super().__init__(timeout=60)
+def build_catch_panel_embed(cog: "Pokemon", mon: dict, items: dict[str, int], catcher_id: int,
+                             spawner_id: int | None, expires_at: datetime, result_line: str | None = None) -> discord.Embed:
+    rarity = "⭐ Legendary" if is_rare(mon) else "Standard"
+    owned = cog.count_owned(catcher_id, mon["id"])
+    collection_line = (
+        f"✨ You already have this species (x{owned})" if owned
+        else "✨ You don't have this species in your collection yet."
+    )
+
+    embed = discord.Embed(
+        title=f"Catch {mon['name']}",
+        description=(
+            "Choose a ball. Each valid throw consumes one, even if it misses.\n"
+            f"Flees <t:{int(expires_at.timestamp())}:R>."
+        ),
+        color=discord.Color.red(),
+    )
+    embed.add_field(name="Rarity", value=rarity, inline=True)
+    embed.add_field(name="Your Collection", value=collection_line, inline=False)
+    embed.add_field(
+        name="Your Balls",
+        value="\n".join(f"{BALLS[k]['label']}: **{items.get(k, 0)}**" for k in BALLS),
+        inline=False,
+    )
+    if spawner_id:
+        note = (
+            "You can catch it. As the summoner, you have a better chance of catching it than other trainers."
+            if catcher_id == spawner_id
+            else "This was summoned by another trainer, who has a slight catch advantage over you."
+        )
+        embed.add_field(name="Summoned Appearance", value=note, inline=False)
+    if result_line:
+        embed.add_field(name="Result", value=result_line, inline=False)
+    embed.set_thumbnail(url=mon.get("sprite") or mon.get("artwork"))
+    return embed
+
+
+class CatchPanelView(discord.ui.View):
+    def __init__(self, cog: "Pokemon", spawn_view: "SpawnView", catcher_id: int):
+        super().__init__(timeout=300)
         self.cog = cog
-        self.catcher_id = catcher_id
-        self.mon = mon
         self.spawn_view = spawn_view
+        self.catcher_id = catcher_id
+        self._build_buttons()
 
-        options = [
-            discord.SelectOption(label=f"{BALLS[key]['label']} ({qty})", value=key)
-            for key, qty in items.items()
-            if qty > 0 and key in BALLS
-        ]
-        self.add_item(BallSelect(options))
+    def _build_buttons(self):
+        self.clear_items()
+        items = self.cog.get_items(self.catcher_id)
+        locked = self.spawn_view.caught or self.spawn_view.fled
+        for key in BALLS:
+            qty = items.get(key, 0)
+            btn = discord.ui.Button(
+                label=f"{BALLS[key]['label']} ({qty})",
+                style=discord.ButtonStyle.secondary,
+                disabled=(qty <= 0 or locked),
+                emoji=self.cog.ball_emojis.get(key),
+                row=0,
+            )
+            btn.callback = self._throw_callback(key)
+            self.add_item(btn)
 
-    async def handle_choice(self, interaction: discord.Interaction, ball: str):
+        refresh = discord.ui.Button(label="Refresh", style=discord.ButtonStyle.grey, emoji="🔄", row=1)
+        refresh.callback = self._refresh
+        self.add_item(refresh)
+
+    def _throw_callback(self, ball_key: str):
+        async def callback(interaction: discord.Interaction):
+            await self._throw(interaction, ball_key)
+        return callback
+
+    async def _refresh(self, interaction: discord.Interaction):
+        items = self.cog.get_items(self.catcher_id)
+        self._build_buttons()
+        embed = build_catch_panel_embed(
+            self.cog, self.spawn_view.mon, items, self.catcher_id,
+            self.spawn_view.spawner_id, self.spawn_view.expires_at,
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def _throw(self, interaction: discord.Interaction, ball_key: str):
         if self.spawn_view.caught:
-            await interaction.response.edit_message(content="Someone already caught this Pokémon!", view=None)
+            await interaction.response.edit_message(
+                embed=discord.Embed(description="Someone already caught this Pokémon!", color=discord.Color.dark_grey()),
+                view=None,
+            )
+            return
+        if self.spawn_view.fled:
+            await interaction.response.edit_message(
+                embed=discord.Embed(description="This Pokémon already fled!", color=discord.Color.dark_grey()),
+                view=None,
+            )
             return
 
-        self.cog.add_item(self.catcher_id, ball, -1)
-        success = random.random() < BALLS[ball]["catch_rate"]
+        mon = self.spawn_view.mon
+        self.cog.add_item(self.catcher_id, ball_key, -1)
+        is_summoner = self.spawn_view.spawner_id == self.catcher_id
+        rate = self.cog.compute_catch_rate(ball_key, mon, is_summoner)
+        success = random.random() < rate
 
         if success:
             self.spawn_view.caught = True
-            self.cog.add_to_collection(self.catcher_id, self.mon["id"])
+            self.cog.add_to_collection(self.catcher_id, mon["id"])
             await self.spawn_view.mark_caught(interaction.user.display_name)
-            await interaction.response.edit_message(
-                content=f"Gotcha! **{self.mon['name']}** was caught with a {BALLS[ball]['label']}!",
-                view=None,
-            )
+            result = f"🎉 Gotcha! **{mon['name']}** was caught with a {BALLS[ball_key]['label']}!"
         else:
-            await interaction.response.edit_message(
-                content=f"Oh no! **{self.mon['name']}** broke free from the {BALLS[ball]['label']}. "
-                        f"Try again if it's still up for grabs!",
-                view=None,
-            )
+            result = f"The {mon['name']} broke free from the {BALLS[ball_key]['label']}!"
+
+        items = self.cog.get_items(self.catcher_id)
+        self._build_buttons()
+        embed = build_catch_panel_embed(
+            self.cog, mon, items, self.catcher_id, self.spawn_view.spawner_id,
+            self.spawn_view.expires_at, result_line=result,
+        )
+        await interaction.response.edit_message(embed=embed, view=None if success else self)
 
 
 class SpawnView(discord.ui.View):
-    def __init__(self, cog: "Pokemon", mon: dict):
-        super().__init__(timeout=None)
+    def __init__(self, cog: "Pokemon", mon: dict, spawner_id: int | None = None):
+        super().__init__(timeout=SPAWN_FLEE_AFTER.total_seconds())
         self.cog = cog
         self.mon = mon
+        self.spawner_id = spawner_id
         self.caught = False
+        self.fled = False
         self.message: discord.Message | None = None
+        self.expires_at = datetime.now(timezone.utc) + SPAWN_FLEE_AFTER
+
+    async def on_timeout(self):
+        if self.caught:
+            return
+        self.fled = True
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            embed = self.message.embeds[0]
+            embed.title = f"The wild {self.mon['name']} fled!"
+            embed.color = discord.Color.dark_grey()
+            try:
+                await self.message.edit(embed=embed, view=self)
+            except discord.HTTPException as e:
+                log.error(f"Failed to mark spawn as fled: {e}")
 
     async def mark_caught(self, catcher_name: str):
         self.caught = True
@@ -132,6 +238,9 @@ class SpawnView(discord.ui.View):
         if self.caught:
             await interaction.response.send_message("This Pokémon has already been caught!", ephemeral=True)
             return
+        if self.fled:
+            await interaction.response.send_message("This Pokémon already fled!", ephemeral=True)
+            return
 
         if not self.cog.get_trainer(interaction.user.id):
             await interaction.response.send_message(
@@ -146,8 +255,9 @@ class SpawnView(discord.ui.View):
             )
             return
 
-        view = BallSelectView(self.cog, interaction.user.id, self.mon, self, items)
-        await interaction.response.send_message("Which ball do you want to throw?", view=view, ephemeral=True)
+        panel = CatchPanelView(self.cog, self, interaction.user.id)
+        embed = build_catch_panel_embed(self.cog, self.mon, items, interaction.user.id, self.spawner_id, self.expires_at)
+        await interaction.response.send_message(embed=embed, view=panel, ephemeral=True)
 
 
 class StarterSelect(discord.ui.Select):
@@ -198,11 +308,12 @@ class Pokemon(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.pokedex = load_pokedex()
+        self.ball_emojis: dict[str, discord.Emoji] = {}
         self._init_db()
-        self.spawn_task = self.bot.loop.create_task(self._random_spawn_loop())
+        self.startup_task = self.bot.loop.create_task(self._startup())
 
     def cog_unload(self):
-        self.spawn_task.cancel()
+        self.startup_task.cancel()
 
     def _init_db(self):
         with sqlite3.connect(DB_PATH) as conn:
@@ -278,6 +389,24 @@ class Pokemon(commands.Cog):
                 (user_id, dex_id, datetime.now(timezone.utc).isoformat()),
             )
 
+    def count_owned(self, user_id: int, dex_id: int) -> int:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?",
+                (user_id, dex_id),
+            ).fetchone()
+        return row[0] if row else 0
+
+    def compute_catch_rate(self, ball_key: str, mon: dict, is_summoner: bool) -> float:
+        if ball_key == "masterball":
+            return 1.0
+        rate = BALLS[ball_key]["catch_rate"]
+        if is_rare(mon):
+            rate *= LEGENDARY_PENALTY
+        if is_summoner:
+            rate *= SUMMONER_BONUS
+        return min(rate, 1.0)
+
     def check_and_use_spawn(self, user_id: int) -> tuple[bool, int, datetime | None]:
         """Returns (allowed, remaining_after_use, reset_time_if_blocked)."""
         now = datetime.now(timezone.utc)
@@ -311,24 +440,55 @@ class Pokemon(commands.Cog):
             ).fetchall()
         return rows
 
+    # ---------- Emoji setup ----------
+
+    async def _ensure_ball_emojis(self):
+        guild_id = os.getenv("GUILD_ID")
+        if not guild_id:
+            log.warning("GUILD_ID not set — skipping ball emoji setup, buttons will show text only.")
+            return
+        guild = self.bot.get_guild(int(guild_id))
+        if not guild:
+            log.warning("Could not find guild for ball emoji setup.")
+            return
+
+        existing = {e.name: e for e in guild.emojis}
+        async with aiohttp.ClientSession() as session:
+            for key, url in BALL_SPRITES.items():
+                if key in existing:
+                    self.ball_emojis[key] = existing[key]
+                    continue
+                try:
+                    async with session.get(url) as resp:
+                        image_bytes = await resp.read()
+                    emoji = await guild.create_custom_emoji(name=key, image=image_bytes)
+                    self.ball_emojis[key] = emoji
+                    log.info(f"Created ball emoji :{key}:")
+                except discord.HTTPException as e:
+                    log.warning(f"Could not create emoji '{key}' (check Manage Emojis permission): {e}")
+
     # ---------- Embeds ----------
 
-    def build_spawn_embed(self, mon: dict, spawned_by: str) -> discord.Embed:
+    def build_spawn_embed(self, mon: dict, spawned_by: str, expires_at: datetime) -> discord.Embed:
+        rare = is_rare(mon)
         embed = discord.Embed(
             title=f"A wild {mon['name']} appeared!",
-            color=discord.Color.green(),
+            color=discord.Color.gold() if rare else discord.Color.green(),
         )
         embed.add_field(name="Pokédex #", value=f"#{mon['id']:03}", inline=True)
         embed.add_field(name="Type", value=format_types(mon["types"]), inline=True)
         embed.add_field(name="Category", value=mon["category"], inline=True)
+        embed.add_field(name="Rarity", value="⭐ Legendary" if rare else "Standard", inline=True)
+        embed.add_field(name="Flees", value=f"<t:{int(expires_at.timestamp())}:R>", inline=True)
         embed.set_image(url=mon["artwork"] or mon["sprite"])
         embed.set_footer(text=f"Spawned by {spawned_by}")
         return embed
 
-    # ---------- Background random spawns ----------
+    # ---------- Background tasks ----------
 
-    async def _random_spawn_loop(self):
+    async def _startup(self):
         await self.bot.wait_until_ready()
+        await self._ensure_ball_emojis()
         while not self.bot.is_closed():
             wait_seconds = random.randint(RANDOM_SPAWN_MIN_SECONDS, RANDOM_SPAWN_MAX_SECONDS)
             await asyncio.sleep(wait_seconds)
@@ -348,8 +508,8 @@ class Pokemon(commands.Cog):
             if not channel:
                 continue
             mon = random.choice(list(self.pokedex.values()))
-            embed = self.build_spawn_embed(mon, spawned_by=self.bot.user.mention)
-            view = SpawnView(self, mon)
+            view = SpawnView(self, mon, spawner_id=None)
+            embed = self.build_spawn_embed(mon, spawned_by=self.bot.user.mention, expires_at=view.expires_at)
             try:
                 msg = await channel.send(embed=embed, view=view)
                 view.message = msg
@@ -387,8 +547,8 @@ class Pokemon(commands.Cog):
             return
 
         mon = random.choice(list(self.pokedex.values()))
-        embed = self.build_spawn_embed(mon, spawned_by=interaction.user.mention)
-        view = SpawnView(self, mon)
+        view = SpawnView(self, mon, spawner_id=interaction.user.id)
+        embed = self.build_spawn_embed(mon, spawned_by=interaction.user.mention, expires_at=view.expires_at)
         await interaction.response.send_message(embed=embed, view=view)
         view.message = await interaction.original_response()
         await interaction.followup.send(f"({remaining} spawns left in this 5-hour window)", ephemeral=True)
