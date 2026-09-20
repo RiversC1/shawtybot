@@ -478,6 +478,7 @@ class Pokemon(commands.Cog):
         rare = is_rare(mon)
         embed = discord.Embed(
             title=f"A wild {mon['name']} appeared!",
+            description=f"Spawned by {spawned_by}",
             color=discord.Color.gold() if rare else discord.Color.green(),
         )
         embed.add_field(name="Pokédex #", value=f"#{mon['id']:03}", inline=True)
@@ -486,7 +487,6 @@ class Pokemon(commands.Cog):
         embed.add_field(name="Rarity", value="⭐ Legendary" if rare else "Standard", inline=True)
         embed.add_field(name="Flees", value=f"<t:{int(expires_at.timestamp())}:R>", inline=True)
         embed.set_image(url=mon["artwork"] or mon["sprite"])
-        embed.set_footer(text=f"Spawned by {spawned_by}")
         return embed
 
     # ---------- Background tasks ----------
