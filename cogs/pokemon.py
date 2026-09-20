@@ -25,9 +25,9 @@ STARTERS = [
 
 # Base catch rates before rarity/summoner adjustments. Master Ball always succeeds.
 BALLS = {
-    "pokeball": {"label": "Poké Ball", "catch_rate": 0.35},
-    "greatball": {"label": "Great Ball", "catch_rate": 0.55},
-    "ultraball": {"label": "Ultra Ball", "catch_rate": 0.75},
+    "pokeball": {"label": "Poké Ball", "catch_rate": 0.30},
+    "greatball": {"label": "Great Ball", "catch_rate": 0.45},
+    "ultraball": {"label": "Ultra Ball", "catch_rate": 0.65},
     "masterball": {"label": "Master Ball", "catch_rate": 1.00},
 }
 
@@ -75,6 +75,9 @@ SPAWN_WINDOW = timedelta(hours=5)
 SPAWN_FLEE_AFTER = timedelta(minutes=10)
 RANDOM_SPAWN_INTERVAL_SECONDS = 10 * 60  # 10 minutes
 
+# Legendary/mythical species get this spawn weight vs. 1.0 for everything else,
+# so they show up far less often (roughly ~1% of spawns instead of ~7%).
+LEGENDARY_SPAWN_WEIGHT = 0.15
 # Non-master balls are multiplied by this against legendary/mythical Pokémon,
 # so a handful of Poké Balls won't realistically land one.
 LEGENDARY_PENALTY = 0.15
@@ -103,7 +106,7 @@ COFFERS = {
         "color": discord.Color.gold(),
         "image": "https://archives.bulbagarden.net/media/upload/0/06/SugimoriGreatBall.png",
         "interval_seconds": 30 * 60,
-        "rewards": {"greatball": (2, 4), "ultraball": (1, 2), "candy": (2, 4), "coin": (15, 25)},
+        "rewards": {"pokeball": (5, 10), "greatball": (2, 4), "ultraball": (1, 2), "candy": (2, 4), "coin": (15, 25)},
         "masterball_chance": 0.0,
     },
     "diamond": {
@@ -111,7 +114,7 @@ COFFERS = {
         "color": discord.Color.blue(),
         "image": "https://archives.bulbagarden.net/media/upload/2/26/SugimoriUltraBall.png",
         "interval_seconds": 60 * 60,
-        "rewards": {"ultraball": (2, 4), "candy": (3, 6), "coin": (30, 50)},
+        "rewards": {"pokeball": (8, 15), "ultraball": (2, 4), "candy": (3, 6), "coin": (30, 50)},
         "masterball_chance": 0.15,
     },
 }
@@ -166,9 +169,12 @@ def format_evolution_line(mon: dict, pokedex: dict[int, dict]) -> str | None:
 
 
 def roll_spawn_mon(pokedex: dict[int, dict]) -> dict:
-    """Pick a random species and roll whether this particular spawn is shiny.
-    Returns a shallow copy so the shared pokedex entries are never mutated."""
-    base = random.choice(list(pokedex.values()))
+    """Pick a random species (legendaries/mythicals are much rarer) and roll
+    whether this particular spawn is shiny. Returns a shallow copy so the
+    shared pokedex entries are never mutated."""
+    population = list(pokedex.values())
+    weights = [LEGENDARY_SPAWN_WEIGHT if is_rare(p) else 1.0 for p in population]
+    base = random.choices(population, weights=weights, k=1)[0]
     mon = dict(base)
     mon["is_shiny"] = random.random() < SHINY_CHANCE
     return mon
