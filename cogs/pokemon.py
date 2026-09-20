@@ -431,13 +431,6 @@ class CofferView(discord.ui.View):
             f"You opened the {COFFERS[self.coffer_key]['label']} and got: " + ", ".join(reward_lines),
             ephemeral=True,
         )
-        if interaction.channel:
-            try:
-                await interaction.channel.send(
-                    f"{interaction.user.mention} claimed the **{COFFERS[self.coffer_key]['label']}**!"
-                )
-            except discord.HTTPException as e:
-                log.error(f"Failed to announce coffer claim: {e}")
 
 
 class StarterSelect(discord.ui.Select):
