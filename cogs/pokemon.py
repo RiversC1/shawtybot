@@ -79,8 +79,9 @@ RANDOM_SPAWN_INTERVAL_SECONDS = 10 * 60  # 10 minutes
 # so they show up far less often (roughly ~1% of spawns instead of ~7%).
 LEGENDARY_SPAWN_WEIGHT = 0.15
 # Non-master balls are multiplied by this against legendary/mythical Pokémon,
-# so a handful of Poké Balls won't realistically land one.
-LEGENDARY_PENALTY = 0.15
+# so a handful of Poké Balls won't realistically land one — Master Ball is by
+# far the reliable way to catch one.
+LEGENDARY_PENALTY = 0.08
 # The trainer who summoned the spawn (via /poke spawn-daily) gets a slight edge.
 SUMMONER_BONUS = 1.3
 # Odds that any given spawn is shiny — intentionally very rare.
