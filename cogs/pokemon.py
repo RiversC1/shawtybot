@@ -174,11 +174,14 @@ def roll_coffer_rewards(coffer_key: str) -> dict[str, int]:
     return rewards
 
 
-def build_coffer_embed(coffer_key: str) -> discord.Embed:
+def build_coffer_embed(coffer_key: str, expires_at: datetime) -> discord.Embed:
     cfg = COFFERS[coffer_key]
     embed = discord.Embed(
         title=f"A {cfg['label']} appeared!",
-        description="Click the button below to claim it before someone else does!",
+        description=(
+            "Click the button below to claim the coffer before it despawns "
+            f"<t:{int(expires_at.timestamp())}:R>."
+        ),
         color=cfg["color"],
     )
     embed.set_image(url=cfg["image"])
@@ -944,7 +947,7 @@ class Pokemon(commands.Cog):
             if not channel:
                 continue
             view = CofferView(self, coffer_key)
-            embed = build_coffer_embed(coffer_key)
+            embed = build_coffer_embed(coffer_key, view.expires_at)
             try:
                 msg = await channel.send(embed=embed, view=view)
                 view.message = msg
