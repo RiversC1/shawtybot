@@ -304,6 +304,7 @@ class SpawnView(discord.ui.View):
             embed.color = discord.Color.dark_grey()
             try:
                 await self.message.edit(embed=embed, view=self)
+                self.cog.untrack_spawn(self.message.id)
             except discord.HTTPException as e:
                 log.error(f"Failed to mark spawn as fled: {e}")
 
@@ -318,6 +319,7 @@ class SpawnView(discord.ui.View):
             embed.set_footer(text=f"Caught by {catcher_name}")
             try:
                 await self.message.edit(embed=embed, view=self)
+                self.cog.untrack_spawn(self.message.id)
                 await self.message.channel.send(
                     f"{catcher_mention} caught **{self.mon['name']}** with a {ball_label}!"
                 )
@@ -358,6 +360,7 @@ class CofferView(discord.ui.View):
         self.coffer_key = coffer_key
         self.claimed_by: set[int] = set()
         self.message: discord.Message | None = None
+        self.expires_at = datetime.now(timezone.utc) + timedelta(seconds=COFFER_EXPIRE_SECONDS)
 
     async def on_timeout(self):
         for child in self.children:
@@ -368,6 +371,7 @@ class CofferView(discord.ui.View):
             embed.color = discord.Color.dark_grey()
             try:
                 await self.message.edit(embed=embed, view=self)
+                self.cog.untrack_coffer(self.message.id)
             except discord.HTTPException as e:
                 log.error(f"Failed to mark coffer as vanished: {e}")
 
@@ -463,6 +467,7 @@ class Pokemon(commands.Cog):
         self._init_db()
         self.tasks = [
             self.bot.loop.create_task(self._startup()),
+            self.bot.loop.create_task(self._sweep_loop()),
         ]
         for coffer_key, cfg in COFFERS.items():
             self.tasks.append(
@@ -510,6 +515,25 @@ class Pokemon(commands.Cog):
                 CREATE TABLE IF NOT EXISTS poke_settings (
                     guild_id INTEGER PRIMARY KEY,
                     channel_id INTEGER
+                )
+            """)
+            # Tracks currently-live spawn/coffer cards so a bot restart doesn't leave
+            # a stale, still-clickable button behind — see _sweep_expired().
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_active_spawns (
+                    message_id INTEGER PRIMARY KEY,
+                    channel_id INTEGER NOT NULL,
+                    dex_id INTEGER NOT NULL,
+                    is_shiny INTEGER NOT NULL DEFAULT 0,
+                    expires_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_active_coffers (
+                    message_id INTEGER PRIMARY KEY,
+                    channel_id INTEGER NOT NULL,
+                    coffer_key TEXT NOT NULL,
+                    expires_at TEXT NOT NULL
                 )
             """)
             # Migration for DBs created before is_shiny existed
@@ -611,6 +635,32 @@ class Pokemon(commands.Cog):
             ).fetchall()
         return rows
 
+    # ---------- Active spawn/coffer tracking (for restart recovery) ----------
+
+    def track_spawn(self, message_id: int, channel_id: int, dex_id: int, is_shiny: bool, expires_at: datetime):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO poke_active_spawns "
+                "(message_id, channel_id, dex_id, is_shiny, expires_at) VALUES (?, ?, ?, ?, ?)",
+                (message_id, channel_id, dex_id, int(is_shiny), expires_at.isoformat()),
+            )
+
+    def untrack_spawn(self, message_id: int):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("DELETE FROM poke_active_spawns WHERE message_id = ?", (message_id,))
+
+    def track_coffer(self, message_id: int, channel_id: int, coffer_key: str, expires_at: datetime):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO poke_active_coffers "
+                "(message_id, channel_id, coffer_key, expires_at) VALUES (?, ?, ?, ?)",
+                (message_id, channel_id, coffer_key, expires_at.isoformat()),
+            )
+
+    def untrack_coffer(self, message_id: int):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("DELETE FROM poke_active_coffers WHERE message_id = ?", (message_id,))
+
     # ---------- Emoji setup ----------
 
     async def _ensure_ball_emojis(self):
@@ -665,6 +715,10 @@ class Pokemon(commands.Cog):
     async def _startup(self):
         await self.bot.wait_until_ready()
         await self._ensure_ball_emojis()
+        try:
+            await self._sweep_expired()
+        except Exception as e:
+            log.error(f"Startup sweep failed: {e}", exc_info=True)
         while not self.bot.is_closed():
             wait_seconds = random.randint(RANDOM_SPAWN_MIN_SECONDS, RANDOM_SPAWN_MAX_SECONDS)
             await asyncio.sleep(wait_seconds)
@@ -681,6 +735,86 @@ class Pokemon(commands.Cog):
                 await self._spawn_coffer(coffer_key)
             except Exception as e:
                 log.error(f"Coffer spawn failed ({coffer_key}): {e}", exc_info=True)
+
+    async def _sweep_loop(self):
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            await asyncio.sleep(60)
+            try:
+                await self._sweep_expired()
+            except Exception as e:
+                log.error(f"Sweep failed: {e}", exc_info=True)
+
+    async def _sweep_expired(self):
+        """Catches up on any spawn/coffer whose flee/expiry timer elapsed while the
+        bot was offline (e.g. a redeploy) — discord.py's View.on_timeout only fires
+        for views still alive in memory, so a restart otherwise leaves the button
+        looking clickable forever."""
+        now = datetime.now(timezone.utc)
+
+        with sqlite3.connect(DB_PATH) as conn:
+            spawn_rows = conn.execute(
+                "SELECT message_id, channel_id, dex_id, is_shiny, expires_at FROM poke_active_spawns"
+            ).fetchall()
+            coffer_rows = conn.execute(
+                "SELECT message_id, channel_id, coffer_key, expires_at FROM poke_active_coffers"
+            ).fetchall()
+
+        for message_id, channel_id, dex_id, is_shiny, expires_at_str in spawn_rows:
+            if now < datetime.fromisoformat(expires_at_str):
+                continue
+            mon = dict(self.pokedex.get(dex_id, {"name": "Pokémon"}))
+            mon["is_shiny"] = bool(is_shiny)
+            await self._resolve_stale_spawn(channel_id, message_id, mon)
+            self.untrack_spawn(message_id)
+
+        for message_id, channel_id, coffer_key, expires_at_str in coffer_rows:
+            if now < datetime.fromisoformat(expires_at_str):
+                continue
+            await self._resolve_stale_coffer(channel_id, message_id, coffer_key)
+            self.untrack_coffer(message_id)
+
+    async def _resolve_stale_spawn(self, channel_id: int, message_id: int, mon: dict):
+        channel = self.bot.get_channel(channel_id)
+        if not channel:
+            return
+        try:
+            msg = await channel.fetch_message(message_id)
+        except discord.HTTPException:
+            return
+        if not msg.embeds:
+            return
+        embed = msg.embeds[0]
+        embed.title = f"The wild {spawn_title_prefix(mon)}{mon.get('name', 'Pokémon')} fled!"
+        embed.color = discord.Color.dark_grey()
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label="Catch!", style=discord.ButtonStyle.secondary, disabled=True, emoji="🎯"))
+        try:
+            await msg.edit(embed=embed, view=view)
+            log.info(f"Swept stale spawn {message_id} ({mon.get('name')})")
+        except discord.HTTPException as e:
+            log.error(f"Failed to sweep stale spawn {message_id}: {e}")
+
+    async def _resolve_stale_coffer(self, channel_id: int, message_id: int, coffer_key: str):
+        channel = self.bot.get_channel(channel_id)
+        if not channel:
+            return
+        try:
+            msg = await channel.fetch_message(message_id)
+        except discord.HTTPException:
+            return
+        if not msg.embeds:
+            return
+        embed = msg.embeds[0]
+        embed.title = f"The {COFFERS[coffer_key]['label']} vanished!"
+        embed.color = discord.Color.dark_grey()
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(label="Claim Coffer", style=discord.ButtonStyle.secondary, disabled=True, emoji="🗝️"))
+        try:
+            await msg.edit(embed=embed, view=view)
+            log.info(f"Swept stale coffer {message_id} ({coffer_key})")
+        except discord.HTTPException as e:
+            log.error(f"Failed to sweep stale coffer {message_id}: {e}")
 
     def _spawn_channels(self) -> list[int]:
         with sqlite3.connect(DB_PATH) as conn:
@@ -700,6 +834,7 @@ class Pokemon(commands.Cog):
             try:
                 msg = await channel.send(embed=embed, view=view)
                 view.message = msg
+                self.track_spawn(msg.id, msg.channel.id, mon["id"], mon["is_shiny"], view.expires_at)
                 log.info(f"Random spawn: {mon['name']}{' (shiny)' if mon['is_shiny'] else ''} in #{channel}")
             except discord.HTTPException as e:
                 log.error(f"Failed to spawn Pokémon in channel {channel_id}: {e}")
@@ -714,6 +849,7 @@ class Pokemon(commands.Cog):
             try:
                 msg = await channel.send(embed=embed, view=view)
                 view.message = msg
+                self.track_coffer(msg.id, msg.channel.id, coffer_key, view.expires_at)
                 log.info(f"Spawned {coffer_key} coffer in #{channel}")
             except discord.HTTPException as e:
                 log.error(f"Failed to spawn {coffer_key} coffer in channel {channel_id}: {e}")
@@ -752,6 +888,7 @@ class Pokemon(commands.Cog):
         embed = self.build_spawn_embed(mon, spawned_by=interaction.user.mention, expires_at=view.expires_at)
         await interaction.response.send_message(embed=embed, view=view)
         view.message = await interaction.original_response()
+        self.track_spawn(view.message.id, view.message.channel.id, mon["id"], mon["is_shiny"], view.expires_at)
         await interaction.followup.send(f"({remaining} spawns left in this 5-hour window)", ephemeral=True)
 
     @poke.command(name="setchannel", description="Set the channel for random Pokémon and coffer spawns")
