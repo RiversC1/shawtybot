@@ -25,9 +25,9 @@ STARTERS = [
 
 # Base catch rates before rarity/summoner adjustments. Master Ball always succeeds.
 BALLS = {
-    "pokeball": {"label": "Poké Ball", "catch_rate": 0.45},
-    "greatball": {"label": "Great Ball", "catch_rate": 0.60},
-    "ultraball": {"label": "Ultra Ball", "catch_rate": 0.80},
+    "pokeball": {"label": "Poké Ball", "catch_rate": 0.35},
+    "greatball": {"label": "Great Ball", "catch_rate": 0.55},
+    "ultraball": {"label": "Ultra Ball", "catch_rate": 0.75},
     "masterball": {"label": "Master Ball", "catch_rate": 1.00},
 }
 
@@ -382,9 +382,9 @@ class Pokemon(commands.Cog):
     def add_item(self, user_id: int, item: str, delta: int):
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
-                "INSERT INTO poke_items (user_id, item, qty) VALUES (?, ?, ?) "
-                "ON CONFLICT(user_id, item) DO UPDATE SET qty = MAX(qty + excluded.qty, 0)",
-                (user_id, item, max(delta, 0)),
+                "INSERT INTO poke_items (user_id, item, qty) VALUES (?, ?, MAX(?, 0)) "
+                "ON CONFLICT(user_id, item) DO UPDATE SET qty = MAX(qty + ?, 0)",
+                (user_id, item, delta, delta),
             )
 
     def add_to_collection(self, user_id: int, dex_id: int):
