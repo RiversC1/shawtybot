@@ -179,7 +179,9 @@ class CatchPanelView(discord.ui.View):
         if success:
             self.spawn_view.caught = True
             self.cog.add_to_collection(self.catcher_id, mon["id"])
-            await self.spawn_view.mark_caught(interaction.user.display_name)
+            await self.spawn_view.mark_caught(
+                interaction.user.display_name, interaction.user.mention, BALLS[ball_key]["label"]
+            )
             result = f"🎉 Gotcha! **{mon['name']}** was caught with a {BALLS[ball_key]['label']}!"
         else:
             result = f"The {mon['name']} broke free from the {BALLS[ball_key]['label']}!"
@@ -219,7 +221,7 @@ class SpawnView(discord.ui.View):
             except discord.HTTPException as e:
                 log.error(f"Failed to mark spawn as fled: {e}")
 
-    async def mark_caught(self, catcher_name: str):
+    async def mark_caught(self, catcher_name: str, catcher_mention: str, ball_label: str):
         self.caught = True
         for child in self.children:
             child.disabled = True
@@ -230,6 +232,9 @@ class SpawnView(discord.ui.View):
             embed.set_footer(text=f"Caught by {catcher_name}")
             try:
                 await self.message.edit(embed=embed, view=self)
+                await self.message.channel.send(
+                    f"{catcher_mention} caught **{self.mon['name']}** with a {ball_label}!"
+                )
             except discord.HTTPException as e:
                 log.error(f"Failed to update caught spawn message: {e}")
 
