@@ -38,6 +38,9 @@ BALL_SPRITES = {
     "masterball": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png",
 }
 
+ITEM_LABELS = {key: v["label"] for key, v in BALLS.items()}
+ITEM_LABELS["candy"] = "Rare Candy"
+
 TYPE_EMOJIS = {
     "normal": "⚪", "fire": "🔥", "water": "💧", "grass": "🌿", "electric": "⚡",
     "ice": "❄️", "fighting": "🥊", "poison": "☠️", "ground": "🌍", "flying": "🕊️",
@@ -56,6 +59,39 @@ RANDOM_SPAWN_MAX_SECONDS = 3 * 60 * 60   # 3 hours
 LEGENDARY_PENALTY = 0.15
 # The trainer who summoned the spawn (via /poke spawn-daily) gets a slight edge.
 SUMMONER_BONUS = 1.3
+# Odds that any given spawn is shiny — intentionally very rare.
+SHINY_CHANCE = 1 / 200
+
+# ---------- Coffers ----------
+
+COFFER_EXPIRE_SECONDS = 15 * 60  # unclaimed coffers vanish after 15 minutes
+
+COFFERS = {
+    "silver": {
+        "label": "Silver Coffer",
+        "color": discord.Color.light_grey(),
+        "image": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f948.png",
+        "interval_seconds": 30 * 60,
+        "rewards": {"pokeball": (3, 6), "candy": (1, 2)},
+        "masterball_chance": 0.0,
+    },
+    "golden": {
+        "label": "Golden Coffer",
+        "color": discord.Color.gold(),
+        "image": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f947.png",
+        "interval_seconds": 60 * 60,
+        "rewards": {"greatball": (2, 4), "ultraball": (1, 2), "candy": (2, 4)},
+        "masterball_chance": 0.0,
+    },
+    "diamond": {
+        "label": "Diamond Coffer",
+        "color": discord.Color.blue(),
+        "image": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f48e.png",
+        "interval_seconds": 2 * 60 * 60,
+        "rewards": {"ultraball": (2, 4), "candy": (3, 6)},
+        "masterball_chance": 0.15,
+    },
+}
 
 
 def load_pokedex() -> dict[int, dict]:
@@ -73,8 +109,58 @@ def format_types(types: list[str]) -> str:
     return " / ".join(f"{TYPE_EMOJIS.get(t, '')} {t.capitalize()}".strip() for t in types)
 
 
+def format_abilities(abilities: list[dict]) -> str:
+    if not abilities:
+        return "Unknown"
+    parts = []
+    for a in abilities:
+        name = a["name"].replace("-", " ").title()
+        if a.get("is_hidden"):
+            name += " (Hidden)"
+        parts.append(name)
+    return ", ".join(parts)
+
+
 def is_rare(mon: dict) -> bool:
     return bool(mon.get("is_legendary") or mon.get("is_mythical"))
+
+
+def roll_spawn_mon(pokedex: dict[int, dict]) -> dict:
+    """Pick a random species and roll whether this particular spawn is shiny.
+    Returns a shallow copy so the shared pokedex entries are never mutated."""
+    base = random.choice(list(pokedex.values()))
+    mon = dict(base)
+    mon["is_shiny"] = random.random() < SHINY_CHANCE
+    return mon
+
+
+def spawn_title_prefix(mon: dict) -> str:
+    return "✨ " if mon.get("is_shiny") else ""
+
+
+def spawn_image_url(mon: dict) -> str | None:
+    if mon.get("is_shiny"):
+        return mon.get("artwork_shiny") or mon.get("sprite_shiny") or mon.get("artwork") or mon.get("sprite")
+    return mon.get("artwork") or mon.get("sprite")
+
+
+def roll_coffer_rewards(coffer_key: str) -> dict[str, int]:
+    config = COFFERS[coffer_key]
+    rewards = {item: random.randint(lo, hi) for item, (lo, hi) in config["rewards"].items()}
+    if config["masterball_chance"] > 0 and random.random() < config["masterball_chance"]:
+        rewards["masterball"] = rewards.get("masterball", 0) + 1
+    return rewards
+
+
+def build_coffer_embed(coffer_key: str) -> discord.Embed:
+    cfg = COFFERS[coffer_key]
+    embed = discord.Embed(
+        title=f"A {cfg['label']} appeared!",
+        description="Click the button below to claim it before someone else does!",
+        color=cfg["color"],
+    )
+    embed.set_image(url=cfg["image"])
+    return embed
 
 
 def build_catch_panel_embed(cog: "Pokemon", mon: dict, items: dict[str, int], catcher_id: int,
@@ -87,7 +173,7 @@ def build_catch_panel_embed(cog: "Pokemon", mon: dict, items: dict[str, int], ca
     )
 
     embed = discord.Embed(
-        title=f"Catch {mon['name']}",
+        title=f"Catch {spawn_title_prefix(mon)}{mon['name']}",
         description=(
             "Choose a ball. Each valid throw consumes one, even if it misses.\n"
             f"Flees <t:{int(expires_at.timestamp())}:R>."
@@ -178,7 +264,7 @@ class CatchPanelView(discord.ui.View):
 
         if success:
             self.spawn_view.caught = True
-            self.cog.add_to_collection(self.catcher_id, mon["id"])
+            self.cog.add_to_collection(self.catcher_id, mon["id"], is_shiny=mon.get("is_shiny", False))
             await self.spawn_view.mark_caught(
                 interaction.user.display_name, interaction.user.mention, BALLS[ball_key]["label"]
             )
@@ -214,7 +300,7 @@ class SpawnView(discord.ui.View):
             child.disabled = True
         if self.message:
             embed = self.message.embeds[0]
-            embed.title = f"The wild {self.mon['name']} fled!"
+            embed.title = f"The wild {spawn_title_prefix(self.mon)}{self.mon['name']} fled!"
             embed.color = discord.Color.dark_grey()
             try:
                 await self.message.edit(embed=embed, view=self)
@@ -227,7 +313,7 @@ class SpawnView(discord.ui.View):
             child.disabled = True
         if self.message:
             embed = self.message.embeds[0]
-            embed.title = f"{self.mon['name']} was caught!"
+            embed.title = f"{spawn_title_prefix(self.mon)}{self.mon['name']} was caught!"
             embed.color = discord.Color.blurple()
             embed.set_footer(text=f"Caught by {catcher_name}")
             try:
@@ -249,7 +335,7 @@ class SpawnView(discord.ui.View):
 
         if not self.cog.get_trainer(interaction.user.id):
             await interaction.response.send_message(
-                "You need a starter Pokémon first! Use `/poke start`.", ephemeral=True
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
             )
             return
 
@@ -263,6 +349,72 @@ class SpawnView(discord.ui.View):
         panel = CatchPanelView(self.cog, self, interaction.user.id)
         embed = build_catch_panel_embed(self.cog, self.mon, items, interaction.user.id, self.spawner_id, self.expires_at)
         await interaction.response.send_message(embed=embed, view=panel, ephemeral=True)
+
+
+class CofferView(discord.ui.View):
+    def __init__(self, cog: "Pokemon", coffer_key: str):
+        super().__init__(timeout=COFFER_EXPIRE_SECONDS)
+        self.cog = cog
+        self.coffer_key = coffer_key
+        self.claimed = False
+        self.message: discord.Message | None = None
+
+    async def on_timeout(self):
+        if self.claimed:
+            return
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            embed = self.message.embeds[0]
+            embed.title = f"The {COFFERS[self.coffer_key]['label']} vanished!"
+            embed.color = discord.Color.dark_grey()
+            try:
+                await self.message.edit(embed=embed, view=self)
+            except discord.HTTPException as e:
+                log.error(f"Failed to mark coffer as vanished: {e}")
+
+    @discord.ui.button(label="Claim Coffer", style=discord.ButtonStyle.success, emoji="🗝️")
+    async def claim(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.claimed:
+            await interaction.response.send_message("This coffer has already been claimed!", ephemeral=True)
+            return
+
+        if not self.cog.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+
+        self.claimed = True
+        rewards = roll_coffer_rewards(self.coffer_key)
+        for item, qty in rewards.items():
+            self.cog.add_item(interaction.user.id, item, qty)
+
+        reward_lines = [f"{qty}x {ITEM_LABELS.get(item, item.title())}" for item, qty in rewards.items()]
+
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            embed = self.message.embeds[0]
+            embed.title = f"{COFFERS[self.coffer_key]['label']} claimed!"
+            embed.color = discord.Color.dark_grey()
+            embed.set_footer(text=f"Claimed by {interaction.user.display_name}")
+            try:
+                await self.message.edit(embed=embed, view=self)
+            except discord.HTTPException as e:
+                log.error(f"Failed to update claimed coffer message: {e}")
+
+        await interaction.response.send_message(
+            f"You opened the {COFFERS[self.coffer_key]['label']} and got: " + ", ".join(reward_lines),
+            ephemeral=True,
+        )
+        if interaction.channel:
+            try:
+                await interaction.channel.send(
+                    f"{interaction.user.mention} claimed the **{COFFERS[self.coffer_key]['label']}**!"
+                )
+            except discord.HTTPException as e:
+                log.error(f"Failed to announce coffer claim: {e}")
 
 
 class StarterSelect(discord.ui.Select):
@@ -315,10 +467,17 @@ class Pokemon(commands.Cog):
         self.pokedex = load_pokedex()
         self.ball_emojis: dict[str, discord.Emoji] = {}
         self._init_db()
-        self.startup_task = self.bot.loop.create_task(self._startup())
+        self.tasks = [
+            self.bot.loop.create_task(self._startup()),
+        ]
+        for coffer_key, cfg in COFFERS.items():
+            self.tasks.append(
+                self.bot.loop.create_task(self._coffer_loop(coffer_key, cfg["interval_seconds"]))
+            )
 
     def cog_unload(self):
-        self.startup_task.cancel()
+        for task in self.tasks:
+            task.cancel()
 
     def _init_db(self):
         with sqlite3.connect(DB_PATH) as conn:
@@ -342,7 +501,8 @@ class Pokemon(commands.Cog):
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
                     dex_id INTEGER NOT NULL,
-                    caught_at TEXT NOT NULL
+                    caught_at TEXT NOT NULL,
+                    is_shiny INTEGER NOT NULL DEFAULT 0
                 )
             """)
             conn.execute("""
@@ -358,6 +518,10 @@ class Pokemon(commands.Cog):
                     channel_id INTEGER
                 )
             """)
+            # Migration for DBs created before is_shiny existed
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_collection)").fetchall()]
+            if "is_shiny" not in cols:
+                conn.execute("ALTER TABLE poke_collection ADD COLUMN is_shiny INTEGER NOT NULL DEFAULT 0")
 
     # ---------- DB helpers ----------
 
@@ -379,6 +543,13 @@ class Pokemon(commands.Cog):
         owned = {item: qty for item, qty in rows}
         return {key: owned.get(key, 0) for key in BALLS}
 
+    def get_candy(self, user_id: int) -> int:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'candy'", (user_id,)
+            ).fetchone()
+        return row[0] if row else 0
+
     def add_item(self, user_id: int, item: str, delta: int):
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
@@ -387,11 +558,11 @@ class Pokemon(commands.Cog):
                 (user_id, item, delta, delta),
             )
 
-    def add_to_collection(self, user_id: int, dex_id: int):
+    def add_to_collection(self, user_id: int, dex_id: int, is_shiny: bool = False):
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
-                "INSERT INTO poke_collection (user_id, dex_id, caught_at) VALUES (?, ?, ?)",
-                (user_id, dex_id, datetime.now(timezone.utc).isoformat()),
+                "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny) VALUES (?, ?, ?, ?)",
+                (user_id, dex_id, datetime.now(timezone.utc).isoformat(), int(is_shiny)),
             )
 
     def count_owned(self, user_id: int, dex_id: int) -> int:
@@ -436,11 +607,12 @@ class Pokemon(commands.Cog):
             conn.execute("UPDATE poke_spawn_usage SET count = count + 1 WHERE user_id = ?", (user_id,))
             return True, SPAWN_LIMIT - count - 1, None
 
-    def get_collection_summary(self, user_id: int) -> list[tuple[int, int]]:
-        """Returns [(dex_id, count), ...] sorted by dex_id."""
+    def get_collection_summary(self, user_id: int) -> list[tuple[int, int, int]]:
+        """Returns [(dex_id, count, has_shiny), ...] sorted by dex_id."""
         with sqlite3.connect(DB_PATH) as conn:
             rows = conn.execute(
-                "SELECT dex_id, COUNT(*) FROM poke_collection WHERE user_id = ? GROUP BY dex_id ORDER BY dex_id",
+                "SELECT dex_id, COUNT(*), MAX(is_shiny) FROM poke_collection "
+                "WHERE user_id = ? GROUP BY dex_id ORDER BY dex_id",
                 (user_id,),
             ).fetchall()
         return rows
@@ -476,17 +648,22 @@ class Pokemon(commands.Cog):
 
     def build_spawn_embed(self, mon: dict, spawned_by: str, expires_at: datetime) -> discord.Embed:
         rare = is_rare(mon)
+        shiny = mon.get("is_shiny", False)
+        color = discord.Color.magenta() if shiny else (discord.Color.gold() if rare else discord.Color.green())
         embed = discord.Embed(
-            title=f"A wild {mon['name']} appeared!",
+            title=f"A wild {spawn_title_prefix(mon)}{mon['name']} appeared!",
             description=f"Spawned by {spawned_by}",
-            color=discord.Color.gold() if rare else discord.Color.green(),
+            color=color,
         )
         embed.add_field(name="Pokédex #", value=f"#{mon['id']:03}", inline=True)
         embed.add_field(name="Type", value=format_types(mon["types"]), inline=True)
         embed.add_field(name="Category", value=mon["category"], inline=True)
         embed.add_field(name="Rarity", value="⭐ Legendary" if rare else "Standard", inline=True)
+        embed.add_field(name="Abilities", value=format_abilities(mon.get("abilities", [])), inline=True)
         embed.add_field(name="Flees", value=f"<t:{int(expires_at.timestamp())}:R>", inline=True)
-        embed.set_image(url=mon["artwork"] or mon["sprite"])
+        embed.set_image(url=spawn_image_url(mon))
+        if shiny:
+            embed.add_field(name="Shiny!", value="✨ This is an extremely rare shiny Pokémon!", inline=False)
         return embed
 
     # ---------- Background tasks ----------
@@ -502,25 +679,50 @@ class Pokemon(commands.Cog):
             except Exception as e:
                 log.error(f"Random Pokémon spawn failed: {e}", exc_info=True)
 
-    async def _do_random_spawns(self):
+    async def _coffer_loop(self, coffer_key: str, interval_seconds: int):
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            await asyncio.sleep(interval_seconds)
+            try:
+                await self._spawn_coffer(coffer_key)
+            except Exception as e:
+                log.error(f"Coffer spawn failed ({coffer_key}): {e}", exc_info=True)
+
+    def _spawn_channels(self) -> list[int]:
         with sqlite3.connect(DB_PATH) as conn:
             rows = conn.execute(
                 "SELECT channel_id FROM poke_settings WHERE channel_id IS NOT NULL"
             ).fetchall()
+        return [r[0] for r in rows]
 
-        for (channel_id,) in rows:
+    async def _do_random_spawns(self):
+        for channel_id in self._spawn_channels():
             channel = self.bot.get_channel(channel_id)
             if not channel:
                 continue
-            mon = random.choice(list(self.pokedex.values()))
+            mon = roll_spawn_mon(self.pokedex)
             view = SpawnView(self, mon, spawner_id=None)
             embed = self.build_spawn_embed(mon, spawned_by=self.bot.user.mention, expires_at=view.expires_at)
             try:
                 msg = await channel.send(embed=embed, view=view)
                 view.message = msg
-                log.info(f"Random spawn: {mon['name']} in #{channel}")
+                log.info(f"Random spawn: {mon['name']}{' (shiny)' if mon['is_shiny'] else ''} in #{channel}")
             except discord.HTTPException as e:
                 log.error(f"Failed to spawn Pokémon in channel {channel_id}: {e}")
+
+    async def _spawn_coffer(self, coffer_key: str):
+        for channel_id in self._spawn_channels():
+            channel = self.bot.get_channel(channel_id)
+            if not channel:
+                continue
+            view = CofferView(self, coffer_key)
+            embed = build_coffer_embed(coffer_key)
+            try:
+                msg = await channel.send(embed=embed, view=view)
+                view.message = msg
+                log.info(f"Spawned {coffer_key} coffer in #{channel}")
+            except discord.HTTPException as e:
+                log.error(f"Failed to spawn {coffer_key} coffer in channel {channel_id}: {e}")
 
     # ---------- Commands ----------
 
@@ -539,7 +741,7 @@ class Pokemon(commands.Cog):
     async def poke_spawn_daily(self, interaction: discord.Interaction):
         if not self.get_trainer(interaction.user.id):
             await interaction.response.send_message(
-                "You need a starter Pokémon first! Use `/poke start`.", ephemeral=True
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
             )
             return
 
@@ -551,14 +753,14 @@ class Pokemon(commands.Cog):
             )
             return
 
-        mon = random.choice(list(self.pokedex.values()))
+        mon = roll_spawn_mon(self.pokedex)
         view = SpawnView(self, mon, spawner_id=interaction.user.id)
         embed = self.build_spawn_embed(mon, spawned_by=interaction.user.mention, expires_at=view.expires_at)
         await interaction.response.send_message(embed=embed, view=view)
         view.message = await interaction.original_response()
         await interaction.followup.send(f"({remaining} spawns left in this 5-hour window)", ephemeral=True)
 
-    @poke.command(name="setchannel", description="Set the channel where wild Pokémon spawn randomly")
+    @poke.command(name="setchannel", description="Set the channel for random Pokémon and coffer spawns")
     @app_commands.describe(channel="The channel for random spawns")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def poke_setchannel(self, interaction: discord.Interaction, channel: discord.TextChannel):
@@ -569,18 +771,19 @@ class Pokemon(commands.Cog):
                 (interaction.guild_id, channel.id),
             )
         await interaction.response.send_message(
-            f"Wild Pokémon will now randomly spawn in {channel.mention}.", ephemeral=True
+            f"Wild Pokémon and coffers will now randomly spawn in {channel.mention}.", ephemeral=True
         )
 
-    @poke.command(name="inventory", description="See how many balls you have")
+    @poke.command(name="inventory", description="See how many balls and candies you have")
     async def poke_inventory(self, interaction: discord.Interaction):
         if not self.get_trainer(interaction.user.id):
             await interaction.response.send_message(
-                "You need a starter Pokémon first! Use `/poke start`.", ephemeral=True
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
             )
             return
         items = self.get_items(interaction.user.id)
         lines = [f"**{BALLS[key]['label']}**: {qty}" for key, qty in items.items()]
+        lines.append(f"**Rare Candy**: {self.get_candy(interaction.user.id)}")
         embed = discord.Embed(title="Your Bag", description="\n".join(lines), color=discord.Color.orange())
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -588,7 +791,7 @@ class Pokemon(commands.Cog):
     async def poke_pokedex(self, interaction: discord.Interaction):
         if not self.get_trainer(interaction.user.id):
             await interaction.response.send_message(
-                "You need a starter Pokémon first! Use `/poke start`.", ephemeral=True
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
             )
             return
 
@@ -598,8 +801,8 @@ class Pokemon(commands.Cog):
             return
 
         lines = [
-            f"#{dex_id:03} **{self.pokedex[dex_id]['name']}** x{count}"
-            for dex_id, count in summary[:25]
+            f"#{dex_id:03} **{self.pokedex[dex_id]['name']}**{' ✨' if has_shiny else ''} x{count}"
+            for dex_id, count, has_shiny in summary[:25]
         ]
         embed = discord.Embed(
             title=f"{interaction.user.display_name}'s Pokédex",
