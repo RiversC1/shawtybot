@@ -82,6 +82,8 @@ LEGENDARY_PENALTY = 0.15
 SUMMONER_BONUS = 1.3
 # Odds that any given spawn is shiny — intentionally very rare.
 SHINY_CHANCE = 1 / 200
+# Flat family-candy cost to evolve any Pokémon — a handful of catches, not a grind.
+EVOLUTION_CANDY_COST = 20
 
 # ---------- Coffers ----------
 
@@ -144,6 +146,23 @@ def format_abilities(abilities: list[dict]) -> str:
 
 def is_rare(mon: dict) -> bool:
     return bool(mon.get("is_legendary") or mon.get("is_mythical"))
+
+
+def format_evolution_line(mon: dict, pokedex: dict[int, dict]) -> str | None:
+    """Returns a display string for what this Pokémon evolves into, or None if it doesn't."""
+    options = mon.get("evolves_to") or []
+    if not options:
+        return None
+    parts = []
+    for opt in options:
+        target = pokedex.get(opt["id"])
+        if not target:
+            continue
+        if opt.get("item"):
+            parts.append(f"{target['name']} ({ITEM_LABELS.get(opt['item'], opt['item'].replace('-', ' ').title())})")
+        else:
+            parts.append(target["name"])
+    return ", ".join(parts) if parts else None
 
 
 def roll_spawn_mon(pokedex: dict[int, dict]) -> dict:
@@ -289,10 +308,17 @@ class CatchPanelView(discord.ui.View):
         if success:
             self.spawn_view.caught = True
             self.cog.add_to_collection(self.catcher_id, mon["id"], is_shiny=mon.get("is_shiny", False))
+            family_id = mon.get("family_id", mon["id"])
+            family_name = self.cog.pokedex.get(family_id, mon)["name"]
+            candy_qty = random.randint(2, 5)
+            self.cog.add_item(self.catcher_id, f"famcandy_{family_id}", candy_qty)
             await self.spawn_view.mark_caught(
                 interaction.user.display_name, interaction.user.mention, BALLS[ball_key]["label"]
             )
-            result = f"🎉 Gotcha! **{mon['name']}** was caught with a {BALLS[ball_key]['label']}!"
+            result = (
+                f"🎉 Gotcha! **{mon['name']}** was caught with a {BALLS[ball_key]['label']}!\n"
+                f"You also got **{candy_qty}x {family_name} Candy**."
+            )
         else:
             result = f"The {mon['name']} broke free from the {BALLS[ball_key]['label']}!"
 
@@ -546,6 +572,80 @@ class StoreView(discord.ui.View):
         return True
 
 
+class EvolutionChoiceSelect(discord.ui.Select):
+    def __init__(self, options_data: list[dict]):
+        options = [
+            discord.SelectOption(label=o["target"]["name"], value=str(o["target"]["id"]))
+            for o in options_data
+        ]
+        super().__init__(placeholder="Choose which evolution...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        view: "EvolutionChoiceView" = self.view
+        target_id = int(self.values[0])
+        target = next(o["target"] for o in view.options_data if o["target"]["id"] == target_id)
+        await interaction.response.edit_message(content="Evolving...", view=None)
+        await view.cog.perform_evolution(interaction, view.from_mon, target, view.candy_key)
+
+
+class EvolutionChoiceView(discord.ui.View):
+    def __init__(self, cog: "Pokemon", user_id: int, from_mon: dict, options_data: list[dict], candy_key: str):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.user_id = user_id
+        self.from_mon = from_mon
+        self.options_data = options_data
+        self.candy_key = candy_key
+        self.add_item(EvolutionChoiceSelect(options_data))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("This isn't your evolution choice!", ephemeral=True)
+            return False
+        return True
+
+
+class TeamSelect(discord.ui.Select):
+    def __init__(self, owned_species: list[tuple[int, str]], current_team: list[int]):
+        options = [
+            discord.SelectOption(
+                label=f"#{dex_id:03} {name}",
+                value=str(dex_id),
+                default=(dex_id in current_team),
+            )
+            for dex_id, name in owned_species
+        ]
+        super().__init__(
+            placeholder="Choose up to 6 Pokémon for your team...",
+            min_values=0,
+            max_values=min(6, len(options)),
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: "TeamView" = self.view
+        dex_ids = [int(v) for v in self.values]
+        view.cog.set_team(view.user_id, dex_ids)
+        names = [view.cog.pokedex[d]["name"] for d in dex_ids] if dex_ids else ["(empty)"]
+        await interaction.response.edit_message(
+            content=f"✅ Your team is now: {', '.join(names)}", embed=None, view=None
+        )
+
+
+class TeamView(discord.ui.View):
+    def __init__(self, cog: "Pokemon", user_id: int, owned_species: list[tuple[int, str]], current_team: list[int]):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.user_id = user_id
+        self.add_item(TeamSelect(owned_species, current_team))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("This isn't your team!", ephemeral=True)
+            return False
+        return True
+
+
 class Pokemon(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -623,6 +723,14 @@ class Pokemon(commands.Cog):
                     expires_at TEXT NOT NULL
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_team (
+                    user_id INTEGER NOT NULL,
+                    slot INTEGER NOT NULL,
+                    dex_id INTEGER NOT NULL,
+                    PRIMARY KEY (user_id, slot)
+                )
+            """)
             # Migration for DBs created before is_shiny existed
             cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_collection)").fetchall()]
             if "is_shiny" not in cols:
@@ -661,6 +769,63 @@ class Pokemon(commands.Cog):
                 "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'coin'", (user_id,)
             ).fetchone()
         return row[0] if row else 0
+
+    def get_item_qty(self, user_id: int, item_key: str) -> int:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, item_key)
+            ).fetchone()
+        return row[0] if row else 0
+
+    def get_family_candies(self, user_id: int) -> list[tuple[int, int]]:
+        """Returns [(family_dex_id, qty), ...] for family candies the user owns (qty > 0)."""
+        with sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT item, qty FROM poke_items WHERE user_id = ? AND item LIKE 'famcandy_%' AND qty > 0",
+                (user_id,),
+            ).fetchall()
+        result = []
+        for item, qty in rows:
+            try:
+                family_id = int(item.split("_", 1)[1])
+            except (IndexError, ValueError):
+                continue
+            result.append((family_id, qty))
+        return result
+
+    def evolve_one(self, user_id: int, from_dex_id: int, to_dex_id: int) -> bool:
+        """Converts one caught instance of from_dex_id into to_dex_id, preserving shininess.
+        Returns False if the user doesn't own one."""
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT id, is_shiny FROM poke_collection WHERE user_id = ? AND dex_id = ? ORDER BY id LIMIT 1",
+                (user_id, from_dex_id),
+            ).fetchone()
+            if not row:
+                return False
+            row_id, is_shiny = row
+            conn.execute("DELETE FROM poke_collection WHERE id = ?", (row_id,))
+            conn.execute(
+                "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny) VALUES (?, ?, ?, ?)",
+                (user_id, to_dex_id, datetime.now(timezone.utc).isoformat(), is_shiny),
+            )
+        return True
+
+    def get_team(self, user_id: int) -> list[int]:
+        with sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT dex_id FROM poke_team WHERE user_id = ? ORDER BY slot", (user_id,)
+            ).fetchall()
+        return [r[0] for r in rows]
+
+    def set_team(self, user_id: int, dex_ids: list[int]):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("DELETE FROM poke_team WHERE user_id = ?", (user_id,))
+            for slot, dex_id in enumerate(dex_ids[:6]):
+                conn.execute(
+                    "INSERT INTO poke_team (user_id, slot, dex_id) VALUES (?, ?, ?)",
+                    (user_id, slot, dex_id),
+                )
 
     def add_item(self, user_id: int, item: str, delta: int):
         with sqlite3.connect(DB_PATH) as conn:
@@ -799,6 +964,9 @@ class Pokemon(commands.Cog):
         embed.add_field(name="Rarity", value="⭐ Legendary" if rare else "Standard", inline=True)
         embed.add_field(name="Abilities", value=format_abilities(mon.get("abilities", [])), inline=True)
         embed.add_field(name="Flees", value=f"<t:{int(expires_at.timestamp())}:R>", inline=True)
+        evolution_line = format_evolution_line(mon, self.pokedex)
+        if evolution_line:
+            embed.add_field(name="Evolves Into", value=evolution_line, inline=True)
         embed.set_image(url=spawn_image_url(mon))
         if shiny:
             embed.add_field(name="Shiny!", value="✨ This is an extremely rare shiny Pokémon!", inline=False)
@@ -947,6 +1115,35 @@ class Pokemon(commands.Cog):
             except discord.HTTPException as e:
                 log.error(f"Failed to spawn {coffer_key} coffer in channel {channel_id}: {e}")
 
+    async def perform_evolution(self, interaction: discord.Interaction, from_mon: dict, to_mon: dict, candy_key: str):
+        self.add_item(interaction.user.id, candy_key, -EVOLUTION_CANDY_COST)
+        self.evolve_one(interaction.user.id, from_mon["id"], to_mon["id"])
+
+        embed = discord.Embed(
+            title=f"{from_mon['name']} evolved into {to_mon['name']}!",
+            color=discord.Color.gold(),
+        )
+        embed.set_image(url=to_mon.get("artwork") or to_mon.get("sprite"))
+        embed.set_footer(text=f"{interaction.user.display_name}'s Pokémon")
+
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed)
+        else:
+            await interaction.response.send_message(embed=embed)
+
+    async def evolve_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        current = (current or "").lower()
+        summary = self.get_collection_summary(interaction.user.id)
+        choices = []
+        for dex_id, count, _ in summary:
+            mon = self.pokedex.get(dex_id)
+            if not mon or not mon.get("evolves_to"):
+                continue
+            if current and current not in mon["name"].lower():
+                continue
+            choices.append(app_commands.Choice(name=f"{mon['name']} (x{count})", value=mon["name"]))
+        return choices[:25]
+
     # ---------- Commands ----------
 
     poke = app_commands.Group(name="poke", description="Pokémon commands")
@@ -1009,6 +1206,15 @@ class Pokemon(commands.Cog):
         lines = [f"**{BALLS[key]['label']}**: {qty}" for key, qty in items.items()]
         lines.append(f"**Rare Candy**: {self.get_candy(interaction.user.id)}")
         lines.append(f"**Poké Coins**: {self.get_coins(interaction.user.id)} {COIN_EMOJI}")
+
+        family_candies = self.get_family_candies(interaction.user.id)
+        if family_candies:
+            lines.append("")
+            lines.append("**Evolution Candy:**")
+            for family_id, qty in family_candies:
+                name = self.pokedex.get(family_id, {}).get("name", f"#{family_id}")
+                lines.append(f"{name} Candy: {qty}")
+
         embed = discord.Embed(title="Your Bag", description="\n".join(lines), color=discord.Color.orange())
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -1055,6 +1261,103 @@ class Pokemon(commands.Cog):
         )
         embed.set_footer(text=f"{len(summary)} unique species caught")
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @poke.command(name="evolve", description="Evolve one of your caught Pokémon using family candy")
+    @app_commands.describe(pokemon="The Pokémon species you want to evolve")
+    @app_commands.autocomplete(pokemon=evolve_autocomplete)
+    async def poke_evolve(self, interaction: discord.Interaction, pokemon: str):
+        if not self.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+
+        mon = find_by_name(self.pokedex, pokemon)
+        if not mon:
+            await interaction.response.send_message("Couldn't find that Pokémon.", ephemeral=True)
+            return
+
+        if self.count_owned(interaction.user.id, mon["id"]) < 1:
+            await interaction.response.send_message(f"You don't have a {mon['name']} to evolve.", ephemeral=True)
+            return
+
+        options = mon.get("evolves_to") or []
+        if not options:
+            await interaction.response.send_message(f"**{mon['name']}** doesn't evolve any further.", ephemeral=True)
+            return
+
+        family_id = mon.get("family_id", mon["id"])
+        family_name = self.pokedex.get(family_id, mon)["name"]
+        candy_key = f"famcandy_{family_id}"
+        have_candy = self.get_item_qty(interaction.user.id, candy_key)
+
+        candidates = []
+        for opt in options:
+            target = self.pokedex.get(opt["id"])
+            if not target:
+                continue
+            item_needed = opt.get("item")
+            has_item = item_needed is None or self.get_item_qty(interaction.user.id, item_needed) > 0
+            candidates.append({"target": target, "item": item_needed, "has_item": has_item})
+
+        if have_candy < EVOLUTION_CANDY_COST:
+            options_text = ", ".join(
+                c["target"]["name"] + (f" (needs {ITEM_LABELS.get(c['item'], c['item'])})" if c["item"] else "")
+                for c in candidates
+            )
+            await interaction.response.send_message(
+                f"**{mon['name']}** can evolve into: {options_text}\n"
+                f"You need **{EVOLUTION_CANDY_COST}** {family_name} Candy — you have **{have_candy}**.",
+                ephemeral=True,
+            )
+            return
+
+        ready = [c for c in candidates if c["has_item"]]
+        if not ready:
+            missing_items = ", ".join(ITEM_LABELS.get(c["item"], c["item"]) for c in candidates if c["item"])
+            await interaction.response.send_message(
+                f"You have enough candy, but evolving **{mon['name']}** needs one of: {missing_items}. "
+                f"Buy one from `/poke store`!",
+                ephemeral=True,
+            )
+            return
+
+        if len(ready) == 1:
+            await self.perform_evolution(interaction, mon, ready[0]["target"], candy_key)
+            return
+
+        names = ", ".join(c["target"]["name"] for c in ready)
+        view = EvolutionChoiceView(self, interaction.user.id, mon, ready, candy_key)
+        await interaction.response.send_message(
+            f"**{mon['name']}** can evolve into multiple forms: {names}. Pick one:",
+            view=view,
+            ephemeral=True,
+        )
+
+    @poke.command(name="team", description="Set your team of up to 6 Pokémon")
+    async def poke_team(self, interaction: discord.Interaction):
+        if not self.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+
+        summary = self.get_collection_summary(interaction.user.id)
+        if not summary:
+            await interaction.response.send_message("You haven't caught any Pokémon yet!", ephemeral=True)
+            return
+
+        owned_species = [(dex_id, self.pokedex[dex_id]["name"]) for dex_id, _, _ in summary][:25]
+        current_team = self.get_team(interaction.user.id)
+
+        team_names = [self.pokedex[d]["name"] for d in current_team if d in self.pokedex]
+        desc = f"Current team: {', '.join(team_names)}" if team_names else "Your team is empty."
+        if len(summary) > 25:
+            desc += "\n(Only your first 25 species are shown here for now.)"
+
+        embed = discord.Embed(title="Your Pokémon Team", description=desc, color=discord.Color.purple())
+        view = TeamView(self, interaction.user.id, owned_species, current_team)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
