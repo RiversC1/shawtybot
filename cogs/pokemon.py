@@ -956,13 +956,14 @@ class Pokemon(commands.Cog):
 
     # ---------- Embeds ----------
 
-    def build_spawn_embed(self, mon: dict, spawned_by: str, expires_at: datetime) -> discord.Embed:
+    def build_spawn_embed(self, mon: dict, spawned_by: str | None, expires_at: datetime) -> discord.Embed:
         rare = is_rare(mon)
         shiny = mon.get("is_shiny", False)
         color = discord.Color.magenta() if shiny else (discord.Color.gold() if rare else discord.Color.green())
+        description = "Spawned naturally 🍃" if spawned_by is None else f"Spawned by {spawned_by}"
         embed = discord.Embed(
             title=f"A wild {spawn_title_prefix(mon)}{mon['name']} appeared!",
-            description=f"Spawned by {spawned_by}",
+            description=description,
             color=color,
         )
         embed.add_field(name="Pokédex #", value=f"#{mon['id']:03}", inline=True)
@@ -1098,7 +1099,7 @@ class Pokemon(commands.Cog):
                 continue
             mon = roll_spawn_mon(self.pokedex)
             view = SpawnView(self, mon, spawner_id=None)
-            embed = self.build_spawn_embed(mon, spawned_by=self.bot.user.mention, expires_at=view.expires_at)
+            embed = self.build_spawn_embed(mon, spawned_by=None, expires_at=view.expires_at)
             try:
                 msg = await channel.send(embed=embed, view=view)
                 view.message = msg
