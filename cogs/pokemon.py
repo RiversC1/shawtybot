@@ -92,7 +92,7 @@ COFFERS = {
     "silver": {
         "label": "Silver Coffer",
         "color": discord.Color.light_grey(),
-        "image": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f948.png",
+        "image": "https://archives.bulbagarden.net/media/upload/a/a6/SugimoriPokeBall.png",
         "interval_seconds": 15 * 60,
         "rewards": {"pokeball": (3, 6), "candy": (1, 2), "coin": (5, 10)},
         "masterball_chance": 0.0,
@@ -100,7 +100,7 @@ COFFERS = {
     "golden": {
         "label": "Golden Coffer",
         "color": discord.Color.gold(),
-        "image": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f947.png",
+        "image": "https://archives.bulbagarden.net/media/upload/0/06/SugimoriGreatBall.png",
         "interval_seconds": 30 * 60,
         "rewards": {"greatball": (2, 4), "ultraball": (1, 2), "candy": (2, 4), "coin": (15, 25)},
         "masterball_chance": 0.0,
@@ -108,7 +108,7 @@ COFFERS = {
     "diamond": {
         "label": "Diamond Coffer",
         "color": discord.Color.blue(),
-        "image": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f48e.png",
+        "image": "https://archives.bulbagarden.net/media/upload/2/26/SugimoriUltraBall.png",
         "interval_seconds": 60 * 60,
         "rewards": {"ultraball": (2, 4), "candy": (3, 6), "coin": (30, 50)},
         "masterball_chance": 0.15,
