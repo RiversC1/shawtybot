@@ -116,7 +116,7 @@ def format_abilities(abilities: list[dict]) -> str:
     for a in abilities:
         name = a["name"].replace("-", " ").title()
         if a.get("is_hidden"):
-            name += " (Hidden)"
+            name += " (Hidden Ability)"
         parts.append(name)
     return ", ".join(parts)
 
