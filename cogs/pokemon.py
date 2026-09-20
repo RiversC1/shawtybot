@@ -38,8 +38,30 @@ BALL_SPRITES = {
     "masterball": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png",
 }
 
+COIN_EMOJI = "🪙"
+
+# Evolution stones — inventory-only for now, will be consumed once the evolution
+# mechanic exists for the web app.
+STORE_ITEMS = {
+    "pokeball": {"label": "Poké Ball", "price": 5},
+    "greatball": {"label": "Great Ball", "price": 15},
+    "ultraball": {"label": "Ultra Ball", "price": 35},
+    "masterball": {"label": "Master Ball", "price": 300},
+    "fire-stone": {"label": "Fire Stone", "price": 80},
+    "water-stone": {"label": "Water Stone", "price": 80},
+    "thunder-stone": {"label": "Thunder Stone", "price": 80},
+    "leaf-stone": {"label": "Leaf Stone", "price": 80},
+    "moon-stone": {"label": "Moon Stone", "price": 90},
+    "sun-stone": {"label": "Sun Stone", "price": 90},
+    "shiny-stone": {"label": "Shiny Stone", "price": 110},
+    "dusk-stone": {"label": "Dusk Stone", "price": 110},
+    "dawn-stone": {"label": "Dawn Stone", "price": 110},
+}
+
 ITEM_LABELS = {key: v["label"] for key, v in BALLS.items()}
 ITEM_LABELS["candy"] = "Rare Candy"
+ITEM_LABELS["coin"] = "Poké Coin"
+ITEM_LABELS.update({key: cfg["label"] for key, cfg in STORE_ITEMS.items()})
 
 TYPE_EMOJIS = {
     "normal": "⚪", "fire": "🔥", "water": "💧", "grass": "🌿", "electric": "⚡",
@@ -72,7 +94,7 @@ COFFERS = {
         "color": discord.Color.light_grey(),
         "image": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f948.png",
         "interval_seconds": 15 * 60,
-        "rewards": {"pokeball": (3, 6), "candy": (1, 2)},
+        "rewards": {"pokeball": (3, 6), "candy": (1, 2), "coin": (5, 10)},
         "masterball_chance": 0.0,
     },
     "golden": {
@@ -80,7 +102,7 @@ COFFERS = {
         "color": discord.Color.gold(),
         "image": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f947.png",
         "interval_seconds": 30 * 60,
-        "rewards": {"greatball": (2, 4), "ultraball": (1, 2), "candy": (2, 4)},
+        "rewards": {"greatball": (2, 4), "ultraball": (1, 2), "candy": (2, 4), "coin": (15, 25)},
         "masterball_chance": 0.0,
     },
     "diamond": {
@@ -88,7 +110,7 @@ COFFERS = {
         "color": discord.Color.blue(),
         "image": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f48e.png",
         "interval_seconds": 60 * 60,
-        "rewards": {"ultraball": (2, 4), "candy": (3, 6)},
+        "rewards": {"ultraball": (2, 4), "candy": (3, 6), "coin": (30, 50)},
         "masterball_chance": 0.15,
     },
 }
@@ -459,6 +481,76 @@ class StarterSelectView(discord.ui.View):
         await interaction.response.edit_message(content=None, embed=embed, view=self)
 
 
+class QuantityModal(discord.ui.Modal):
+    def __init__(self, cog: "Pokemon", user_id: int, item_key: str):
+        super().__init__(title=f"Buy {STORE_ITEMS[item_key]['label']}")
+        self.cog = cog
+        self.user_id = user_id
+        self.item_key = item_key
+        self.quantity = discord.ui.TextInput(
+            label="Quantity", placeholder="1", default="1", max_length=3, required=True
+        )
+        self.add_item(self.quantity)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            qty = int(self.quantity.value)
+        except ValueError:
+            await interaction.response.send_message("Please enter a valid whole number.", ephemeral=True)
+            return
+        if qty <= 0:
+            await interaction.response.send_message("Quantity must be at least 1.", ephemeral=True)
+            return
+
+        item_cfg = STORE_ITEMS[self.item_key]
+        total_cost = item_cfg["price"] * qty
+        balance = self.cog.get_coins(self.user_id)
+
+        if balance < total_cost:
+            await interaction.response.send_message(
+                f"You need **{total_cost}** {COIN_EMOJI} for {qty}x {item_cfg['label']}, "
+                f"but you only have **{balance}**.",
+                ephemeral=True,
+            )
+            return
+
+        self.cog.add_item(self.user_id, "coin", -total_cost)
+        self.cog.add_item(self.user_id, self.item_key, qty)
+
+        await interaction.response.send_message(
+            f"✅ Bought **{qty}x {item_cfg['label']}** for **{total_cost}** {COIN_EMOJI}. "
+            f"You have **{balance - total_cost}** {COIN_EMOJI} left.",
+            ephemeral=True,
+        )
+
+
+class StoreSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label=f"{cfg['label']} — {cfg['price']} coins", value=key)
+            for key, cfg in STORE_ITEMS.items()
+        ]
+        super().__init__(placeholder="Choose an item to buy...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        view: "StoreView" = self.view
+        await interaction.response.send_modal(QuantityModal(view.cog, view.user_id, self.values[0]))
+
+
+class StoreView(discord.ui.View):
+    def __init__(self, cog: "Pokemon", user_id: int):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.user_id = user_id
+        self.add_item(StoreSelect())
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("This isn't your store session!", ephemeral=True)
+            return False
+        return True
+
+
 class Pokemon(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -565,6 +657,13 @@ class Pokemon(commands.Cog):
         with sqlite3.connect(DB_PATH) as conn:
             row = conn.execute(
                 "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'candy'", (user_id,)
+            ).fetchone()
+        return row[0] if row else 0
+
+    def get_coins(self, user_id: int) -> int:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'coin'", (user_id,)
             ).fetchone()
         return row[0] if row else 0
 
@@ -915,8 +1014,28 @@ class Pokemon(commands.Cog):
         items = self.get_items(interaction.user.id)
         lines = [f"**{BALLS[key]['label']}**: {qty}" for key, qty in items.items()]
         lines.append(f"**Rare Candy**: {self.get_candy(interaction.user.id)}")
+        lines.append(f"**Poké Coins**: {self.get_coins(interaction.user.id)} {COIN_EMOJI}")
         embed = discord.Embed(title="Your Bag", description="\n".join(lines), color=discord.Color.orange())
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @poke.command(name="store", description="Spend your Poké Coins on balls and evolution stones")
+    async def poke_store(self, interaction: discord.Interaction):
+        if not self.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+
+        balance = self.get_coins(interaction.user.id)
+        lines = [f"{cfg['label']}: **{cfg['price']}** {COIN_EMOJI}" for cfg in STORE_ITEMS.values()]
+        embed = discord.Embed(
+            title="Poké Mart",
+            description="\n".join(lines),
+            color=discord.Color.teal(),
+        )
+        embed.set_footer(text=f"Your balance: {balance} Poké Coins — pick an item below")
+        view = StoreView(self, interaction.user.id)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @poke.command(name="pokedex", description="See the Pokémon you've caught")
     async def poke_pokedex(self, interaction: discord.Interaction):
