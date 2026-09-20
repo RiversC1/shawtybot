@@ -356,12 +356,10 @@ class CofferView(discord.ui.View):
         super().__init__(timeout=COFFER_EXPIRE_SECONDS)
         self.cog = cog
         self.coffer_key = coffer_key
-        self.claimed = False
+        self.claimed_by: set[int] = set()
         self.message: discord.Message | None = None
 
     async def on_timeout(self):
-        if self.claimed:
-            return
         for child in self.children:
             child.disabled = True
         if self.message:
@@ -375,8 +373,8 @@ class CofferView(discord.ui.View):
 
     @discord.ui.button(label="Claim Coffer", style=discord.ButtonStyle.success, emoji="🗝️")
     async def claim(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.claimed:
-            await interaction.response.send_message("This coffer has already been claimed!", ephemeral=True)
+        if interaction.user.id in self.claimed_by:
+            await interaction.response.send_message("You've already claimed this coffer!", ephemeral=True)
             return
 
         if not self.cog.get_trainer(interaction.user.id):
@@ -385,24 +383,20 @@ class CofferView(discord.ui.View):
             )
             return
 
-        self.claimed = True
+        self.claimed_by.add(interaction.user.id)
         rewards = roll_coffer_rewards(self.coffer_key)
         for item, qty in rewards.items():
             self.cog.add_item(interaction.user.id, item, qty)
 
         reward_lines = [f"{qty}x {ITEM_LABELS.get(item, item.title())}" for item, qty in rewards.items()]
 
-        for child in self.children:
-            child.disabled = True
         if self.message:
             embed = self.message.embeds[0]
-            embed.title = f"{COFFERS[self.coffer_key]['label']} claimed!"
-            embed.color = discord.Color.dark_grey()
-            embed.set_footer(text=f"Claimed by {interaction.user.display_name}")
+            embed.set_footer(text=f"Claimed by {len(self.claimed_by)} trainer(s) so far")
             try:
                 await self.message.edit(embed=embed, view=self)
             except discord.HTTPException as e:
-                log.error(f"Failed to update claimed coffer message: {e}")
+                log.error(f"Failed to update coffer claim count: {e}")
 
         await interaction.response.send_message(
             f"You opened the {COFFERS[self.coffer_key]['label']} and got: " + ", ".join(reward_lines),
