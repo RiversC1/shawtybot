@@ -8,6 +8,7 @@ import os
 import random
 import logging
 import asyncio
+import secrets
 from datetime import datetime, timedelta, timezone
 
 log = logging.getLogger("bot")
@@ -88,6 +89,8 @@ SUMMONER_BONUS = 1.3
 SHINY_CHANCE = 1 / 200
 # Flat family-candy cost to evolve any Pokémon — a handful of catches, not a grind.
 EVOLUTION_CANDY_COST = 20
+# /poke web one-time login link validity.
+WEB_TOKEN_EXPIRE_MINUTES = 10
 
 # ---------- Coffers ----------
 
@@ -738,10 +741,24 @@ class Pokemon(commands.Cog):
                     PRIMARY KEY (user_id, slot)
                 )
             """)
+            # One-time login tokens for /poke web — exchanged by the web API for a session.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_web_tokens (
+                    token TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    expires_at TEXT NOT NULL
+                )
+            """)
             # Migration for DBs created before is_shiny existed
             cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_collection)").fetchall()]
             if "is_shiny" not in cols:
                 conn.execute("ALTER TABLE poke_collection ADD COLUMN is_shiny INTEGER NOT NULL DEFAULT 0")
+            # Migration for DBs created before web profile caching existed
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_trainers)").fetchall()]
+            if "username" not in cols:
+                conn.execute("ALTER TABLE poke_trainers ADD COLUMN username TEXT")
+            if "avatar_url" not in cols:
+                conn.execute("ALTER TABLE poke_trainers ADD COLUMN avatar_url TEXT")
 
     # ---------- DB helpers ----------
 
@@ -833,6 +850,20 @@ class Pokemon(commands.Cog):
                     "INSERT INTO poke_team (user_id, slot, dex_id) VALUES (?, ?, ?)",
                     (user_id, slot, dex_id),
                 )
+
+    def create_web_token(self, user_id: int, username: str, avatar_url: str | None) -> str:
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=WEB_TOKEN_EXPIRE_MINUTES)
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT INTO poke_web_tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
+                (token, user_id, expires_at.isoformat()),
+            )
+            conn.execute(
+                "UPDATE poke_trainers SET username = ?, avatar_url = ? WHERE user_id = ?",
+                (username, avatar_url, user_id),
+            )
+        return token
 
     def add_item(self, user_id: int, item: str, delta: int):
         with sqlite3.connect(DB_PATH) as conn:
@@ -1366,6 +1397,30 @@ class Pokemon(commands.Cog):
         embed = discord.Embed(title="Your Pokémon Team", description=desc, color=discord.Color.purple())
         view = TeamView(self, interaction.user.id, owned_species, current_team)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    @poke.command(name="web", description="Get a link to view your profile, Pokédex, team, and inventory on the web")
+    async def poke_web(self, interaction: discord.Interaction):
+        if not self.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+
+        token = self.create_web_token(
+            interaction.user.id, interaction.user.name, interaction.user.display_avatar.url
+        )
+        base_url = os.getenv("WEB_BASE_URL", "http://localhost:8080")
+        link = f"{base_url}/login?token={token}"
+
+        embed = discord.Embed(
+            title="Your Pokémon Web Profile",
+            description=(
+                f"[Click here to open your profile]({link})\n\n"
+                f"This link expires in **{WEB_TOKEN_EXPIRE_MINUTES} minutes** and can only be used once."
+            ),
+            color=discord.Color.blurple(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

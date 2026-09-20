@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Profile — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="profile-header">
+        {% if trainer.avatar_url %}
+        <img src="{{ trainer.avatar_url }}" alt="avatar" class="avatar">
+        {% endif %}
+        <div>
+            <h1>{{ trainer.username or "Trainer" }}</h1>
+            <p class="muted">Trainer since {{ trainer.created_at[:10] }}</p>
+        </div>
+    </div>
+    <p><strong>Starter Pokémon:</strong> {{ trainer.starter }}</p>
+</div>
+{% endblock %}

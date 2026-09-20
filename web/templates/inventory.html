@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Inventory — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Your Bag</h1>
+
+<div class="card">
+    <h2>Balls</h2>
+    {% for item, qty in inventory.balls.items() %}
+    <div class="item-row"><span>{{ item }}</span><span>{{ qty }}</span></div>
+    {% else %}
+    <p class="muted">No balls yet.</p>
+    {% endfor %}
+</div>
+
+<div class="card">
+    <h2>Currency</h2>
+    <div class="item-row"><span>Poké Coins</span><span>🪙 {{ inventory.coins }}</span></div>
+    <div class="item-row"><span>Rare Candy</span><span>{{ inventory.rare_candy }}</span></div>
+</div>
+
+<div class="card">
+    <h2>Evolution Candy</h2>
+    {% for name, qty in inventory.family_candies.items() %}
+    <div class="item-row"><span>{{ name }} Candy</span><span>{{ qty }}</span></div>
+    {% else %}
+    <p class="muted">No evolution candy yet — catch some Pokémon!</p>
+    {% endfor %}
+</div>
+{% endblock %}

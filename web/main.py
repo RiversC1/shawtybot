@@ -1,0 +1,127 @@
+"""
+Public-facing web app — hosted separately from the bot (e.g. on EC2).
+Holds no game data itself; every page fetches from the internal API
+(webapi.py, running on the bot's machine) using the session token
+issued at /login, forwarded as a cookie between browser and this app.
+
+Run with: uvicorn web.main:app --host 0.0.0.0 --port 8080
+"""
+import os
+import logging
+
+import httpx
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+log = logging.getLogger("web")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() == "true"
+SESSION_COOKIE = "session"
+SESSION_MAX_AGE = 7 * 24 * 60 * 60  # 7 days, matches the API's JWT expiry
+
+BASE_DIR = os.path.dirname(__file__)
+
+app = FastAPI(title="ShawtyBot Pokémon Web")
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+
+async def api_get(session: str, path: str) -> tuple[int, dict | list]:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{API_BASE_URL}{path}", headers={"Authorization": f"Bearer {session}"})
+    try:
+        return resp.status_code, resp.json()
+    except ValueError:
+        return resp.status_code, {}
+
+
+def clear_session(response):
+    response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
+@app.get("/")
+def landing(request: Request):
+    if request.cookies.get(SESSION_COOKIE):
+        return RedirectResponse("/profile")
+    return templates.TemplateResponse(request, "landing.html")
+
+
+@app.get("/login")
+async def login(request: Request, token: str):
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(f"{API_BASE_URL}/api/auth/exchange", json={"token": token})
+
+    if resp.status_code != 200:
+        detail = resp.json().get("detail", "This link is invalid or has expired.")
+        return templates.TemplateResponse(request, "landing.html", {"error": detail})
+
+    session = resp.json()["session"]
+    response = RedirectResponse("/profile")
+    response.set_cookie(
+        SESSION_COOKIE, session,
+        max_age=SESSION_MAX_AGE, httponly=True, secure=COOKIE_SECURE, samesite="lax",
+    )
+    return response
+
+
+@app.get("/logout")
+def logout():
+    response = RedirectResponse("/")
+    return clear_session(response)
+
+
+@app.get("/profile")
+async def profile(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/me")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "profile.html", {"trainer": data})
+
+
+@app.get("/pokedex")
+async def pokedex(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/pokedex")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "pokedex.html", {"species": data})
+
+
+@app.get("/inventory")
+async def inventory(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/inventory")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "inventory.html", {"inventory": data})
+
+
+@app.get("/team")
+async def team(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/team")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "team.html", {"team": data})

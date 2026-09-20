@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Team — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Your Team</h1>
+<p class="muted">Manage your team with <code>/poke team</code> in Discord for now.</p>
+<div class="grid">
+    {% for mon in team %}
+    <div class="dex-card">
+        <div class="dex-name">#{{ "%03d"|format(mon.dex_id) }} {{ mon.name }}</div>
+    </div>
+    {% else %}
+    <p>Your team is empty.</p>
+    {% endfor %}
+</div>
+{% endblock %}

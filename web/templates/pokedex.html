@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Pokédex — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Your Pokédex</h1>
+<p class="muted">{{ species|length }} unique species caught</p>
+<div class="grid">
+    {% for mon in species %}
+    <div class="dex-card">
+        <img src="{{ mon.artwork }}" alt="{{ mon.name }}">
+        <div class="dex-name">
+            #{{ "%03d"|format(mon.dex_id) }} {{ mon.name }}{% if mon.has_shiny %} ✨{% endif %}
+        </div>
+        <div class="muted">{{ mon.category }}</div>
+        <div class="muted">x{{ mon.count }}</div>
+    </div>
+    {% else %}
+    <p>You haven't caught any Pokémon yet!</p>
+    {% endfor %}
+</div>
+{% endblock %}

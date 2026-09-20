@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<div class="card center-card">
+    <h1>ShawtyBot Pokémon</h1>
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+    <p>To view your profile, run <code>/poke web</code> in Discord and click the link it gives you.</p>
+</div>
+{% endblock %}

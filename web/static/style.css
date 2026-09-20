@@ -1,0 +1,119 @@
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    background: #16213e;
+    border-bottom: 2px solid #e94560;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.brand {
+    font-weight: bold;
+    color: #e94560;
+    text-decoration: none;
+    font-size: 1.1em;
+}
+
+.nav-links a {
+    color: #eee;
+    text-decoration: none;
+    margin-left: 16px;
+    font-size: 0.95em;
+}
+
+.nav-links a:hover {
+    color: #e94560;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 16px;
+}
+
+.card {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.center-card {
+    text-align: center;
+    max-width: 480px;
+    margin: 80px auto;
+}
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+}
+
+.muted {
+    color: #999;
+    font-size: 0.9em;
+}
+
+.error {
+    color: #e94560;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.dex-card {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+}
+
+.dex-card img {
+    max-width: 100%;
+    height: 100px;
+    object-fit: contain;
+}
+
+.dex-name {
+    font-weight: bold;
+    margin-top: 8px;
+}
+
+.item-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #2a2a4a;
+}
+
+.item-row:last-child {
+    border-bottom: none;
+}
+
+code {
+    background: #0f0f23;
+    padding: 2px 6px;
+    border-radius: 4px;
+}

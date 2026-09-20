@@ -1,0 +1,18 @@
+[Unit]
+Description=ShawtyBot Pokemon Web App
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+# This is a separate clone of the same repo, deployed on the EC2 machine —
+# only web/requirements.txt needs to be installed here, not the bot's deps.
+WorkingDirectory=/home/ubuntu/shawtybot
+Environment=API_BASE_URL=https://api.yourdomain.com
+Environment=COOKIE_SECURE=true
+ExecStart=/home/ubuntu/shawtybot/venv/bin/uvicorn web.main:app --host 127.0.0.1 --port 8080
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

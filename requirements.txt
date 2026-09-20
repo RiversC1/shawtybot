@@ -5,3 +5,8 @@ yt-dlp
 syncedlyrics
 watchfiles
 anthropic
+
+# Internal Pokémon web API (webapi.py) — runs alongside the bot on this machine
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+pyjwt==2.14.0

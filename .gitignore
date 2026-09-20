@@ -13,3 +13,7 @@ __pycache__/
 
 # Spotipy token cache
 .cache
+
+# Runtime databases — contain live user data, never commit
+*.db
+tmp_*/

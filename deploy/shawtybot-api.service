@@ -1,0 +1,15 @@
+[Unit]
+Description=ShawtyBot Pokemon Internal API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/shawtybot
+EnvironmentFile=/home/ubuntu/shawtybot/.env
+ExecStart=/home/ubuntu/shawtybot/venv/bin/uvicorn webapi:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
