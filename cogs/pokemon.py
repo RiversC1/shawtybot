@@ -73,8 +73,7 @@ TYPE_EMOJIS = {
 SPAWN_LIMIT = 10
 SPAWN_WINDOW = timedelta(hours=5)
 SPAWN_FLEE_AFTER = timedelta(minutes=10)
-RANDOM_SPAWN_MIN_SECONDS = 60 * 60       # 1 hour
-RANDOM_SPAWN_MAX_SECONDS = 3 * 60 * 60   # 3 hours
+RANDOM_SPAWN_INTERVAL_SECONDS = 10 * 60  # 10 minutes
 
 # Non-master balls are multiplied by this against legendary/mythical Pokémon,
 # so a handful of Poké Balls won't realistically land one.
@@ -815,8 +814,7 @@ class Pokemon(commands.Cog):
         except Exception as e:
             log.error(f"Startup sweep failed: {e}", exc_info=True)
         while not self.bot.is_closed():
-            wait_seconds = random.randint(RANDOM_SPAWN_MIN_SECONDS, RANDOM_SPAWN_MAX_SECONDS)
-            await asyncio.sleep(wait_seconds)
+            await asyncio.sleep(RANDOM_SPAWN_INTERVAL_SECONDS)
             try:
                 await self._do_random_spawns()
             except Exception as e:
