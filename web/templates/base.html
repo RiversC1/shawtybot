@@ -8,22 +8,51 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    {% if request.cookies.get("session") %}
-    <nav class="navbar">
-        <a href="/profile" class="brand">ShawtyBot Pokémon</a>
-        <div class="nav-links">
-            <a href="/profile">Profile</a>
-            <a href="/pokedex">Pokédex</a>
-            <a href="/team">Team</a>
-            <a href="/inventory">Inventory</a>
-            <a href="/store">Store</a>
-            <a href="/trainers">Trainers</a>
-            <a href="/logout">Log out</a>
-        </div>
-    </nav>
-    {% endif %}
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+{% set logged_in = request.cookies.get("session") %}
+{% if logged_in %}
+    <div class="app-shell">
+        <aside class="sidebar">
+            <a href="/profile" class="sidebar-brand">
+                <img src="/static/favicon.png" alt="" class="sidebar-brand-icon">
+                <div>
+                    <div class="sidebar-brand-name">ShawtyBot</div>
+                    <div class="sidebar-brand-sub">Pokémon Center</div>
+                </div>
+            </a>
+            <nav class="sidebar-nav">
+                <a href="/profile" class="sidebar-link{{ ' active' if request.url.path == '/profile' else '' }}">
+                    <span class="sidebar-icon">🪪</span> Profile
+                </a>
+                <a href="/pokedex" class="sidebar-link{{ ' active' if request.url.path == '/pokedex' else '' }}">
+                    <span class="sidebar-icon">📕</span> Pokédex
+                </a>
+                <a href="/team" class="sidebar-link{{ ' active' if request.url.path == '/team' else '' }}">
+                    <span class="sidebar-icon">🛡️</span> Team
+                </a>
+                <a href="/inventory" class="sidebar-link{{ ' active' if request.url.path == '/inventory' else '' }}">
+                    <span class="sidebar-icon">🎒</span> Inventory
+                </a>
+                <a href="/store" class="sidebar-link{{ ' active' if request.url.path == '/store' else '' }}">
+                    <span class="sidebar-icon">🏪</span> Store
+                </a>
+                <a href="/trainers" class="sidebar-link{{ ' active' if request.url.path.startswith('/trainer') else '' }}">
+                    <span class="sidebar-icon">🧑‍🤝‍🧑</span> Trainers
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" class="sidebar-link">
+                    <span class="sidebar-icon">🚪</span> Log out
+                </a>
+            </div>
+        </aside>
+{% endif %}
+        <main class="main{{ '' if logged_in else ' main-public' }}">
+            <div class="container">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+{% if logged_in %}
+    </div>
+{% endif %}
 </body>
 </html>
