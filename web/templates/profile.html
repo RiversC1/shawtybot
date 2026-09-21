@@ -80,8 +80,34 @@
 
     <hr>
 
-    <div class="section-label">Permanent Achievements</div>
-    <p class="muted">Coming soon — this will track milestones across your whole journey.</p>
+    <div class="achievements-header">
+        <div class="section-label">Permanent Achievements</div>
+        <div class="muted">{{ trainer.achievements.unlocked }} / {{ trainer.achievements.total }} tiers</div>
+    </div>
+    <p class="muted achievements-subtitle">Bronze · Silver · Gold · Platinum · Diamond. Each tier delivers its rewards to your bag automatically, once.</p>
+
+    <div class="achievement-list">
+        {% for cat in achievements.categories %}
+        <div class="achievement-row">
+            <div class="achievement-info">
+                <div class="achievement-label">{{ cat.label }}</div>
+                <div class="muted">{{ cat.description }}</div>
+            </div>
+            <div class="achievement-badges">
+                {% for tier in cat.tiers %}
+                <span class="badge-tier badge-{{ tier.tier }}{{ ' unlocked' if tier.unlocked else '' }}" title="{{ tier.tier|capitalize }}: {{ tier.threshold }}">{{ tier.tier[0]|upper }}</span>
+                {% endfor %}
+            </div>
+            <div class="achievement-progress muted">
+                {% if cat.next_threshold %}
+                {{ cat.current_value }} / {{ cat.next_threshold }}
+                {% else %}
+                All tiers complete!
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
 
 <div id="customize-modal" class="modal-overlay" hidden>

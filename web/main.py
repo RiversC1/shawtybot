@@ -98,7 +98,9 @@ async def profile(request: Request):
     if status == 401:
         return clear_session(RedirectResponse("/"))
 
-    return templates.TemplateResponse(request, "profile.html", {"trainer": data})
+    _, achievements = await api_get(session, "/api/achievements")
+
+    return templates.TemplateResponse(request, "profile.html", {"trainer": data, "achievements": achievements})
 
 
 @app.get("/pokedex")

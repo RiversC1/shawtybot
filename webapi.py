@@ -61,6 +61,65 @@ def compute_level(total_xp: int) -> tuple[int, int, int]:
     return level, remaining, xp_for_level(level)
 
 
+# Keep in sync with cogs/pokemon.py's ACHIEVEMENTS.
+ACHIEVEMENT_TIERS = ["bronze", "silver", "gold", "platinum", "diamond"]
+
+ACHIEVEMENTS = {
+    "catches": {
+        "label": "Catches", "description": "Catch Pokémon", "stat": "total_caught",
+        "tiers": {
+            "bronze": {"threshold": 10, "rewards": {"pokeball": 5}},
+            "silver": {"threshold": 50, "rewards": {"pokeball": 10, "greatball": 5}},
+            "gold": {"threshold": 150, "rewards": {"greatball": 10, "coin": 50}},
+            "platinum": {"threshold": 300, "rewards": {"ultraball": 10, "coin": 100}},
+            "diamond": {"threshold": 500, "rewards": {"masterball": 1, "coin": 200}},
+        },
+    },
+    "species": {
+        "label": "Pokédex Completion", "description": "Catch unique species", "stat": "unique_species",
+        "tiers": {
+            "bronze": {"threshold": 10, "rewards": {"greatball": 5}},
+            "silver": {"threshold": 50, "rewards": {"greatball": 10, "coin": 50}},
+            "gold": {"threshold": 150, "rewards": {"ultraball": 10, "coin": 100}},
+            "platinum": {"threshold": 300, "rewards": {"masterball": 1, "coin": 150}},
+            "diamond": {"threshold": 493, "rewards": {"masterball": 2, "coin": 500}},
+        },
+    },
+    "shiny": {
+        "label": "Shiny Hunter", "description": "Catch shiny Pokémon", "stat": "shiny_count",
+        "tiers": {
+            "bronze": {"threshold": 1, "rewards": {"coin": 50}},
+            "silver": {"threshold": 3, "rewards": {"ultraball": 5, "coin": 100}},
+            "gold": {"threshold": 5, "rewards": {"masterball": 1}},
+            "platinum": {"threshold": 10, "rewards": {"masterball": 2, "coin": 200}},
+            "diamond": {"threshold": 20, "rewards": {"masterball": 3, "coin": 500}},
+        },
+    },
+    "evolutions": {
+        "label": "Evolver", "description": "Evolve Pokémon", "stat": "evolution_count",
+        "tiers": {
+            "bronze": {"threshold": 1, "rewards": {"coin": 20}},
+            "silver": {"threshold": 5, "rewards": {"greatball": 5, "coin": 50}},
+            "gold": {"threshold": 15, "rewards": {"ultraball": 5, "coin": 100}},
+            "platinum": {"threshold": 30, "rewards": {"masterball": 1, "coin": 200}},
+            "diamond": {"threshold": 50, "rewards": {"masterball": 2, "coin": 300}},
+        },
+    },
+    "level": {
+        "label": "Trainer Level", "description": "Reach trainer levels", "stat": "level",
+        "tiers": {
+            "bronze": {"threshold": 5, "rewards": {"pokeball": 10}},
+            "silver": {"threshold": 10, "rewards": {"greatball": 10}},
+            "gold": {"threshold": 20, "rewards": {"ultraball": 10, "coin": 100}},
+            "platinum": {"threshold": 35, "rewards": {"masterball": 1, "coin": 150}},
+            "diamond": {"threshold": 50, "rewards": {"masterball": 2, "coin": 300}},
+        },
+    },
+}
+
+TOTAL_ACHIEVEMENT_TIERS = sum(len(cat["tiers"]) for cat in ACHIEVEMENTS.values())
+
+
 with open(DATA_PATH, encoding="utf-8") as f:
     POKEDEX: dict[int, dict] = {p["id"]: p for p in json.load(f)}
 
@@ -149,6 +208,9 @@ def get_me(user_id: int = Depends(get_current_user_id)):
         unique_species = conn.execute(
             "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (user_id,)
         ).fetchone()[0]
+        unlocked_count = conn.execute(
+            "SELECT COUNT(*) FROM poke_achievements WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
 
     starter = POKEDEX.get(trainer["starter_id"])
     level, xp_into_level, xp_needed = compute_level(total_xp)
@@ -190,7 +252,71 @@ def get_me(user_id: int = Depends(get_current_user_id)):
         },
         # Battling isn't built yet — always accurate at 0 until it is.
         "battle_record": {"wins": 0, "games": 0},
+        "achievements": {"unlocked": unlocked_count, "total": TOTAL_ACHIEVEMENT_TIERS},
     }
+
+
+# ---------- Achievements ----------
+
+@app.get("/api/achievements")
+def get_achievements(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        total_caught = conn.execute(
+            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
+        unique_species = conn.execute(
+            "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
+        shiny_count = conn.execute(
+            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND is_shiny = 1", (user_id,)
+        ).fetchone()[0]
+        evo_row = conn.execute(
+            "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'stat_evolutions'", (user_id,)
+        ).fetchone()
+        evolution_count = evo_row["qty"] if evo_row else 0
+        xp_row = conn.execute(
+            "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (user_id,)
+        ).fetchone()
+        level, _, _ = compute_level(xp_row["qty"] if xp_row else 0)
+
+        unlocked = {
+            r["achievement_key"]
+            for r in conn.execute(
+                "SELECT achievement_key FROM poke_achievements WHERE user_id = ?", (user_id,)
+            ).fetchall()
+        }
+
+    stats = {
+        "total_caught": total_caught,
+        "unique_species": unique_species,
+        "shiny_count": shiny_count,
+        "evolution_count": evolution_count,
+        "level": level,
+    }
+
+    categories = []
+    for cat_key, cat in ACHIEVEMENTS.items():
+        stat_value = stats[cat["stat"]]
+        tiers = []
+        for tier_key in ACHIEVEMENT_TIERS:
+            tier = cat["tiers"][tier_key]
+            tiers.append({
+                "tier": tier_key,
+                "threshold": tier["threshold"],
+                "rewards": tier["rewards"],
+                "unlocked": f"{cat_key}_{tier_key}" in unlocked,
+            })
+        next_threshold = next((t["threshold"] for t in tiers if not t["unlocked"]), None)
+        categories.append({
+            "key": cat_key,
+            "label": cat["label"],
+            "description": cat["description"],
+            "current_value": stat_value,
+            "next_threshold": next_threshold,  # None once all 5 tiers are unlocked
+            "tiers": tiers,
+        })
+
+    return {"categories": categories, "total": TOTAL_ACHIEVEMENT_TIERS}
 
 
 # ---------- Trainer character ----------

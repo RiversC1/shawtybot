@@ -63,6 +63,78 @@ def compute_level(total_xp: int) -> tuple[int, int, int]:
         level += 1
     return level, remaining, xp_for_level(level)
 
+
+# ---------- Permanent Achievements ----------
+# 5 categories x 5 tiers = 25 total. Each tier grants its rewards to the bag
+# automatically, exactly once, the moment its threshold is crossed.
+
+ACHIEVEMENT_TIERS = ["bronze", "silver", "gold", "platinum", "diamond"]
+
+ACHIEVEMENTS = {
+    "catches": {
+        "label": "Catches",
+        "description": "Catch Pokémon",
+        "stat": "total_caught",
+        "tiers": {
+            "bronze": {"threshold": 10, "rewards": {"pokeball": 5}},
+            "silver": {"threshold": 50, "rewards": {"pokeball": 10, "greatball": 5}},
+            "gold": {"threshold": 150, "rewards": {"greatball": 10, "coin": 50}},
+            "platinum": {"threshold": 300, "rewards": {"ultraball": 10, "coin": 100}},
+            "diamond": {"threshold": 500, "rewards": {"masterball": 1, "coin": 200}},
+        },
+    },
+    "species": {
+        "label": "Pokédex Completion",
+        "description": "Catch unique species",
+        "stat": "unique_species",
+        "tiers": {
+            "bronze": {"threshold": 10, "rewards": {"greatball": 5}},
+            "silver": {"threshold": 50, "rewards": {"greatball": 10, "coin": 50}},
+            "gold": {"threshold": 150, "rewards": {"ultraball": 10, "coin": 100}},
+            "platinum": {"threshold": 300, "rewards": {"masterball": 1, "coin": 150}},
+            "diamond": {"threshold": 493, "rewards": {"masterball": 2, "coin": 500}},
+        },
+    },
+    "shiny": {
+        "label": "Shiny Hunter",
+        "description": "Catch shiny Pokémon",
+        "stat": "shiny_count",
+        "tiers": {
+            "bronze": {"threshold": 1, "rewards": {"coin": 50}},
+            "silver": {"threshold": 3, "rewards": {"ultraball": 5, "coin": 100}},
+            "gold": {"threshold": 5, "rewards": {"masterball": 1}},
+            "platinum": {"threshold": 10, "rewards": {"masterball": 2, "coin": 200}},
+            "diamond": {"threshold": 20, "rewards": {"masterball": 3, "coin": 500}},
+        },
+    },
+    "evolutions": {
+        "label": "Evolver",
+        "description": "Evolve Pokémon",
+        "stat": "evolution_count",
+        "tiers": {
+            "bronze": {"threshold": 1, "rewards": {"coin": 20}},
+            "silver": {"threshold": 5, "rewards": {"greatball": 5, "coin": 50}},
+            "gold": {"threshold": 15, "rewards": {"ultraball": 5, "coin": 100}},
+            "platinum": {"threshold": 30, "rewards": {"masterball": 1, "coin": 200}},
+            "diamond": {"threshold": 50, "rewards": {"masterball": 2, "coin": 300}},
+        },
+    },
+    "level": {
+        "label": "Trainer Level",
+        "description": "Reach trainer levels",
+        "stat": "level",
+        "tiers": {
+            "bronze": {"threshold": 5, "rewards": {"pokeball": 10}},
+            "silver": {"threshold": 10, "rewards": {"greatball": 10}},
+            "gold": {"threshold": 20, "rewards": {"ultraball": 10, "coin": 100}},
+            "platinum": {"threshold": 35, "rewards": {"masterball": 1, "coin": 150}},
+            "diamond": {"threshold": 50, "rewards": {"masterball": 2, "coin": 300}},
+        },
+    },
+}
+
+TOTAL_ACHIEVEMENT_TIERS = sum(len(cat["tiers"]) for cat in ACHIEVEMENTS.values())
+
 # Base catch rates before rarity/summoner adjustments. Master Ball always succeeds.
 BALLS = {
     "pokeball": {"label": "Poké Ball", "catch_rate": 0.10},
@@ -386,6 +458,7 @@ class CatchPanelView(discord.ui.View):
             if is_rare(mon):
                 xp_gain += XP_LEGENDARY_BONUS
             self.cog.add_xp(self.catcher_id, xp_gain)
+            self.cog.check_achievements(self.catcher_id)
 
             await self.spawn_view.mark_caught(
                 interaction.user.display_name, interaction.user.mention, BALLS[ball_key]["label"]
@@ -517,6 +590,7 @@ class CofferView(discord.ui.View):
         for item, qty in rewards.items():
             self.cog.add_item(interaction.user.id, item, qty)
         self.cog.add_xp(interaction.user.id, XP_PER_COFFER[self.coffer_key])
+        self.cog.check_achievements(interaction.user.id)
 
         if self.message:
             embed = self.message.embeds[0]
@@ -829,6 +903,14 @@ class Pokemon(commands.Cog):
                 conn.execute("ALTER TABLE poke_trainers ADD COLUMN character TEXT")
             if "favorite_dex_id" not in cols:
                 conn.execute("ALTER TABLE poke_trainers ADD COLUMN favorite_dex_id INTEGER")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_achievements (
+                    user_id INTEGER NOT NULL,
+                    achievement_key TEXT NOT NULL,
+                    unlocked_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, achievement_key)
+                )
+            """)
 
     # ---------- DB helpers ----------
 
@@ -973,6 +1055,63 @@ class Pokemon(commands.Cog):
             "dex_total": len(self.pokedex),
             "dex_percent": round(unique / len(self.pokedex) * 100, 1) if self.pokedex else 0,
         }
+
+    def get_shiny_count(self, user_id: int) -> int:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND is_shiny = 1", (user_id,)
+            ).fetchone()
+        return row[0] if row else 0
+
+    def get_evolution_count(self, user_id: int) -> int:
+        return self.get_item_qty(user_id, "stat_evolutions")
+
+    def get_achievement_stats(self, user_id: int) -> dict:
+        stats = self.get_collection_stats(user_id)
+        level, _, _ = compute_level(self.get_xp(user_id))
+        return {
+            "total_caught": stats["total_caught"],
+            "unique_species": stats["unique_species"],
+            "shiny_count": self.get_shiny_count(user_id),
+            "evolution_count": self.get_evolution_count(user_id),
+            "level": level,
+        }
+
+    def get_unlocked_achievements(self, user_id: int) -> set[str]:
+        with sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT achievement_key FROM poke_achievements WHERE user_id = ?", (user_id,)
+            ).fetchall()
+        return {r[0] for r in rows}
+
+    def check_achievements(self, user_id: int) -> list[dict]:
+        """Compares current stats against every achievement tier, unlocks any
+        newly-earned ones (granting rewards exactly once), and returns them."""
+        stats = self.get_achievement_stats(user_id)
+        unlocked = self.get_unlocked_achievements(user_id)
+        newly_unlocked = []
+
+        for cat_key, cat in ACHIEVEMENTS.items():
+            stat_value = stats[cat["stat"]]
+            for tier_key in ACHIEVEMENT_TIERS:
+                achievement_key = f"{cat_key}_{tier_key}"
+                if achievement_key in unlocked:
+                    continue
+                tier = cat["tiers"][tier_key]
+                if stat_value >= tier["threshold"]:
+                    with sqlite3.connect(DB_PATH) as conn:
+                        conn.execute(
+                            "INSERT INTO poke_achievements (user_id, achievement_key, unlocked_at) VALUES (?, ?, ?)",
+                            (user_id, achievement_key, datetime.now(timezone.utc).isoformat()),
+                        )
+                    for item, qty in tier["rewards"].items():
+                        self.add_item(user_id, item, qty)
+                    newly_unlocked.append({
+                        "category": cat_key, "category_label": cat["label"],
+                        "tier": tier_key, "rewards": tier["rewards"],
+                    })
+
+        return newly_unlocked
 
     def add_item(self, user_id: int, item: str, delta: int):
         with sqlite3.connect(DB_PATH) as conn:
@@ -1267,6 +1406,8 @@ class Pokemon(commands.Cog):
         self.add_item(interaction.user.id, candy_key, -EVOLUTION_CANDY_COST)
         self.evolve_one(interaction.user.id, from_mon["id"], to_mon["id"])
         self.add_xp(interaction.user.id, XP_PER_EVOLUTION)
+        self.add_item(interaction.user.id, "stat_evolutions", 1)
+        self.check_achievements(interaction.user.id)
 
         embed = discord.Embed(
             title=f"{from_mon['name']} evolved into {to_mon['name']}!",
