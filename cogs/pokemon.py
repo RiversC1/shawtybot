@@ -180,6 +180,9 @@ ITEM_LABELS["candy"] = "Rare Candy"
 ITEM_LABELS["coin"] = "Poké Coin"
 ITEM_LABELS.update({key: cfg["label"] for key, cfg in STORE_ITEMS.items()})
 
+# Items the bot owner can hand out via /poke give.
+GIVABLE_ITEM_KEYS = list(BALLS.keys()) + ["candy", "coin"] + [k for k in STORE_ITEMS if k not in BALLS]
+
 TYPE_EMOJIS = {
     "normal": "⚪", "fire": "🔥", "water": "💧", "grass": "🌿", "electric": "⚡",
     "ice": "❄️", "fighting": "🥊", "poison": "☠️", "ground": "🌍", "flying": "🕊️",
@@ -1675,6 +1678,38 @@ class Pokemon(commands.Cog):
             color=discord.Color.blurple(),
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @poke.command(name="give", description="[Bot owner only] Give a player balls, stones, candy, or coins")
+    @app_commands.describe(member="The player to give items to", quantity="How many to give")
+    @app_commands.choices(item=[
+        app_commands.Choice(name=ITEM_LABELS[key], value=key) for key in GIVABLE_ITEM_KEYS
+    ])
+    async def poke_give(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        item: app_commands.Choice[str],
+        quantity: int,
+    ):
+        if not await self.bot.is_owner(interaction.user):
+            await interaction.response.send_message(
+                "You don't have permission to use this command.", ephemeral=True
+            )
+            return
+        if quantity <= 0:
+            await interaction.response.send_message("Quantity must be at least 1.", ephemeral=True)
+            return
+        if not self.get_trainer(member.id):
+            await interaction.response.send_message(
+                f"{member.display_name} hasn't started their Pokémon journey yet (`/poke start`).",
+                ephemeral=True,
+            )
+            return
+
+        self.add_item(member.id, item.value, quantity)
+        await interaction.response.send_message(
+            f"✅ Gave **{quantity}x {item.name}** to **{member.display_name}**.", ephemeral=True
+        )
 
 
 async def setup(bot: commands.Bot):
