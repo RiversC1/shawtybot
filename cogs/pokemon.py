@@ -27,15 +27,18 @@ STARTERS = [
 # Main protagonist characters, one male/female pair per generation 1-4, for the
 # web profile's trainer customization. Sprites are official game art (Bulbagarden
 # Archives), used only for the web trainer-card feature, not sold/traded in-bot.
+# Self-hosted (web/static/trainers/) since Bulbagarden Archives intermittently
+# 403s hotlinked requests for some of these files — not worth depending on.
+WEB_STATIC_BASE = "https://shawtypoke-web.duckdns.org/static/trainers"
 TRAINER_CHARACTERS = {
-    "red": {"label": "Red", "generation": "Kanto", "sprite": "https://archives.bulbagarden.net/media/upload/e/e8/Spr_HGSS_Red.png"},
-    "leaf": {"label": "Leaf", "generation": "Kanto", "sprite": "https://archives.bulbagarden.net/media/upload/2/2b/Spr_FRLG_Leaf.png"},
-    "gold": {"label": "Gold", "generation": "Johto", "sprite": "https://archives.bulbagarden.net/media/upload/a/a5/Spr_HGSS_Ethan.png"},
-    "kris": {"label": "Kris", "generation": "Johto", "sprite": "https://archives.bulbagarden.net/media/upload/9/9e/Spr_C_Kris.png"},
-    "brendan": {"label": "Brendan", "generation": "Hoenn", "sprite": "https://archives.bulbagarden.net/media/upload/6/68/Spr_RS_Brendan.png"},
-    "may": {"label": "May", "generation": "Hoenn", "sprite": "https://archives.bulbagarden.net/media/upload/3/38/Spr_RS_May.png"},
-    "lucas": {"label": "Lucas", "generation": "Sinnoh", "sprite": "https://archives.bulbagarden.net/media/upload/6/6b/Spr_Pt_Lucas.png"},
-    "dawn": {"label": "Dawn", "generation": "Sinnoh", "sprite": "https://archives.bulbagarden.net/media/upload/0/00/Spr_DP_Dawn.png"},
+    "red": {"label": "Red", "generation": "Kanto", "sprite": f"{WEB_STATIC_BASE}/red.png"},
+    "leaf": {"label": "Leaf", "generation": "Kanto", "sprite": f"{WEB_STATIC_BASE}/leaf.png"},
+    "gold": {"label": "Gold", "generation": "Johto", "sprite": f"{WEB_STATIC_BASE}/gold.png"},
+    "kris": {"label": "Kris", "generation": "Johto", "sprite": f"{WEB_STATIC_BASE}/kris.png"},
+    "brendan": {"label": "Brendan", "generation": "Hoenn", "sprite": f"{WEB_STATIC_BASE}/brendan.png"},
+    "may": {"label": "May", "generation": "Hoenn", "sprite": f"{WEB_STATIC_BASE}/may.png"},
+    "lucas": {"label": "Lucas", "generation": "Sinnoh", "sprite": f"{WEB_STATIC_BASE}/lucas.png"},
+    "dawn": {"label": "Dawn", "generation": "Sinnoh", "sprite": f"{WEB_STATIC_BASE}/dawn.png"},
 }
 DEFAULT_CHARACTER = "red"
 

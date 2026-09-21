@@ -35,15 +35,18 @@ BALL_KEYS = {"pokeball", "greatball", "ultraball", "masterball"}
 
 # Keep in sync with cogs/pokemon.py — duplicated here so this API has no
 # discord.py dependency and can be deployed/restarted independently of the bot.
+# Self-hosted (web/static/trainers/) since Bulbagarden Archives intermittently
+# 403s hotlinked requests for some of these files — not worth depending on.
+WEB_STATIC_BASE = "https://shawtypoke-web.duckdns.org/static/trainers"
 TRAINER_CHARACTERS = {
-    "red": {"label": "Red", "generation": "Kanto", "sprite": "https://archives.bulbagarden.net/media/upload/e/e8/Spr_HGSS_Red.png"},
-    "leaf": {"label": "Leaf", "generation": "Kanto", "sprite": "https://archives.bulbagarden.net/media/upload/2/2b/Spr_FRLG_Leaf.png"},
-    "gold": {"label": "Gold", "generation": "Johto", "sprite": "https://archives.bulbagarden.net/media/upload/a/a5/Spr_HGSS_Ethan.png"},
-    "kris": {"label": "Kris", "generation": "Johto", "sprite": "https://archives.bulbagarden.net/media/upload/9/9e/Spr_C_Kris.png"},
-    "brendan": {"label": "Brendan", "generation": "Hoenn", "sprite": "https://archives.bulbagarden.net/media/upload/6/68/Spr_RS_Brendan.png"},
-    "may": {"label": "May", "generation": "Hoenn", "sprite": "https://archives.bulbagarden.net/media/upload/3/38/Spr_RS_May.png"},
-    "lucas": {"label": "Lucas", "generation": "Sinnoh", "sprite": "https://archives.bulbagarden.net/media/upload/6/6b/Spr_Pt_Lucas.png"},
-    "dawn": {"label": "Dawn", "generation": "Sinnoh", "sprite": "https://archives.bulbagarden.net/media/upload/0/00/Spr_DP_Dawn.png"},
+    "red": {"label": "Red", "generation": "Kanto", "sprite": f"{WEB_STATIC_BASE}/red.png"},
+    "leaf": {"label": "Leaf", "generation": "Kanto", "sprite": f"{WEB_STATIC_BASE}/leaf.png"},
+    "gold": {"label": "Gold", "generation": "Johto", "sprite": f"{WEB_STATIC_BASE}/gold.png"},
+    "kris": {"label": "Kris", "generation": "Johto", "sprite": f"{WEB_STATIC_BASE}/kris.png"},
+    "brendan": {"label": "Brendan", "generation": "Hoenn", "sprite": f"{WEB_STATIC_BASE}/brendan.png"},
+    "may": {"label": "May", "generation": "Hoenn", "sprite": f"{WEB_STATIC_BASE}/may.png"},
+    "lucas": {"label": "Lucas", "generation": "Sinnoh", "sprite": f"{WEB_STATIC_BASE}/lucas.png"},
+    "dawn": {"label": "Dawn", "generation": "Sinnoh", "sprite": f"{WEB_STATIC_BASE}/dawn.png"},
 }
 DEFAULT_CHARACTER = "red"
 
@@ -190,27 +193,25 @@ def exchange_token(body: ExchangeRequest):
 
 # ---------- Profile ----------
 
-@app.get("/api/me")
-def get_me(user_id: int = Depends(get_current_user_id)):
-    with db() as conn:
-        trainer = conn.execute("SELECT * FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
-        if not trainer:
-            raise HTTPException(404, "Trainer not found")
+def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | None:
+    trainer = conn.execute("SELECT * FROM poke_trainers WHERE user_id = ?", (target_id,)).fetchone()
+    if not trainer:
+        return None
 
-        xp_row = conn.execute(
-            "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (user_id,)
-        ).fetchone()
-        total_xp = xp_row["qty"] if xp_row else 0
+    xp_row = conn.execute(
+        "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (target_id,)
+    ).fetchone()
+    total_xp = xp_row["qty"] if xp_row else 0
 
-        total_caught = conn.execute(
-            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (user_id,)
-        ).fetchone()[0]
-        unique_species = conn.execute(
-            "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (user_id,)
-        ).fetchone()[0]
-        unlocked_count = conn.execute(
-            "SELECT COUNT(*) FROM poke_achievements WHERE user_id = ?", (user_id,)
-        ).fetchone()[0]
+    total_caught = conn.execute(
+        "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (target_id,)
+    ).fetchone()[0]
+    unique_species = conn.execute(
+        "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (target_id,)
+    ).fetchone()[0]
+    unlocked_count = conn.execute(
+        "SELECT COUNT(*) FROM poke_achievements WHERE user_id = ?", (target_id,)
+    ).fetchone()[0]
 
     starter = POKEDEX.get(trainer["starter_id"])
     level, xp_into_level, xp_needed = compute_level(total_xp)
@@ -233,7 +234,7 @@ def get_me(user_id: int = Depends(get_current_user_id)):
     dex_total = len(POKEDEX)
 
     return {
-        "user_id": user_id,
+        "user_id": target_id,
         "username": trainer["username"],
         "avatar_url": trainer["avatar_url"],
         "starter": starter["name"] if starter else None,
@@ -256,35 +257,83 @@ def get_me(user_id: int = Depends(get_current_user_id)):
     }
 
 
+@app.get("/api/me")
+def get_me(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        payload = build_profile_payload(user_id, conn)
+    if not payload:
+        raise HTTPException(404, "Trainer not found")
+    return payload
+
+
+@app.get("/api/trainers")
+def list_trainers(user_id: int = Depends(get_current_user_id)):
+    """A public directory of every trainer, for browsing other people's profiles."""
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT user_id, username, avatar_url, character FROM poke_trainers"
+        ).fetchall()
+        results = []
+        for row in rows:
+            xp_row = conn.execute(
+                "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (row["user_id"],)
+            ).fetchone()
+            level, _, _ = compute_level(xp_row["qty"] if xp_row else 0)
+            unique_species = conn.execute(
+                "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (row["user_id"],)
+            ).fetchone()[0]
+            character_key = row["character"] or DEFAULT_CHARACTER
+            character = TRAINER_CHARACTERS.get(character_key, TRAINER_CHARACTERS[DEFAULT_CHARACTER])
+            results.append({
+                "user_id": row["user_id"],
+                "username": row["username"] or "Trainer",
+                "avatar_url": row["avatar_url"],
+                "level": level,
+                "unique_species": unique_species,
+                "character_sprite": character["sprite"],
+                "is_you": row["user_id"] == user_id,
+            })
+
+    results.sort(key=lambda t: (-t["level"], t["username"].lower()))
+    return results
+
+
+@app.get("/api/trainer/{target_id}")
+def get_trainer(target_id: int, user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        payload = build_profile_payload(target_id, conn)
+    if not payload:
+        raise HTTPException(404, "Trainer not found")
+    return payload
+
+
 # ---------- Achievements ----------
 
-@app.get("/api/achievements")
-def get_achievements(user_id: int = Depends(get_current_user_id)):
-    with db() as conn:
-        total_caught = conn.execute(
-            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (user_id,)
-        ).fetchone()[0]
-        unique_species = conn.execute(
-            "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (user_id,)
-        ).fetchone()[0]
-        shiny_count = conn.execute(
-            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND is_shiny = 1", (user_id,)
-        ).fetchone()[0]
-        evo_row = conn.execute(
-            "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'stat_evolutions'", (user_id,)
-        ).fetchone()
-        evolution_count = evo_row["qty"] if evo_row else 0
-        xp_row = conn.execute(
-            "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (user_id,)
-        ).fetchone()
-        level, _, _ = compute_level(xp_row["qty"] if xp_row else 0)
+def build_achievements_payload(target_id: int, conn: sqlite3.Connection) -> dict:
+    total_caught = conn.execute(
+        "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (target_id,)
+    ).fetchone()[0]
+    unique_species = conn.execute(
+        "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (target_id,)
+    ).fetchone()[0]
+    shiny_count = conn.execute(
+        "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND is_shiny = 1", (target_id,)
+    ).fetchone()[0]
+    evo_row = conn.execute(
+        "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'stat_evolutions'", (target_id,)
+    ).fetchone()
+    evolution_count = evo_row["qty"] if evo_row else 0
+    xp_row = conn.execute(
+        "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (target_id,)
+    ).fetchone()
+    level, _, _ = compute_level(xp_row["qty"] if xp_row else 0)
 
-        unlocked = {
-            r["achievement_key"]
-            for r in conn.execute(
-                "SELECT achievement_key FROM poke_achievements WHERE user_id = ?", (user_id,)
-            ).fetchall()
-        }
+    unlocked = {
+        r["achievement_key"]
+        for r in conn.execute(
+            "SELECT achievement_key FROM poke_achievements WHERE user_id = ?", (target_id,)
+        ).fetchall()
+    }
 
     stats = {
         "total_caught": total_caught,
@@ -317,6 +366,21 @@ def get_achievements(user_id: int = Depends(get_current_user_id)):
         })
 
     return {"categories": categories, "total": TOTAL_ACHIEVEMENT_TIERS}
+
+
+@app.get("/api/achievements")
+def get_achievements(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        return build_achievements_payload(user_id, conn)
+
+
+@app.get("/api/trainer/{target_id}/achievements")
+def get_trainer_achievements(target_id: int, user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        trainer = conn.execute("SELECT 1 FROM poke_trainers WHERE user_id = ?", (target_id,)).fetchone()
+        if not trainer:
+            raise HTTPException(404, "Trainer not found")
+        return build_achievements_payload(target_id, conn)
 
 
 # ---------- Trainer character ----------

@@ -100,7 +100,41 @@ async def profile(request: Request):
 
     _, achievements = await api_get(session, "/api/achievements")
 
-    return templates.TemplateResponse(request, "profile.html", {"trainer": data, "achievements": achievements})
+    return templates.TemplateResponse(
+        request, "profile.html", {"trainer": data, "achievements": achievements, "is_own": True}
+    )
+
+
+@app.get("/trainers")
+async def trainers_directory(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/trainers")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "trainers.html", {"trainers": data})
+
+
+@app.get("/trainer/{target_id}")
+async def view_trainer(request: Request, target_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, f"/api/trainer/{target_id}")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+    if status == 404:
+        return templates.TemplateResponse(request, "landing.html", {"error": "That trainer doesn't exist."})
+
+    _, achievements = await api_get(session, f"/api/trainer/{target_id}/achievements")
+
+    return templates.TemplateResponse(
+        request, "profile.html", {"trainer": data, "achievements": achievements, "is_own": False}
+    )
 
 
 @app.get("/pokedex")

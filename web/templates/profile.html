@@ -30,7 +30,7 @@
     </div>
 
     <div class="trainer-info">
-        <div class="section-label">Your Trainer Card</div>
+        <div class="section-label">{{ "Your Trainer Card" if is_own else "Trainer Card" }}</div>
         <h1>{{ trainer.username or "Trainer" }}</h1>
         <p class="trainer-tagline">Your companion. Your style. Your story.</p>
         <p class="trainer-level-tag">Level {{ trainer.level }}</p>
@@ -52,9 +52,13 @@
             </div>
         </div>
 
+        {% if is_own %}
         <button id="customize-btn" class="btn-primary"
                 data-character-key="{{ trainer.character.key }}"
                 data-favorite-dex-id="{{ trainer.favorite.dex_id if trainer.favorite else '' }}">Customize ✦</button>
+        {% else %}
+        <a href="/trainers" class="btn-secondary">← Back to Trainers</a>
+        {% endif %}
     </div>
 
     {% if trainer.avatar_url %}
@@ -110,6 +114,7 @@
     </div>
 </div>
 
+{% if is_own %}
 <div id="customize-modal" class="modal-overlay" hidden>
     <div class="modal">
         <div class="modal-header">
@@ -139,4 +144,5 @@
 </div>
 
 <script src="/static/profile.js"></script>
+{% endif %}
 {% endblock %}

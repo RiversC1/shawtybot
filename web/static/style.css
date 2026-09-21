@@ -551,3 +551,52 @@ code {
         justify-content: center;
     }
 }
+
+/* ---------- Trainers directory ---------- */
+
+.trainer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.trainer-list-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #16213e;
+    border-radius: 10px;
+    padding: 12px 16px;
+    text-decoration: none;
+    color: #eee;
+    border: 1px solid transparent;
+}
+
+.trainer-list-item:hover {
+    border-color: #e94560;
+}
+
+.trainer-list-item.is-you {
+    border-color: #a4e864;
+}
+
+.trainer-list-sprite {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.trainer-list-info {
+    flex: 1;
+}
+
+.trainer-list-name {
+    font-weight: bold;
+}
+
+.trainer-list-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+}
