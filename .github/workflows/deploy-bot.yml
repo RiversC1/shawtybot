@@ -1,0 +1,34 @@
+name: Deploy Bot & Internal API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cogs/**"
+      - "bot.py"
+      - "webapi.py"
+      - "data/**"
+      - "requirements.txt"
+      - ".github/workflows/deploy-bot.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Oracle VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ubuntu
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/ubuntu/shawtybot
+            git pull origin main
+            source venv/bin/activate
+            pip install -r requirements.txt
+            sudo systemctl restart shawtybot
+            sudo systemctl restart shawtybot-api
+            sleep 2
+            sudo systemctl is-active shawtybot
+            sudo systemctl is-active shawtybot-api
