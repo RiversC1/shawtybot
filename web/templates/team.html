@@ -2,14 +2,28 @@
 {% block title %}Team — ShawtyBot Pokémon{% endblock %}
 {% block content %}
 <h1>Your Team</h1>
-<p class="muted">Manage your team with <code>/poke team</code> in Discord for now.</p>
-<div class="grid">
-    {% for mon in team %}
-    <div class="dex-card">
-        <div class="dex-name">#{{ "%03d"|format(mon.dex_id) }} {{ mon.name }}</div>
-    </div>
-    {% else %}
-    <p>Your team is empty.</p>
-    {% endfor %}
+<p class="muted">Pick up to 6 Pokémon from your collection to carry as your active team.</p>
+
+<div class="team-grid" id="team-grid"></div>
+
+<div class="team-actions">
+    <button id="team-save" class="btn-primary">Save Team</button>
+    <span id="team-status" class="muted"></span>
 </div>
+
+<div id="team-modal" class="modal-overlay" hidden>
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Choose a Pokémon</h2>
+            <button id="team-modal-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="text" id="team-search" placeholder="Search your catches..." class="search-input" style="width: 100%; margin-bottom: 12px;">
+            <div id="team-picker-grid" class="picker-grid"></div>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="team-data">{{ team_json|safe }}</script>
+<script src="/static/team.js"></script>
 {% endblock %}

@@ -5,8 +5,11 @@
 
 <div class="card">
     <h2>Balls</h2>
-    {% for item, qty in inventory.balls.items() %}
-    <div class="item-row"><span>{{ item }}</span><span>{{ qty }}</span></div>
+    {% for item in inventory.balls %}
+    <div class="item-row">
+        <span class="item-name"><img src="{{ item.icon }}" alt="" class="item-icon">{{ item.label }}</span>
+        <span>{{ item.qty }}</span>
+    </div>
     {% else %}
     <p class="muted">No balls yet.</p>
     {% endfor %}
@@ -15,13 +18,25 @@
 <div class="card">
     <h2>Currency</h2>
     <div class="item-row"><span>Poké Coins</span><span>🪙 {{ inventory.coins }}</span></div>
-    <div class="item-row"><span>Rare Candy</span><span>{{ inventory.rare_candy }}</span></div>
+    <div class="item-row"><span>Rare Candy</span><span>🍬 {{ inventory.rare_candy }}</span></div>
+</div>
+
+<div class="card">
+    <h2>Evolution Stones</h2>
+    {% for item in inventory.stones %}
+    <div class="item-row">
+        <span class="item-name"><img src="{{ item.icon }}" alt="" class="item-icon">{{ item.label }}</span>
+        <span>{{ item.qty }}</span>
+    </div>
+    {% else %}
+    <p class="muted">No evolution stones yet — check the <a href="/store">Store</a>!</p>
+    {% endfor %}
 </div>
 
 <div class="card">
     <h2>Evolution Candy</h2>
-    {% for name, qty in inventory.family_candies.items() %}
-    <div class="item-row"><span>{{ name }} Candy</span><span>{{ qty }}</span></div>
+    {% for candy in inventory.family_candies %}
+    <div class="item-row"><span>🍬 {{ candy.name }} Candy</span><span>{{ candy.qty }}</span></div>
     {% else %}
     <p class="muted">No evolution candy yet — catch some Pokémon!</p>
     {% endfor %}

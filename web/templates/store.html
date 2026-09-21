@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Store — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Poké Store</h1>
+<p class="muted">Balance: <span id="store-coins">🪙 {{ store.coins }}</span></p>
+<p id="store-status" class="muted"></p>
+
+<div class="grid" id="store-grid">
+    {% for item in store['items'] %}
+    <div class="dex-card store-item" data-key="{{ item.key }}" data-price="{{ item.price }}">
+        <img src="{{ item.icon }}" alt="{{ item.label }}">
+        <div class="dex-name">{{ item.label }}</div>
+        <div class="muted">{{ item.price }} 🪙</div>
+        <div class="store-buy-row">
+            <input type="number" min="1" value="1" class="store-qty">
+            <button class="btn-primary store-buy-btn">Buy</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script src="/static/store.js"></script>
+{% endblock %}

@@ -9,6 +9,7 @@ Run with: uvicorn web.main:app --host 0.0.0.0 --port 8080
 CD test marker: deploy-web.yml pipeline
 """
 import os
+import json
 import logging
 
 import httpx
@@ -143,7 +144,7 @@ async def pokedex(request: Request):
     if not session:
         return RedirectResponse("/")
 
-    status, data = await api_get(session, "/api/pokedex")
+    status, data = await api_get(session, "/api/pokedex/full")
     if status == 401:
         return clear_session(RedirectResponse("/"))
 
@@ -173,7 +174,20 @@ async def team(request: Request):
     if status == 401:
         return clear_session(RedirectResponse("/"))
 
-    return templates.TemplateResponse(request, "team.html", {"team": data})
+    return templates.TemplateResponse(request, "team.html", {"team": data, "team_json": json.dumps(data)})
+
+
+@app.get("/store")
+async def store(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/store")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "store.html", {"store": data})
 
 
 # ---------- JSON proxy endpoints for the customize modal's JS ----------
@@ -215,4 +229,24 @@ async def proxy_set_favorite(request: Request):
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     body = await request.json()
     status, data = await api_post(session, "/api/favorite", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/team")
+async def proxy_set_team(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, "/api/team", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/store/buy")
+async def proxy_buy_item(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, "/api/store/buy", body)
     return JSONResponse(data, status_code=status)

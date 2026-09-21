@@ -106,6 +106,22 @@ body {
     margin-top: 8px;
 }
 
+.dex-search {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    margin: 4px 0 20px;
+}
+
+.dex-card.not-owned img {
+    filter: grayscale(100%) brightness(0.5);
+    opacity: 0.6;
+}
+
+.dex-card.not-owned .dex-name {
+    color: #777;
+}
+
 .item-row {
     display: flex;
     justify-content: space-between;
@@ -115,6 +131,19 @@ body {
 
 .item-row:last-child {
     border-bottom: none;
+}
+
+.item-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.item-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    image-rendering: pixelated;
 }
 
 code {
@@ -550,6 +579,102 @@ code {
     .trainer-stats {
         justify-content: center;
     }
+}
+
+/* ---------- Team builder ---------- */
+
+.team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.team-slot {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    position: relative;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.team-slot.empty {
+    border: 2px dashed #2a2a4a;
+}
+
+.team-slot-add {
+    background: none;
+    border: none;
+    color: #9adcff;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: bold;
+}
+
+.team-slot.filled img {
+    width: 90px;
+    height: 90px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.team-slot-name {
+    font-weight: bold;
+    margin: 6px 0 4px;
+}
+
+.team-slot-remove {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: #0f0f23;
+    color: #eee;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 1em;
+    line-height: 1;
+}
+
+.team-slot-remove:hover {
+    background: #e94560;
+}
+
+.team-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* ---------- Store ---------- */
+
+.store-buy-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    justify-content: center;
+}
+
+.store-qty {
+    width: 56px;
+    background: #0f0f23;
+    border: 1px solid #2a2a4a;
+    color: #eee;
+    border-radius: 6px;
+    padding: 4px 6px;
+    text-align: center;
+}
+
+.store-buy-btn {
+    padding: 6px 14px;
+    font-size: 0.85em;
 }
 
 /* ---------- Trainers directory ---------- */

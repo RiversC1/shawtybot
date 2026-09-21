@@ -1,20 +1,39 @@
 {% extends "base.html" %}
 {% block title %}Pokédex — ShawtyBot Pokémon{% endblock %}
 {% block content %}
-<h1>Your Pokédex</h1>
-<p class="muted">{{ species|length }} unique species caught</p>
-<div class="grid">
+<h1>Pokédex</h1>
+<p class="muted" id="dex-count">{{ species|selectattr("owned")|list|length }} / {{ species|length }} species caught</p>
+<input type="text" id="dex-search" class="search-input dex-search" placeholder="Search Pokémon...">
+
+<div class="grid" id="dex-grid">
     {% for mon in species %}
-    <div class="dex-card">
+    <div class="dex-card{{ '' if mon.owned else ' not-owned' }}" data-name="{{ mon.name|lower }}">
         <img src="{{ mon.artwork }}" alt="{{ mon.name }}">
         <div class="dex-name">
             #{{ "%03d"|format(mon.dex_id) }} {{ mon.name }}{% if mon.has_shiny %} ✨{% endif %}
         </div>
         <div class="muted">{{ mon.category }}</div>
+        {% if mon.owned %}
         <div class="muted">x{{ mon.count }}</div>
+        {% else %}
+        <div class="muted">Not caught yet</div>
+        {% endif %}
     </div>
     {% else %}
-    <p>You haven't caught any Pokémon yet!</p>
+    <p>The Pokédex is empty.</p>
     {% endfor %}
 </div>
+
+<script>
+(function () {
+    const search = document.getElementById("dex-search");
+    const cards = Array.from(document.querySelectorAll("#dex-grid .dex-card"));
+    search.addEventListener("input", () => {
+        const q = search.value.trim().toLowerCase();
+        for (const card of cards) {
+            card.hidden = q.length > 0 && !card.dataset.name.includes(q);
+        }
+    });
+})();
+</script>
 {% endblock %}

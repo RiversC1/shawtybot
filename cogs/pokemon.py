@@ -163,7 +163,7 @@ STORE_ITEMS = {
     "pokeball": {"label": "Poké Ball", "price": 5},
     "greatball": {"label": "Great Ball", "price": 15},
     "ultraball": {"label": "Ultra Ball", "price": 35},
-    "masterball": {"label": "Master Ball", "price": 300},
+    "masterball": {"label": "Master Ball", "price": 1500},
     "fire-stone": {"label": "Fire Stone", "price": 80},
     "water-stone": {"label": "Water Stone", "price": 80},
     "thunder-stone": {"label": "Thunder Stone", "price": 80},
@@ -190,7 +190,7 @@ TYPE_EMOJIS = {
 SPAWN_LIMIT = 10
 SPAWN_WINDOW = timedelta(hours=5)
 SPAWN_FLEE_AFTER = timedelta(minutes=10)
-RANDOM_SPAWN_INTERVAL_SECONDS = 10 * 60  # 10 minutes
+RANDOM_SPAWN_INTERVAL_SECONDS = 5 * 60  # 5 minutes
 
 # Legendary/mythical species get this spawn weight vs. 1.0 for everything else,
 # so they show up far less often (roughly ~1% of spawns instead of ~7%).

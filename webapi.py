@@ -122,6 +122,101 @@ ACHIEVEMENTS = {
 
 TOTAL_ACHIEVEMENT_TIERS = sum(len(cat["tiers"]) for cat in ACHIEVEMENTS.values())
 
+# Keep in sync with cogs/pokemon.py's BALLS/STORE_ITEMS/item sprites.
+ITEM_SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items"
+BALL_SPRITES = {
+    "pokeball": f"{ITEM_SPRITE_BASE}/poke-ball.png",
+    "greatball": f"{ITEM_SPRITE_BASE}/great-ball.png",
+    "ultraball": f"{ITEM_SPRITE_BASE}/ultra-ball.png",
+    "masterball": f"{ITEM_SPRITE_BASE}/master-ball.png",
+}
+STORE_ITEMS = {
+    "pokeball": {"label": "Poké Ball", "price": 5},
+    "greatball": {"label": "Great Ball", "price": 15},
+    "ultraball": {"label": "Ultra Ball", "price": 35},
+    "masterball": {"label": "Master Ball", "price": 1500},
+    "fire-stone": {"label": "Fire Stone", "price": 80},
+    "water-stone": {"label": "Water Stone", "price": 80},
+    "thunder-stone": {"label": "Thunder Stone", "price": 80},
+    "leaf-stone": {"label": "Leaf Stone", "price": 80},
+    "moon-stone": {"label": "Moon Stone", "price": 90},
+    "sun-stone": {"label": "Sun Stone", "price": 90},
+    "shiny-stone": {"label": "Shiny Stone", "price": 110},
+    "dusk-stone": {"label": "Dusk Stone", "price": 110},
+    "dawn-stone": {"label": "Dawn Stone", "price": 110},
+}
+
+
+def item_icon(key: str) -> str:
+    return BALL_SPRITES.get(key) or f"{ITEM_SPRITE_BASE}/{key}.png"
+
+
+def add_item_sql(conn: sqlite3.Connection, user_id: int, item: str, delta: int):
+    conn.execute(
+        "INSERT INTO poke_items (user_id, item, qty) VALUES (?, ?, MAX(?, 0)) "
+        "ON CONFLICT(user_id, item) DO UPDATE SET qty = MAX(qty + ?, 0)",
+        (user_id, item, delta, delta),
+    )
+
+
+def check_and_unlock_achievements(conn: sqlite3.Connection, target_id: int) -> list[dict]:
+    """Compares current stats against every achievement tier and unlocks any
+    newly-earned ones, granting rewards exactly once. Mirrors
+    cogs/pokemon.py's check_achievements — called here too so achievements
+    (including ones earned before this feature existed) get backfilled the
+    moment a profile is viewed, not only on the next live gameplay action."""
+    total_caught = conn.execute(
+        "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (target_id,)
+    ).fetchone()[0]
+    unique_species = conn.execute(
+        "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (target_id,)
+    ).fetchone()[0]
+    shiny_count = conn.execute(
+        "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND is_shiny = 1", (target_id,)
+    ).fetchone()[0]
+    evo_row = conn.execute(
+        "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'stat_evolutions'", (target_id,)
+    ).fetchone()
+    evolution_count = evo_row["qty"] if evo_row else 0
+    xp_row = conn.execute(
+        "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (target_id,)
+    ).fetchone()
+    level, _, _ = compute_level(xp_row["qty"] if xp_row else 0)
+
+    stats = {
+        "total_caught": total_caught,
+        "unique_species": unique_species,
+        "shiny_count": shiny_count,
+        "evolution_count": evolution_count,
+        "level": level,
+    }
+
+    unlocked = {
+        r["achievement_key"]
+        for r in conn.execute(
+            "SELECT achievement_key FROM poke_achievements WHERE user_id = ?", (target_id,)
+        ).fetchall()
+    }
+
+    newly_unlocked = []
+    for cat_key, cat in ACHIEVEMENTS.items():
+        stat_value = stats[cat["stat"]]
+        for tier_key in ACHIEVEMENT_TIERS:
+            achievement_key = f"{cat_key}_{tier_key}"
+            if achievement_key in unlocked:
+                continue
+            tier = cat["tiers"][tier_key]
+            if stat_value >= tier["threshold"]:
+                conn.execute(
+                    "INSERT INTO poke_achievements (user_id, achievement_key, unlocked_at) VALUES (?, ?, ?)",
+                    (target_id, achievement_key, datetime.now(timezone.utc).isoformat()),
+                )
+                for item, qty in tier["rewards"].items():
+                    add_item_sql(conn, target_id, item, qty)
+                newly_unlocked.append({"category": cat_key, "tier": tier_key, "rewards": tier["rewards"]})
+
+    return newly_unlocked
+
 
 with open(DATA_PATH, encoding="utf-8") as f:
     POKEDEX: dict[int, dict] = {p["id"]: p for p in json.load(f)}
@@ -197,6 +292,8 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
     trainer = conn.execute("SELECT * FROM poke_trainers WHERE user_id = ?", (target_id,)).fetchone()
     if not trainer:
         return None
+
+    check_and_unlock_achievements(conn, target_id)
 
     xp_row = conn.execute(
         "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (target_id,)
@@ -310,6 +407,8 @@ def get_trainer(target_id: int, user_id: int = Depends(get_current_user_id)):
 # ---------- Achievements ----------
 
 def build_achievements_payload(target_id: int, conn: sqlite3.Connection) -> dict:
+    check_and_unlock_achievements(conn, target_id)
+
     total_caught = conn.execute(
         "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (target_id,)
     ).fetchone()[0]
@@ -451,6 +550,36 @@ def get_pokedex(user_id: int = Depends(get_current_user_id)):
     ]
 
 
+@app.get("/api/pokedex/full")
+def get_pokedex_full(user_id: int = Depends(get_current_user_id)):
+    """Every species in the game, flagged with whether this trainer owns it —
+    used by the Pokédex page so uncaught species show up greyed-out instead
+    of being omitted entirely."""
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT dex_id, COUNT(*) as count, MAX(is_shiny) as has_shiny FROM poke_collection "
+            "WHERE user_id = ? GROUP BY dex_id",
+            (user_id,),
+        ).fetchall()
+    owned = {r["dex_id"]: {"count": r["count"], "has_shiny": bool(r["has_shiny"])} for r in rows}
+
+    result = []
+    for dex_id in sorted(POKEDEX.keys()):
+        mon = POKEDEX[dex_id]
+        o = owned.get(dex_id)
+        result.append({
+            "dex_id": dex_id,
+            "name": mon.get("name", f"#{dex_id}"),
+            "types": mon.get("types", []),
+            "category": mon.get("category"),
+            "artwork": mon.get("artwork"),
+            "owned": o is not None,
+            "count": o["count"] if o else 0,
+            "has_shiny": o["has_shiny"] if o else False,
+        })
+    return result
+
+
 # ---------- Inventory ----------
 
 @app.get("/api/inventory")
@@ -458,25 +587,80 @@ def get_inventory(user_id: int = Depends(get_current_user_id)):
     with db() as conn:
         rows = conn.execute("SELECT item, qty FROM poke_items WHERE user_id = ?", (user_id,)).fetchall()
 
-    balls, family_candies = {}, {}
-    coins = rare_candy = 0
+    raw = {row["item"]: row["qty"] for row in rows}
 
-    for row in rows:
-        item, qty = row["item"], row["qty"]
-        if item == "coin":
-            coins = qty
-        elif item == "candy":
-            rare_candy = qty
-        elif item.startswith("famcandy_"):
+    balls, stones = [], []
+    for key, cfg in STORE_ITEMS.items():
+        if key not in raw:
+            continue
+        entry = {"key": key, "label": cfg["label"], "icon": item_icon(key), "qty": raw[key]}
+        (balls if key in BALL_KEYS else stones).append(entry)
+
+    family_candies = []
+    for key, qty in raw.items():
+        if key.startswith("famcandy_"):
             try:
-                family_id = int(item.split("_", 1)[1])
+                family_id = int(key.split("_", 1)[1])
             except ValueError:
                 continue
-            family_candies[POKEDEX.get(family_id, {}).get("name", item)] = qty
-        else:
-            balls[item] = qty
+            family_candies.append({"name": POKEDEX.get(family_id, {}).get("name", key), "qty": qty})
 
-    return {"balls": balls, "coins": coins, "rare_candy": rare_candy, "family_candies": family_candies}
+    return {
+        "balls": balls,
+        "stones": stones,
+        "coins": raw.get("coin", 0),
+        "rare_candy": raw.get("candy", 0),
+        "family_candies": family_candies,
+    }
+
+
+# ---------- Store ----------
+
+@app.get("/api/store")
+def get_store(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        coin_row = conn.execute(
+            "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'coin'", (user_id,)
+        ).fetchone()
+    return {
+        "items": [
+            {"key": key, "label": cfg["label"], "price": cfg["price"], "icon": item_icon(key)}
+            for key, cfg in STORE_ITEMS.items()
+        ],
+        "coins": coin_row["qty"] if coin_row else 0,
+    }
+
+
+class BuyRequest(BaseModel):
+    item: str
+    quantity: int = 1
+
+
+@app.post("/api/store/buy")
+def buy_item(body: BuyRequest, user_id: int = Depends(get_current_user_id)):
+    if body.item not in STORE_ITEMS:
+        raise HTTPException(400, "Unknown item")
+    if body.quantity <= 0:
+        raise HTTPException(400, "Quantity must be at least 1")
+
+    item_cfg = STORE_ITEMS[body.item]
+    total_cost = item_cfg["price"] * body.quantity
+
+    with db() as conn:
+        coin_row = conn.execute(
+            "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'coin'", (user_id,)
+        ).fetchone()
+        balance = coin_row["qty"] if coin_row else 0
+        if balance < total_cost:
+            raise HTTPException(
+                400,
+                f"You need {total_cost} coins for {body.quantity}x {item_cfg['label']}, "
+                f"but you only have {balance}.",
+            )
+        add_item_sql(conn, user_id, "coin", -total_cost)
+        add_item_sql(conn, user_id, body.item, body.quantity)
+
+    return {"ok": True, "coins_left": balance - total_cost}
 
 
 # ---------- Team ----------
@@ -492,7 +676,12 @@ def get_team(user_id: int = Depends(get_current_user_id)):
             "SELECT dex_id FROM poke_team WHERE user_id = ? ORDER BY slot", (user_id,)
         ).fetchall()
     return [
-        {"dex_id": r["dex_id"], "name": POKEDEX.get(r["dex_id"], {}).get("name", f"#{r['dex_id']}")}
+        {
+            "dex_id": r["dex_id"],
+            "name": POKEDEX.get(r["dex_id"], {}).get("name", f"#{r['dex_id']}"),
+            "artwork": POKEDEX.get(r["dex_id"], {}).get("artwork"),
+            "types": POKEDEX.get(r["dex_id"], {}).get("types", []),
+        }
         for r in rows
     ]
 
