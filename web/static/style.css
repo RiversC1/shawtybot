@@ -110,7 +110,24 @@ body {
     display: block;
     width: 100%;
     max-width: 320px;
-    margin: 4px 0 20px;
+    margin: 4px 0 16px;
+}
+
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.filter-bar select {
+    flex: 1;
+    min-width: 150px;
+    cursor: pointer;
+}
+
+.filter-bar .btn-secondary {
+    padding: 8px 20px;
 }
 
 .dex-card.not-owned img {

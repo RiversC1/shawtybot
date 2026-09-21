@@ -550,6 +550,16 @@ def get_pokedex(user_id: int = Depends(get_current_user_id)):
     ]
 
 
+def dex_generation(dex_id: int) -> int:
+    if dex_id <= 151:
+        return 1
+    if dex_id <= 251:
+        return 2
+    if dex_id <= 386:
+        return 3
+    return 4
+
+
 @app.get("/api/pokedex/full")
 def get_pokedex_full(user_id: int = Depends(get_current_user_id)):
     """Every species in the game, flagged with whether this trainer owns it —
@@ -567,12 +577,20 @@ def get_pokedex_full(user_id: int = Depends(get_current_user_id)):
     for dex_id in sorted(POKEDEX.keys()):
         mon = POKEDEX[dex_id]
         o = owned.get(dex_id)
+        if mon.get("is_mythical"):
+            rarity = "mythical"
+        elif mon.get("is_legendary"):
+            rarity = "legendary"
+        else:
+            rarity = "standard"
         result.append({
             "dex_id": dex_id,
             "name": mon.get("name", f"#{dex_id}"),
             "types": mon.get("types", []),
             "category": mon.get("category"),
             "artwork": mon.get("artwork"),
+            "generation": dex_generation(dex_id),
+            "rarity": rarity,
             "owned": o is not None,
             "count": o["count"] if o else 0,
             "has_shiny": o["has_shiny"] if o else False,

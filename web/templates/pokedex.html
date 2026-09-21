@@ -3,11 +3,50 @@
 {% block content %}
 <h1>Pokédex</h1>
 <p class="muted" id="dex-count">{{ species|selectattr("owned")|list|length }} / {{ species|length }} species caught</p>
+
 <input type="text" id="dex-search" class="search-input dex-search" placeholder="Search Pokémon...">
+
+<div class="filter-bar">
+    <select id="filter-type" class="search-input">
+        <option value="">All Types</option>
+        {% for t in ["normal","fire","water","grass","electric","ice","fighting","poison","ground",
+                     "flying","psychic","bug","rock","ghost","dragon","dark","steel","fairy"] %}
+        <option value="{{ t }}">{{ t|capitalize }}</option>
+        {% endfor %}
+    </select>
+
+    <select id="filter-rarity" class="search-input">
+        <option value="">All Categories</option>
+        <option value="standard">Standard</option>
+        <option value="legendary">Legendary</option>
+        <option value="mythical">Mythical</option>
+    </select>
+
+    <select id="filter-gen" class="search-input">
+        <option value="">All Generations</option>
+        <option value="1">Generation 1 · Kanto</option>
+        <option value="2">Generation 2 · Johto</option>
+        <option value="3">Generation 3 · Hoenn</option>
+        <option value="4">Generation 4 · Sinnoh</option>
+    </select>
+
+    <select id="filter-status" class="search-input">
+        <option value="">All</option>
+        <option value="owned">Caught</option>
+        <option value="unowned">Not Caught</option>
+    </select>
+
+    <button id="filter-clear" class="btn-secondary">Clear</button>
+</div>
 
 <div class="grid" id="dex-grid">
     {% for mon in species %}
-    <div class="dex-card{{ '' if mon.owned else ' not-owned' }}" data-name="{{ mon.name|lower }}">
+    <div class="dex-card{{ '' if mon.owned else ' not-owned' }}"
+         data-name="{{ mon.name|lower }}"
+         data-types="{{ mon.types|join(' ') }}"
+         data-rarity="{{ mon.rarity }}"
+         data-gen="{{ mon.generation }}"
+         data-owned="{{ 'true' if mon.owned else 'false' }}">
         <img src="{{ mon.artwork }}" alt="{{ mon.name }}">
         <div class="dex-name">
             #{{ "%03d"|format(mon.dex_id) }} {{ mon.name }}{% if mon.has_shiny %} ✨{% endif %}
@@ -24,15 +63,55 @@
     {% endfor %}
 </div>
 
+<p id="dex-empty" class="muted" hidden>No Pokémon match these filters.</p>
+
 <script>
 (function () {
     const search = document.getElementById("dex-search");
+    const typeFilter = document.getElementById("filter-type");
+    const rarityFilter = document.getElementById("filter-rarity");
+    const genFilter = document.getElementById("filter-gen");
+    const statusFilter = document.getElementById("filter-status");
+    const clearBtn = document.getElementById("filter-clear");
+    const emptyMsg = document.getElementById("dex-empty");
     const cards = Array.from(document.querySelectorAll("#dex-grid .dex-card"));
-    search.addEventListener("input", () => {
+
+    function applyFilters() {
         const q = search.value.trim().toLowerCase();
+        const type = typeFilter.value;
+        const rarity = rarityFilter.value;
+        const gen = genFilter.value;
+        const status = statusFilter.value;
+
+        let visibleCount = 0;
         for (const card of cards) {
-            card.hidden = q.length > 0 && !card.dataset.name.includes(q);
+            const matchesSearch = !q || card.dataset.name.includes(q);
+            const matchesType = !type || card.dataset.types.split(" ").includes(type);
+            const matchesRarity = !rarity || card.dataset.rarity === rarity;
+            const matchesGen = !gen || card.dataset.gen === gen;
+            const matchesStatus =
+                !status ||
+                (status === "owned" && card.dataset.owned === "true") ||
+                (status === "unowned" && card.dataset.owned === "false");
+
+            const visible = matchesSearch && matchesType && matchesRarity && matchesGen && matchesStatus;
+            card.hidden = !visible;
+            if (visible) visibleCount++;
         }
+        emptyMsg.hidden = visibleCount > 0;
+    }
+
+    [search, typeFilter, rarityFilter, genFilter, statusFilter].forEach((el) =>
+        el.addEventListener("input", applyFilters)
+    );
+
+    clearBtn.addEventListener("click", () => {
+        search.value = "";
+        typeFilter.value = "";
+        rarityFilter.value = "";
+        genFilter.value = "";
+        statusFilter.value = "";
+        applyFilters();
     });
 })();
 </script>
