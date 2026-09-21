@@ -7,13 +7,19 @@
 <input type="text" id="dex-search" class="search-input dex-search" placeholder="Search Pokémon...">
 
 <div class="filter-bar">
-    <select id="filter-type" class="search-input">
-        <option value="">All Types</option>
-        {% for t in ["normal","fire","water","grass","electric","ice","fighting","poison","ground",
-                     "flying","psychic","bug","rock","ghost","dragon","dark","steel","fairy"] %}
-        <option value="{{ t }}">{{ t|capitalize }}</option>
-        {% endfor %}
-    </select>
+    <div class="type-multiselect" id="type-filter-wrap">
+        <button type="button" id="type-filter-btn" class="search-input filter-dropdown-btn">All Types</button>
+        <div id="type-filter-panel" class="filter-dropdown-panel" hidden>
+            <p class="muted filter-dropdown-hint">Select multiple to match Pokémon with all of those types, e.g. Poison + Normal.</p>
+            {% for t in ["normal","fire","water","grass","electric","ice","fighting","poison","ground",
+                         "flying","psychic","bug","rock","ghost","dragon","dark","steel","fairy"] %}
+            <label class="filter-checkbox">
+                <input type="checkbox" class="type-checkbox" value="{{ t }}">
+                <span class="type-badge type-{{ t }}">{{ t|capitalize }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
 
     <select id="filter-rarity" class="search-input">
         <option value="">All Categories</option>
@@ -68,7 +74,10 @@
 <script>
 (function () {
     const search = document.getElementById("dex-search");
-    const typeFilter = document.getElementById("filter-type");
+    const typeBtn = document.getElementById("type-filter-btn");
+    const typePanel = document.getElementById("type-filter-panel");
+    const typeWrap = document.getElementById("type-filter-wrap");
+    const typeCheckboxes = Array.from(document.querySelectorAll(".type-checkbox"));
     const rarityFilter = document.getElementById("filter-rarity");
     const genFilter = document.getElementById("filter-gen");
     const statusFilter = document.getElementById("filter-status");
@@ -76,17 +85,48 @@
     const emptyMsg = document.getElementById("dex-empty");
     const cards = Array.from(document.querySelectorAll("#dex-grid .dex-card"));
 
+    function selectedTypes() {
+        return typeCheckboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+    }
+
+    function updateTypeButtonLabel() {
+        const types = selectedTypes();
+        if (types.length === 0) {
+            typeBtn.textContent = "All Types";
+        } else if (types.length <= 2) {
+            typeBtn.textContent = types.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(" / ");
+        } else {
+            typeBtn.textContent = `${types.length} types selected`;
+        }
+    }
+
+    typeBtn.addEventListener("click", () => {
+        typePanel.hidden = !typePanel.hidden;
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!typeWrap.contains(e.target)) typePanel.hidden = true;
+    });
+
+    typeCheckboxes.forEach((cb) =>
+        cb.addEventListener("change", () => {
+            updateTypeButtonLabel();
+            applyFilters();
+        })
+    );
+
     function applyFilters() {
         const q = search.value.trim().toLowerCase();
-        const type = typeFilter.value;
+        const types = selectedTypes();
         const rarity = rarityFilter.value;
         const gen = genFilter.value;
         const status = statusFilter.value;
 
         let visibleCount = 0;
         for (const card of cards) {
+            const cardTypes = card.dataset.types.split(" ");
             const matchesSearch = !q || card.dataset.name.includes(q);
-            const matchesType = !type || card.dataset.types.split(" ").includes(type);
+            const matchesType = types.length === 0 || types.every((t) => cardTypes.includes(t));
             const matchesRarity = !rarity || card.dataset.rarity === rarity;
             const matchesGen = !gen || card.dataset.gen === gen;
             const matchesStatus =
@@ -101,13 +141,14 @@
         emptyMsg.hidden = visibleCount > 0;
     }
 
-    [search, typeFilter, rarityFilter, genFilter, statusFilter].forEach((el) =>
+    [search, rarityFilter, genFilter, statusFilter].forEach((el) =>
         el.addEventListener("input", applyFilters)
     );
 
     clearBtn.addEventListener("click", () => {
         search.value = "";
-        typeFilter.value = "";
+        typeCheckboxes.forEach((cb) => (cb.checked = false));
+        updateTypeButtonLabel();
         rarityFilter.value = "";
         genFilter.value = "";
         statusFilter.value = "";

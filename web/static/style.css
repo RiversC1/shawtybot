@@ -130,6 +130,51 @@ body {
     padding: 8px 20px;
 }
 
+.type-multiselect {
+    position: relative;
+    flex: 1;
+    min-width: 150px;
+}
+
+.filter-dropdown-btn {
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
+.filter-dropdown-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 20;
+    background: #16213e;
+    border: 1px solid #2a2a4a;
+    border-radius: 8px;
+    padding: 10px;
+    width: max-content;
+    max-width: 320px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.filter-dropdown-hint {
+    grid-column: 1 / -1;
+    max-width: 260px;
+    font-size: 0.8em;
+    margin: 0 0 6px;
+}
+
+.filter-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 3px 0;
+    font-size: 0.9em;
+}
+
 .dex-card.not-owned img {
     filter: grayscale(100%) brightness(0.5);
     opacity: 0.6;
