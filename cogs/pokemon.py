@@ -40,6 +40,8 @@ BALL_SPRITES = {
 }
 
 COIN_EMOJI = "🪙"
+CANDY_EMOJI = "🍬"
+REWARD_FALLBACK_EMOJIS = {"candy": CANDY_EMOJI, "coin": COIN_EMOJI}
 
 # Evolution stones — inventory-only for now, will be consumed once the evolution
 # mechanic exists for the web app.
@@ -213,6 +215,22 @@ def build_coffer_embed(coffer_key: str, expires_at: datetime) -> discord.Embed:
         color=cfg["color"],
     )
     embed.set_image(url=cfg["image"])
+    return embed
+
+
+def build_coffer_reward_embed(cog: "Pokemon", coffer_key: str, rewards: dict[str, int]) -> discord.Embed:
+    lines = []
+    for item, qty in rewards.items():
+        emoji = cog.ball_emojis.get(item)
+        emoji_str = str(emoji) if emoji else REWARD_FALLBACK_EMOJIS.get(item, "•")
+        label = ITEM_LABELS.get(item, item.title())
+        lines.append(f"{emoji_str} **{qty}** {label}")
+
+    embed = discord.Embed(
+        title="Supplies received!",
+        description="\n".join(lines),
+        color=COFFERS[coffer_key]["color"],
+    )
     return embed
 
 
@@ -452,8 +470,6 @@ class CofferView(discord.ui.View):
         for item, qty in rewards.items():
             self.cog.add_item(interaction.user.id, item, qty)
 
-        reward_lines = [f"{qty}x {ITEM_LABELS.get(item, item.title())}" for item, qty in rewards.items()]
-
         if self.message:
             embed = self.message.embeds[0]
             embed.set_footer(text=f"Claimed by {len(self.claimed_by)} trainer(s) so far")
@@ -462,10 +478,8 @@ class CofferView(discord.ui.View):
             except discord.HTTPException as e:
                 log.error(f"Failed to update coffer claim count: {e}")
 
-        await interaction.response.send_message(
-            f"You opened the {COFFERS[self.coffer_key]['label']} and got: " + ", ".join(reward_lines),
-            ephemeral=True,
-        )
+        reward_embed = build_coffer_reward_embed(self.cog, self.coffer_key, rewards)
+        await interaction.response.send_message(embed=reward_embed, ephemeral=True)
 
 
 class StarterSelect(discord.ui.Select):
