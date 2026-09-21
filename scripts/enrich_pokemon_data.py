@@ -102,6 +102,7 @@ async def enrich_one(session, sem, species, move_cache, move_cache_lock):
                 "pp": move_json.get("pp"),
                 "power": move_json.get("power"),
                 "accuracy": move_json.get("accuracy"),
+                "priority": move_json.get("priority"),
                 "description": description,
             }
             async with move_cache_lock:

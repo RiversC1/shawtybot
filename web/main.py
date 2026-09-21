@@ -322,6 +322,15 @@ async def proxy_evolve(request: Request, catch_id: int):
     return JSONResponse(data, status_code=status)
 
 
+@app.get("/api/proxy/species/{dex_id}")
+async def proxy_species_detail(request: Request, dex_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/species/{dex_id}")
+    return JSONResponse(data, status_code=status)
+
+
 @app.get("/api/proxy/pokemon-config/{dex_id}")
 async def proxy_get_pokemon_config(request: Request, dex_id: int):
     session = request.cookies.get(SESSION_COOKIE)

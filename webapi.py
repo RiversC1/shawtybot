@@ -583,21 +583,27 @@ def dex_generation(dex_id: int) -> int:
 
 @app.get("/api/pokedex/full")
 def get_pokedex_full(user_id: int = Depends(get_current_user_id)):
-    """Every species in the game, flagged with whether this trainer owns it —
-    used by the Pokédex page so uncaught species show up greyed-out instead
-    of being omitted entirely."""
+    """Every species in the game. "owned" reflects the permanent Pokédex
+    registration (poke_dex_seen) — once caught, a species stays colored-in
+    forever, even if you no longer currently hold one (evolved it away,
+    traded it, etc). "count" is how many you currently hold, separately."""
     with db() as conn:
-        rows = conn.execute(
+        seen_rows = conn.execute(
+            "SELECT dex_id FROM poke_dex_seen WHERE user_id = ?", (user_id,)
+        ).fetchall()
+        held_rows = conn.execute(
             "SELECT dex_id, COUNT(*) as count, MAX(is_shiny) as has_shiny FROM poke_collection "
             "WHERE user_id = ? GROUP BY dex_id",
             (user_id,),
         ).fetchall()
-    owned = {r["dex_id"]: {"count": r["count"], "has_shiny": bool(r["has_shiny"])} for r in rows}
+
+    seen = {r["dex_id"] for r in seen_rows}
+    held = {r["dex_id"]: {"count": r["count"], "has_shiny": bool(r["has_shiny"])} for r in held_rows}
 
     result = []
     for dex_id in sorted(POKEDEX.keys()):
         mon = POKEDEX[dex_id]
-        o = owned.get(dex_id)
+        h = held.get(dex_id)
         if mon.get("is_mythical"):
             rarity = "mythical"
         elif mon.get("is_legendary"):
@@ -612,11 +618,55 @@ def get_pokedex_full(user_id: int = Depends(get_current_user_id)):
             "artwork": mon.get("artwork"),
             "generation": dex_generation(dex_id),
             "rarity": rarity,
-            "owned": o is not None,
-            "count": o["count"] if o else 0,
-            "has_shiny": o["has_shiny"] if o else False,
+            "owned": dex_id in seen,
+            "count": h["count"] if h else 0,
+            "has_shiny": h["has_shiny"] if h else False,
         })
     return result
+
+
+@app.get("/api/species/{dex_id}")
+def get_species_detail(dex_id: int, user_id: int = Depends(get_current_user_id)):
+    """Species-level detail for the Pokédex click-through card — works even
+    for species you haven't caught, unlike /api/collection/{catch_id} which
+    is about one specific individual you own."""
+    mon = POKEDEX.get(dex_id)
+    if not mon:
+        raise HTTPException(404, "Unknown species")
+
+    with db() as conn:
+        seen_row = conn.execute(
+            "SELECT 1 FROM poke_dex_seen WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+        ).fetchone()
+        count = conn.execute(
+            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+        ).fetchone()[0]
+        evolution = build_evolution_info(dex_id, user_id, conn)
+        if count > 0:
+            config = resolve_pokemon_config(conn, user_id, dex_id)
+        else:
+            pool = mon.get("moves", [])
+            abilities = mon.get("abilities", [])
+            config = {
+                "moves": pool[:4],
+                "move_pool": pool,
+                "ability": format_ability_name(abilities[0]["name"]) if abilities else None,
+                "ability_raw": abilities[0]["name"] if abilities else None,
+                "abilities": [{"name": a["name"], "label": format_ability_name(a["name"])} for a in abilities],
+            }
+
+    return {
+        "dex_id": dex_id,
+        "name": mon["name"],
+        "types": mon.get("types", []),
+        "category": mon.get("category"),
+        "artwork": mon.get("artwork"),
+        "owned": bool(seen_row),
+        "count": count,
+        "base_stats": resolved_base_stats(mon),
+        "evolution": evolution,
+        **config,
+    }
 
 
 # ---------- Inventory ----------
@@ -1037,6 +1087,13 @@ def evolve_pokemon(catch_id: int, body: EvolveRequest, user_id: int = Depends(ge
         if chosen["item"]:
             add_item_sql(conn, user_id, chosen["item"], -1)
         conn.execute("UPDATE poke_collection SET dex_id = ? WHERE id = ?", (chosen["target"]["id"], catch_id))
+        # Evolving into a species registers it in the Pokédex permanently, same
+        # as catching it would — the species evolved FROM stays registered too
+        # (that row was already written when it was originally caught).
+        conn.execute(
+            "INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
+            (user_id, chosen["target"]["id"], datetime.now(timezone.utc).isoformat()),
+        )
         add_item_sql(conn, user_id, "stat_evolutions", 1)
         add_item_sql(conn, user_id, "xp", XP_PER_EVOLUTION)
         check_and_unlock_achievements(conn, user_id)

@@ -8,6 +8,10 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<div id="page-loading-overlay" class="page-loading">
+    <img src="/static/favicon.png" alt="" class="loading-pokeball">
+    <div class="loading-text">Loading your Poké adventure...</div>
+</div>
 {% set logged_in = request.cookies.get("session") %}
 {% if logged_in %}
     <div class="app-shell">
@@ -73,5 +77,34 @@
 {% if logged_in %}
     </div>
 {% endif %}
+<script>
+(function () {
+    var overlay = document.getElementById("page-loading-overlay");
+
+    function hideOverlay() {
+        overlay.classList.add("page-loading-hidden");
+    }
+
+    if (document.readyState === "complete") {
+        hideOverlay();
+    } else {
+        window.addEventListener("load", hideOverlay);
+    }
+
+    document.addEventListener("click", function (e) {
+        var link = e.target.closest("a");
+        if (!link || !link.href) return;
+        if (link.target === "_blank" || link.hasAttribute("download")) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        var url = new URL(link.href, window.location.href);
+        if (url.origin !== window.location.origin) return;
+        overlay.classList.remove("page-loading-hidden");
+    });
+
+    document.addEventListener("submit", function () {
+        overlay.classList.remove("page-loading-hidden");
+    });
+})();
+</script>
 </body>
 </html>

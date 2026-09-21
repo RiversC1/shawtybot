@@ -934,6 +934,23 @@ class Pokemon(commands.Cog):
                     PRIMARY KEY (user_id, dex_id)
                 )
             """)
+            # Permanent Pokédex registration — unlike poke_collection (which only
+            # reflects Pokémon you currently hold), a row here is never removed,
+            # so evolving/trading/releasing a species doesn't un-register it from
+            # your Pokédex. Backfilled from existing collection rows so nobody's
+            # dex regresses when this table is first created.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_dex_seen (
+                    user_id INTEGER NOT NULL,
+                    dex_id INTEGER NOT NULL,
+                    first_caught_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, dex_id)
+                )
+            """)
+            conn.execute("""
+                INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at)
+                SELECT user_id, dex_id, MIN(caught_at) FROM poke_collection GROUP BY user_id, dex_id
+            """)
 
     # ---------- DB helpers ----------
 
@@ -1004,9 +1021,17 @@ class Pokemon(commands.Cog):
                 return False
             row_id, is_shiny = row
             conn.execute("DELETE FROM poke_collection WHERE id = ?", (row_id,))
+            now = datetime.now(timezone.utc).isoformat()
             conn.execute(
                 "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny) VALUES (?, ?, ?, ?)",
-                (user_id, to_dex_id, datetime.now(timezone.utc).isoformat(), is_shiny),
+                (user_id, to_dex_id, now, is_shiny),
+            )
+            # Evolving into a species registers it in the Pokédex too — the
+            # species you evolved FROM is already registered from the original
+            # catch and stays that way permanently (see poke_dex_seen).
+            conn.execute(
+                "INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
+                (user_id, to_dex_id, now),
             )
         return True
 
@@ -1145,10 +1170,15 @@ class Pokemon(commands.Cog):
             )
 
     def add_to_collection(self, user_id: int, dex_id: int, is_shiny: bool = False):
+        now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
                 "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny) VALUES (?, ?, ?, ?)",
-                (user_id, dex_id, datetime.now(timezone.utc).isoformat(), int(is_shiny)),
+                (user_id, dex_id, now, int(is_shiny)),
+            )
+            conn.execute(
+                "INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
+                (user_id, dex_id, now),
             )
 
     def count_owned(self, user_id: int, dex_id: int) -> int:

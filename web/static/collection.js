@@ -34,21 +34,12 @@
       .join("");
   }
 
-  function moveTitle(move) {
-    const parts = [];
-    if (move.description) parts.push(move.description);
-    if (move.pp != null) parts.push(`PP: ${move.pp}`);
-    if (move.power != null) parts.push(`Power: ${move.power}`);
-    if (move.accuracy != null) parts.push(`Accuracy: ${move.accuracy}`);
-    return parts.join(" — ").replace(/"/g, "&quot;");
-  }
-
   function moveGrid(moves) {
     const cells = Array.from({ length: 4 }, (_, i) => {
       const m = moves[i];
       if (!m) return `<div class="move-card" style="opacity:0.4;"><div class="move-card-name">—</div></div>`;
       return `
-        <div class="move-card type-${m.type}" title="${moveTitle(m)}">
+        <div class="move-card type-${m.type}">
           <div class="move-card-name">${m.name}</div>
           <div class="move-card-meta">${m.type} · ${m.category}${m.pp != null ? ` · ${m.pp} PP` : ""}</div>
         </div>`;
@@ -132,6 +123,10 @@
             </div>
             <p id="cm-status" class="muted"></p>
         `;
+
+    body.querySelectorAll(".move-grid .move-card").forEach((cell, i) => {
+      if (mon.moves[i]) window.MoveTooltip.attach(cell, mon.moves[i]);
+    });
 
     const evoBtn = document.getElementById("cm-view-evolution");
     if (evoBtn) evoBtn.addEventListener("click", () => openEvolution(catchId));
