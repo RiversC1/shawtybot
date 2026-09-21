@@ -151,6 +151,26 @@ def item_icon(key: str) -> str:
     return BALL_SPRITES.get(key) or f"{ITEM_SPRITE_BASE}/{key}.png"
 
 
+# Keep in sync with cogs/pokemon.py.
+EVOLUTION_CANDY_COST = 20
+ITEM_LABELS = {key: cfg["label"] for key, cfg in STORE_ITEMS.items()}
+ITEM_LABELS["candy"] = "Rare Candy"
+ITEM_LABELS["coin"] = "Poké Coin"
+
+
+def format_ability_name(raw: str) -> str:
+    return raw.replace("-", " ").title()
+
+
+def stat_at_level_100(base: int, is_hp: bool) -> int:
+    """Displays a representative stat at level 100 (max IVs, no EV investment,
+    neutral nature) using the standard stat formula — there's no real IV/EV/
+    nature tracking yet, so this is a stand-in until the battle system exists."""
+    if is_hp:
+        return 2 * base + 141
+    return 2 * base + 36
+
+
 def add_item_sql(conn: sqlite3.Connection, user_id: int, item: str, delta: int):
     conn.execute(
         "INSERT INTO poke_items (user_id, item, qty) VALUES (?, ?, MAX(?, 0)) "
@@ -681,6 +701,228 @@ def buy_item(body: BuyRequest, user_id: int = Depends(get_current_user_id)):
     return {"ok": True, "coins_left": balance - total_cost}
 
 
+# ---------- Per-species moveset/ability loadout ----------
+# Keyed by (user_id, dex_id) rather than per-catch: every individual of a
+# species you own currently shares one loadout, since there's no battle
+# system yet to make per-individual loadouts matter.
+
+def resolve_pokemon_config(conn: sqlite3.Connection, user_id: int, dex_id: int) -> dict:
+    mon = POKEDEX.get(dex_id, {})
+    pool = mon.get("moves", [])
+    abilities = mon.get("abilities", [])
+    default_moves = [m["name"] for m in pool[:4]]
+    default_ability = abilities[0]["name"] if abilities else None
+
+    row = conn.execute(
+        "SELECT moves, ability FROM poke_pokemon_config WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+    ).fetchone()
+    moves = json.loads(row["moves"]) if row and row["moves"] else default_moves
+    ability_raw = row["ability"] if row and row["ability"] else default_ability
+
+    pool_by_name = {m["name"]: m for m in pool}
+    resolved_moves = [pool_by_name[name] for name in moves if name in pool_by_name]
+
+    return {
+        "moves": resolved_moves,
+        "move_pool": pool,
+        "ability": format_ability_name(ability_raw) if ability_raw else None,
+        "ability_raw": ability_raw,
+        "abilities": [
+            {"name": a["name"], "label": format_ability_name(a["name"])} for a in abilities
+        ],
+    }
+
+
+def resolved_base_stats(mon: dict) -> list[dict]:
+    base_stats = mon.get("base_stats", {})
+    labels = [
+        ("hp", "HP", True), ("attack", "Attack", False), ("defense", "Defense", False),
+        ("sp_attack", "Sp. Attack", False), ("sp_defense", "Sp. Defense", False), ("speed", "Speed", False),
+    ]
+    return [
+        {
+            "key": key, "label": label,
+            "base": base_stats.get(key, 0),
+            "at_level_100": stat_at_level_100(base_stats.get(key, 0), is_hp),
+        }
+        for key, label, is_hp in labels
+    ]
+
+
+@app.get("/api/pokemon-config/{dex_id}")
+def get_pokemon_config(dex_id: int, user_id: int = Depends(get_current_user_id)):
+    mon = POKEDEX.get(dex_id)
+    if not mon:
+        raise HTTPException(404, "Unknown species")
+    with db() as conn:
+        owned = conn.execute(
+            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+        ).fetchone()[0]
+        if owned < 1:
+            raise HTTPException(404, "You don't own this Pokémon")
+        config = resolve_pokemon_config(conn, user_id, dex_id)
+    return {
+        "dex_id": dex_id,
+        "name": mon["name"],
+        "base_stats": resolved_base_stats(mon),
+        **config,
+    }
+
+
+class PokemonConfigRequest(BaseModel):
+    moves: list[str]
+    ability: str
+
+
+@app.post("/api/pokemon-config/{dex_id}")
+def set_pokemon_config(dex_id: int, body: PokemonConfigRequest, user_id: int = Depends(get_current_user_id)):
+    mon = POKEDEX.get(dex_id)
+    if not mon:
+        raise HTTPException(404, "Unknown species")
+    if len(body.moves) > 4:
+        raise HTTPException(400, "You can only pick up to 4 moves")
+
+    valid_moves = {m["name"] for m in mon.get("moves", [])}
+    for name in body.moves:
+        if name not in valid_moves:
+            raise HTTPException(400, f"{name} isn't in this Pokémon's move pool")
+
+    valid_abilities = {a["name"] for a in mon.get("abilities", [])}
+    if body.ability not in valid_abilities:
+        raise HTTPException(400, "Unknown ability for this species")
+
+    with db() as conn:
+        owned = conn.execute(
+            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+        ).fetchone()[0]
+        if owned < 1:
+            raise HTTPException(404, "You don't own this Pokémon")
+        conn.execute(
+            "INSERT INTO poke_pokemon_config (user_id, dex_id, moves, ability) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(user_id, dex_id) DO UPDATE SET moves = excluded.moves, ability = excluded.ability",
+            (user_id, dex_id, json.dumps(body.moves), body.ability),
+        )
+    return {"ok": True}
+
+
+# ---------- Collection (individual catches) ----------
+
+def build_evolution_info(dex_id: int, user_id: int, conn: sqlite3.Connection) -> dict | None:
+    mon = POKEDEX.get(dex_id)
+    if not mon:
+        return None
+    options = mon.get("evolves_to") or []
+    if not options:
+        return None
+
+    family_id = mon.get("family_id", dex_id)
+    family_name = POKEDEX.get(family_id, mon)["name"]
+    candy_key = f"famcandy_{family_id}"
+    candy_row = conn.execute(
+        "SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, candy_key)
+    ).fetchone()
+    have_candy = candy_row["qty"] if candy_row else 0
+
+    candidates = []
+    for opt in options:
+        target = POKEDEX.get(opt["id"])
+        if not target:
+            continue
+        item_needed = opt.get("item")
+        has_item = True
+        if item_needed is not None:
+            item_row = conn.execute(
+                "SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, item_needed)
+            ).fetchone()
+            has_item = (item_row["qty"] if item_row else 0) > 0
+        candidates.append({
+            "dex_id": target["id"],
+            "name": target["name"],
+            "artwork": target.get("artwork"),
+            "item_needed": ITEM_LABELS.get(item_needed, item_needed) if item_needed else None,
+            "has_item": has_item,
+        })
+
+    return {
+        "family_candy_label": f"{family_name} Candy",
+        "have_candy": have_candy,
+        "needed_candy": EVOLUTION_CANDY_COST,
+        "ready": have_candy >= EVOLUTION_CANDY_COST and any(c["has_item"] for c in candidates),
+        "candidates": candidates,
+    }
+
+
+@app.get("/api/collection")
+def get_collection(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, dex_id, nickname, is_shiny, caught_at FROM poke_collection "
+            "WHERE user_id = ? ORDER BY caught_at DESC",
+            (user_id,),
+        ).fetchall()
+    result = []
+    for r in rows:
+        mon = POKEDEX.get(r["dex_id"], {})
+        result.append({
+            "id": r["id"],
+            "dex_id": r["dex_id"],
+            "name": mon.get("name", f"#{r['dex_id']}"),
+            "nickname": r["nickname"],
+            "types": mon.get("types", []),
+            "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if r["is_shiny"] else mon.get("artwork"),
+            "is_shiny": bool(r["is_shiny"]),
+            "caught_at": r["caught_at"],
+        })
+    return result
+
+
+@app.get("/api/collection/{catch_id}")
+def get_collection_detail(catch_id: int, user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        row = conn.execute(
+            "SELECT id, dex_id, nickname, is_shiny, caught_at FROM poke_collection WHERE id = ? AND user_id = ?",
+            (catch_id, user_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Pokémon not found")
+        mon = POKEDEX.get(row["dex_id"])
+        if not mon:
+            raise HTTPException(404, "Unknown species")
+        evolution = build_evolution_info(row["dex_id"], user_id, conn)
+
+    return {
+        "id": row["id"],
+        "dex_id": row["dex_id"],
+        "name": mon["name"],
+        "nickname": row["nickname"],
+        "types": mon.get("types", []),
+        "category": mon.get("category"),
+        "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if row["is_shiny"] else mon.get("artwork"),
+        "is_shiny": bool(row["is_shiny"]),
+        "caught_at": row["caught_at"],
+        "base_stats": resolved_base_stats(mon),
+        "moves": mon.get("moves", []),
+        "evolution": evolution,
+    }
+
+
+class NicknameRequest(BaseModel):
+    nickname: str | None
+
+
+@app.post("/api/collection/{catch_id}/nickname")
+def set_nickname(catch_id: int, body: NicknameRequest, user_id: int = Depends(get_current_user_id)):
+    nickname = (body.nickname or "").strip()[:32] or None
+    with db() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM poke_collection WHERE id = ? AND user_id = ?", (catch_id, user_id)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Pokémon not found")
+        conn.execute("UPDATE poke_collection SET nickname = ? WHERE id = ?", (nickname, catch_id))
+    return {"ok": True, "nickname": nickname}
+
+
 # ---------- Team ----------
 
 class TeamRequest(BaseModel):
@@ -693,15 +935,19 @@ def get_team(user_id: int = Depends(get_current_user_id)):
         rows = conn.execute(
             "SELECT dex_id FROM poke_team WHERE user_id = ? ORDER BY slot", (user_id,)
         ).fetchall()
-    return [
-        {
-            "dex_id": r["dex_id"],
-            "name": POKEDEX.get(r["dex_id"], {}).get("name", f"#{r['dex_id']}"),
-            "artwork": POKEDEX.get(r["dex_id"], {}).get("artwork"),
-            "types": POKEDEX.get(r["dex_id"], {}).get("types", []),
-        }
-        for r in rows
-    ]
+        result = []
+        for r in rows:
+            dex_id = r["dex_id"]
+            mon = POKEDEX.get(dex_id, {})
+            result.append({
+                "dex_id": dex_id,
+                "name": mon.get("name", f"#{dex_id}"),
+                "artwork": mon.get("artwork"),
+                "types": mon.get("types", []),
+                "base_stats": resolved_base_stats(mon),
+                **resolve_pokemon_config(conn, user_id, dex_id),
+            })
+    return result
 
 
 @app.post("/api/team")

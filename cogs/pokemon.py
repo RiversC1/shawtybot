@@ -917,6 +917,23 @@ class Pokemon(commands.Cog):
                     PRIMARY KEY (user_id, achievement_key)
                 )
             """)
+            # Migration for DBs created before nicknames existed
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_collection)").fetchall()]
+            if "nickname" not in cols:
+                conn.execute("ALTER TABLE poke_collection ADD COLUMN nickname TEXT")
+            # Per-species moveset/ability loadout, shown on the web team page.
+            # Keyed by (user_id, dex_id) rather than per-catch — every individual
+            # of a species you own shares one configured loadout for now, since
+            # there's no battle system yet to make per-individual loadouts matter.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_pokemon_config (
+                    user_id INTEGER NOT NULL,
+                    dex_id INTEGER NOT NULL,
+                    moves TEXT,
+                    ability TEXT,
+                    PRIMARY KEY (user_id, dex_id)
+                )
+            """)
 
     # ---------- DB helpers ----------
 
