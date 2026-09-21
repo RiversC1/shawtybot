@@ -26,9 +26,9 @@ STARTERS = [
 
 # Base catch rates before rarity/summoner adjustments. Master Ball always succeeds.
 BALLS = {
-    "pokeball": {"label": "Poké Ball", "catch_rate": 0.30},
-    "greatball": {"label": "Great Ball", "catch_rate": 0.45},
-    "ultraball": {"label": "Ultra Ball", "catch_rate": 0.65},
+    "pokeball": {"label": "Poké Ball", "catch_rate": 0.10},
+    "greatball": {"label": "Great Ball", "catch_rate": 0.20},
+    "ultraball": {"label": "Ultra Ball", "catch_rate": 0.35},
     "masterball": {"label": "Master Ball", "catch_rate": 1.00},
 }
 
