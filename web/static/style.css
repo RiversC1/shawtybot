@@ -473,13 +473,22 @@ code {
 
 .type-normal { background: #A8A878; } .type-fire { background: #F08030; }
 .type-water { background: #6890F0; } .type-grass { background: #78C850; }
-.type-electric { background: #F8D030; color: #222; } .type-ice { background: #98D8D8; color: #222; }
+.type-electric { background: #F8D030; } .type-ice { background: #98D8D8; }
 .type-fighting { background: #C03028; } .type-poison { background: #A040A0; }
-.type-ground { background: #E0C068; color: #222; } .type-flying { background: #A890F0; }
+.type-ground { background: #E0C068; } .type-flying { background: #A890F0; }
 .type-psychic { background: #F85888; } .type-bug { background: #A8B820; }
 .type-rock { background: #B8A038; } .type-ghost { background: #705898; }
 .type-dragon { background: #7038F8; } .type-dark { background: #705848; }
-.type-steel { background: #B8B8D0; color: #222; } .type-fairy { background: #EE99AC; color: #222; }
+.type-steel { background: #B8B8D0; } .type-fairy { background: #EE99AC; }
+
+/* The dark text above is only for the small badge pill, where the light
+   background needs a dark foreground — it must not leak onto other
+   elements that reuse the same .type-X class (e.g. move-card borders),
+   which is exactly what happened when this was unscoped: move names went
+   invisible (near-black on a near-black card) for electric/ice/ground/
+   steel/fairy-type moves. */
+.type-badge.type-electric, .type-badge.type-ice, .type-badge.type-ground,
+.type-badge.type-steel, .type-badge.type-fairy { color: #222; }
 
 .trainer-info h1 {
     margin: 6px 0 0;
@@ -559,6 +568,20 @@ code {
 .btn-secondary:hover {
     border-color: var(--red);
     color: #fff;
+}
+
+.btn-primary:disabled, .btn-secondary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.btn-primary:disabled:hover {
+    background: var(--red);
+}
+
+.btn-secondary:disabled:hover {
+    border-color: var(--border);
+    color: var(--text);
 }
 
 .trajectory-header {

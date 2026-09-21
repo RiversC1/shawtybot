@@ -207,6 +207,15 @@ async def collection(request: Request):
 # These exist so client-side JS never sees the internal API's session token
 # or hostname directly — it only ever talks to this same-origin app.
 
+@app.get("/api/proxy/inventory")
+async def proxy_inventory(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/inventory")
+    return JSONResponse(data, status_code=status)
+
+
 @app.get("/api/proxy/characters")
 async def proxy_characters(request: Request):
     session = request.cookies.get(SESSION_COOKIE)
@@ -290,6 +299,26 @@ async def proxy_set_nickname(request: Request, catch_id: int):
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     body = await request.json()
     status, data = await api_post(session, f"/api/collection/{catch_id}/nickname", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/collection/{catch_id}/convert-candy")
+async def proxy_convert_candy(request: Request, catch_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, f"/api/collection/{catch_id}/convert-candy", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/collection/{catch_id}/evolve")
+async def proxy_evolve(request: Request, catch_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, f"/api/collection/{catch_id}/evolve", body)
     return JSONResponse(data, status_code=status)
 
 

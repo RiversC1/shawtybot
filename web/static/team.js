@@ -34,12 +34,21 @@
       .join("");
   }
 
+  function moveTitle(move) {
+    const parts = [];
+    if (move.description) parts.push(move.description);
+    if (move.pp != null) parts.push(`PP: ${move.pp}`);
+    if (move.power != null) parts.push(`Power: ${move.power}`);
+    if (move.accuracy != null) parts.push(`Accuracy: ${move.accuracy}`);
+    return parts.join(" — ");
+  }
+
   function moveCard(move) {
     if (!move) return "";
     return `
-      <div class="move-card type-${move.type}">
+      <div class="move-card type-${move.type}" title="${moveTitle(move).replace(/"/g, "&quot;")}">
         <div class="move-card-name">${move.name}</div>
-        <div class="move-card-meta">${move.type} · ${move.category}</div>
+        <div class="move-card-meta">${move.type} · ${move.category}${move.pp != null ? ` · ${move.pp} PP` : ""}</div>
       </div>`;
   }
 
@@ -186,8 +195,9 @@
     for (const move of mon.move_pool || []) {
       const item = document.createElement("div");
       item.className = "picker-item move-card type-" + move.type;
+      item.title = moveTitle(move);
       if (configSelectedMoves.includes(move.name)) item.classList.add("selected");
-      item.innerHTML = `<div class="move-card-name">${move.name}</div><div class="move-card-meta">${move.type} · ${move.category}</div>`;
+      item.innerHTML = `<div class="move-card-name">${move.name}</div><div class="move-card-meta">${move.type} · ${move.category}${move.pp != null ? ` · ${move.pp} PP` : ""}</div>`;
       item.addEventListener("click", () => {
         if (configSelectedMoves.includes(move.name)) {
           configSelectedMoves = configSelectedMoves.filter((m) => m !== move.name);

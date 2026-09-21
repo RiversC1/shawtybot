@@ -90,10 +90,19 @@ async def enrich_one(session, sem, species, move_cache, move_cache_lock):
             cached = move_cache.get(name)
         if cached is None:
             move_json = await fetch_json(session, f"https://pokeapi.co/api/v2/move/{name}", sem)
+            short_effect = next(
+                (e["short_effect"] for e in move_json["effect_entries"] if e["language"]["name"] == "en"), ""
+            )
+            effect_chance = move_json.get("effect_chance")
+            description = f"{short_effect} ({effect_chance}%)" if short_effect and effect_chance else short_effect
             cached = {
                 "name": name.replace("-", " ").title(),
                 "type": move_json["type"]["name"],
                 "category": move_json["damage_class"]["name"] if move_json["damage_class"] else "status",
+                "pp": move_json.get("pp"),
+                "power": move_json.get("power"),
+                "accuracy": move_json.get("accuracy"),
+                "description": description,
             }
             async with move_cache_lock:
                 move_cache[name] = cached

@@ -153,6 +153,7 @@ def item_icon(key: str) -> str:
 
 # Keep in sync with cogs/pokemon.py.
 EVOLUTION_CANDY_COST = 20
+XP_PER_EVOLUTION = 20
 ITEM_LABELS = {key: cfg["label"] for key, cfg in STORE_ITEMS.items()}
 ITEM_LABELS["candy"] = "Rare Candy"
 ITEM_LABELS["coin"] = "Poké Coin"
@@ -854,25 +855,39 @@ def build_evolution_info(dex_id: int, user_id: int, conn: sqlite3.Connection) ->
 
 @app.get("/api/collection")
 def get_collection(user_id: int = Depends(get_current_user_id)):
+    """One card per species you own, not one per individual catch — a
+    nicknamed instance is shown preferentially since it's the one you've
+    personalized, otherwise the most recently caught one represents the group."""
     with db() as conn:
         rows = conn.execute(
             "SELECT id, dex_id, nickname, is_shiny, caught_at FROM poke_collection "
             "WHERE user_id = ? ORDER BY caught_at DESC",
             (user_id,),
         ).fetchall()
-    result = []
+
+    groups: dict[int, list] = {}
     for r in rows:
-        mon = POKEDEX.get(r["dex_id"], {})
+        groups.setdefault(r["dex_id"], []).append(r)
+
+    result = []
+    for dex_id, group in groups.items():
+        mon = POKEDEX.get(dex_id, {})
+        representative = next((r for r in group if r["nickname"]), group[0])
         result.append({
-            "id": r["id"],
-            "dex_id": r["dex_id"],
-            "name": mon.get("name", f"#{r['dex_id']}"),
-            "nickname": r["nickname"],
+            "id": representative["id"],
+            "dex_id": dex_id,
+            "name": mon.get("name", f"#{dex_id}"),
+            "nickname": representative["nickname"],
             "types": mon.get("types", []),
-            "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if r["is_shiny"] else mon.get("artwork"),
-            "is_shiny": bool(r["is_shiny"]),
-            "caught_at": r["caught_at"],
+            "artwork": (
+                (mon.get("artwork_shiny") or mon.get("artwork")) if representative["is_shiny"] else mon.get("artwork")
+            ),
+            "is_shiny": bool(representative["is_shiny"]),
+            "caught_at": representative["caught_at"],
+            "count": len(group),
         })
+
+    result.sort(key=lambda m: m["caught_at"], reverse=True)
     return result
 
 
@@ -888,7 +903,11 @@ def get_collection_detail(catch_id: int, user_id: int = Depends(get_current_user
         mon = POKEDEX.get(row["dex_id"])
         if not mon:
             raise HTTPException(404, "Unknown species")
+        count = conn.execute(
+            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?", (user_id, row["dex_id"])
+        ).fetchone()[0]
         evolution = build_evolution_info(row["dex_id"], user_id, conn)
+        config = resolve_pokemon_config(conn, user_id, row["dex_id"])
 
     return {
         "id": row["id"],
@@ -900,9 +919,10 @@ def get_collection_detail(catch_id: int, user_id: int = Depends(get_current_user
         "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if row["is_shiny"] else mon.get("artwork"),
         "is_shiny": bool(row["is_shiny"]),
         "caught_at": row["caught_at"],
+        "count": count,
         "base_stats": resolved_base_stats(mon),
-        "moves": mon.get("moves", []),
         "evolution": evolution,
+        **config,
     }
 
 
@@ -921,6 +941,107 @@ def set_nickname(catch_id: int, body: NicknameRequest, user_id: int = Depends(ge
             raise HTTPException(404, "Pokémon not found")
         conn.execute("UPDATE poke_collection SET nickname = ? WHERE id = ?", (nickname, catch_id))
     return {"ok": True, "nickname": nickname}
+
+
+class ConvertCandyRequest(BaseModel):
+    amount: int
+
+
+@app.post("/api/collection/{catch_id}/convert-candy")
+def convert_candy(catch_id: int, body: ConvertCandyRequest, user_id: int = Depends(get_current_user_id)):
+    """Converts generic Rare Candy into this Pokémon's family-specific candy, 1:1."""
+    if body.amount <= 0:
+        raise HTTPException(400, "Amount must be at least 1")
+
+    with db() as conn:
+        row = conn.execute(
+            "SELECT dex_id FROM poke_collection WHERE id = ? AND user_id = ?", (catch_id, user_id)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Pokémon not found")
+        mon = POKEDEX.get(row["dex_id"], {})
+        family_id = mon.get("family_id", row["dex_id"])
+
+        rare_row = conn.execute(
+            "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'candy'", (user_id,)
+        ).fetchone()
+        have_rare = rare_row["qty"] if rare_row else 0
+        if have_rare < body.amount:
+            raise HTTPException(400, f"You only have {have_rare} Rare Candy")
+
+        add_item_sql(conn, user_id, "candy", -body.amount)
+        add_item_sql(conn, user_id, f"famcandy_{family_id}", body.amount)
+
+    return {"ok": True}
+
+
+class EvolveRequest(BaseModel):
+    target_dex_id: int | None = None  # required only when multiple evolutions are available
+
+
+@app.post("/api/collection/{catch_id}/evolve")
+def evolve_pokemon(catch_id: int, body: EvolveRequest, user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        row = conn.execute(
+            "SELECT id, dex_id FROM poke_collection WHERE id = ? AND user_id = ?", (catch_id, user_id)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Pokémon not found")
+        mon = POKEDEX.get(row["dex_id"])
+        if not mon:
+            raise HTTPException(404, "Unknown species")
+
+        options = mon.get("evolves_to") or []
+        if not options:
+            raise HTTPException(400, f"{mon['name']} doesn't evolve any further")
+
+        family_id = mon.get("family_id", row["dex_id"])
+        candy_key = f"famcandy_{family_id}"
+        candy_row = conn.execute(
+            "SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, candy_key)
+        ).fetchone()
+        have_candy = candy_row["qty"] if candy_row else 0
+        if have_candy < EVOLUTION_CANDY_COST:
+            raise HTTPException(
+                400, f"You need {EVOLUTION_CANDY_COST} {mon['name']} Candy — you have {have_candy}"
+            )
+
+        candidates = []
+        for opt in options:
+            target = POKEDEX.get(opt["id"])
+            if not target:
+                continue
+            item_needed = opt.get("item")
+            has_item = True
+            if item_needed:
+                item_row = conn.execute(
+                    "SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, item_needed)
+                ).fetchone()
+                has_item = (item_row["qty"] if item_row else 0) > 0
+            candidates.append({"target": target, "item": item_needed, "has_item": has_item})
+
+        ready = [c for c in candidates if c["has_item"]]
+        if not ready:
+            raise HTTPException(400, "You don't have the item needed to evolve into any available form")
+
+        if body.target_dex_id is not None:
+            chosen = next((c for c in ready if c["target"]["id"] == body.target_dex_id), None)
+            if not chosen:
+                raise HTTPException(400, "That evolution isn't available right now")
+        elif len(ready) == 1:
+            chosen = ready[0]
+        else:
+            raise HTTPException(400, "Multiple evolutions are available — specify target_dex_id")
+
+        add_item_sql(conn, user_id, candy_key, -EVOLUTION_CANDY_COST)
+        if chosen["item"]:
+            add_item_sql(conn, user_id, chosen["item"], -1)
+        conn.execute("UPDATE poke_collection SET dex_id = ? WHERE id = ?", (chosen["target"]["id"], catch_id))
+        add_item_sql(conn, user_id, "stat_evolutions", 1)
+        add_item_sql(conn, user_id, "xp", XP_PER_EVOLUTION)
+        check_and_unlock_achievements(conn, user_id)
+
+    return {"ok": True, "new_dex_id": chosen["target"]["id"], "new_name": chosen["target"]["name"]}
 
 
 # ---------- Team ----------
