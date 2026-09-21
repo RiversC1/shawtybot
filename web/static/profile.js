@@ -10,7 +10,10 @@
   if (!modal) return;
 
   let allSpecies = [];
-  let currentCharacterKey = null;
+  let currentCharacterKey = openBtn.dataset.characterKey || null;
+  let currentFavoriteDexId = openBtn.dataset.favoriteDexId
+    ? parseInt(openBtn.dataset.favoriteDexId, 10)
+    : null;
 
   function openModal() {
     modal.hidden = false;
@@ -36,10 +39,14 @@
       return;
     }
     const characters = await res.json();
+    renderCharacterGrid(characters);
+  }
+
+  function renderCharacterGrid(characters) {
     characterGrid.innerHTML = "";
     for (const c of characters) {
       const item = document.createElement("div");
-      item.className = "picker-item";
+      item.className = "picker-item" + (c.key === currentCharacterKey ? " selected" : "");
       item.dataset.key = c.key;
       item.innerHTML = `<img src="${c.sprite}" alt="${c.label}"><div>${c.label}</div><div class="muted">${c.generation}</div>`;
       item.addEventListener("click", () => selectCharacter(c.key, c, item));
@@ -58,6 +65,7 @@
     for (const child of characterGrid.children) child.classList.remove("selected");
     itemEl.classList.add("selected");
     currentCharacterKey = key;
+    openBtn.dataset.characterKey = key;
 
     const spriteImg = document.querySelector(".trainer-sprite");
     if (spriteImg) {
@@ -85,9 +93,9 @@
     }
     for (const mon of species) {
       const item = document.createElement("div");
-      item.className = "picker-item";
+      item.className = "picker-item" + (mon.dex_id === currentFavoriteDexId ? " selected" : "");
       item.innerHTML = `<img src="${mon.artwork}" alt="${mon.name}"><div>${mon.name}${mon.has_shiny ? " ✨" : ""}</div>`;
-      item.addEventListener("click", () => selectFavorite(mon.dex_id, mon));
+      item.addEventListener("click", () => selectFavorite(mon, item));
       favoriteGrid.appendChild(item);
     }
   }
@@ -97,13 +105,19 @@
     renderFavoriteGrid(allSpecies.filter((m) => m.name.toLowerCase().includes(q)));
   });
 
-  async function selectFavorite(dexId, mon) {
+  async function selectFavorite(mon, itemEl) {
     const res = await fetch("/api/proxy/favorite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dex_id: dexId }),
+      body: JSON.stringify({ dex_id: mon.dex_id }),
     });
     if (!res.ok) return;
+
+    for (const child of favoriteGrid.children) child.classList.remove("selected");
+    itemEl.classList.add("selected");
+    currentFavoriteDexId = mon.dex_id;
+    openBtn.dataset.favoriteDexId = mon.dex_id;
+
     updateFavoriteDisplay(mon);
   }
 
@@ -114,6 +128,11 @@
       body: JSON.stringify({ dex_id: null }),
     });
     if (!res.ok) return;
+
+    for (const child of favoriteGrid.children) child.classList.remove("selected");
+    currentFavoriteDexId = null;
+    openBtn.dataset.favoriteDexId = "";
+
     updateFavoriteDisplay(null);
   });
 

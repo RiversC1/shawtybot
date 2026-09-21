@@ -52,7 +52,9 @@
             </div>
         </div>
 
-        <button id="customize-btn" class="btn-primary">Customize ✦</button>
+        <button id="customize-btn" class="btn-primary"
+                data-character-key="{{ trainer.character.key }}"
+                data-favorite-dex-id="{{ trainer.favorite.dex_id if trainer.favorite else '' }}">Customize ✦</button>
     </div>
 
     {% if trainer.avatar_url %}
