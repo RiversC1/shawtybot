@@ -5,6 +5,8 @@ app (hosted separately, e.g. on EC2) talks to this over HTTPS instead of
 touching the database itself.
 
 Run with: uvicorn webapi:app --host 0.0.0.0 --port 8000
+
+CD test marker: deploy-bot.yml pipeline
 """
 import os
 import sqlite3

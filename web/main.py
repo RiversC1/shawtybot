@@ -5,6 +5,8 @@ Holds no game data itself; every page fetches from the internal API
 issued at /login, forwarded as a cookie between browser and this app.
 
 Run with: uvicorn web.main:app --host 0.0.0.0 --port 8080
+
+CD test marker: deploy-web.yml pipeline
 """
 import os
 import logging
