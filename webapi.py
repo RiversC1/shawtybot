@@ -33,6 +33,34 @@ SESSION_DAYS = 7
 
 BALL_KEYS = {"pokeball", "greatball", "ultraball", "masterball"}
 
+# Keep in sync with cogs/pokemon.py — duplicated here so this API has no
+# discord.py dependency and can be deployed/restarted independently of the bot.
+TRAINER_CHARACTERS = {
+    "red": {"label": "Red", "generation": "Kanto", "sprite": "https://archives.bulbagarden.net/media/upload/e/e8/Spr_HGSS_Red.png"},
+    "leaf": {"label": "Leaf", "generation": "Kanto", "sprite": "https://archives.bulbagarden.net/media/upload/2/2b/Spr_FRLG_Leaf.png"},
+    "gold": {"label": "Gold", "generation": "Johto", "sprite": "https://archives.bulbagarden.net/media/upload/a/a5/Spr_HGSS_Ethan.png"},
+    "kris": {"label": "Kris", "generation": "Johto", "sprite": "https://archives.bulbagarden.net/media/upload/9/9e/Spr_C_Kris.png"},
+    "brendan": {"label": "Brendan", "generation": "Hoenn", "sprite": "https://archives.bulbagarden.net/media/upload/6/68/Spr_RS_Brendan.png"},
+    "may": {"label": "May", "generation": "Hoenn", "sprite": "https://archives.bulbagarden.net/media/upload/3/38/Spr_RS_May.png"},
+    "lucas": {"label": "Lucas", "generation": "Sinnoh", "sprite": "https://archives.bulbagarden.net/media/upload/6/6b/Spr_Pt_Lucas.png"},
+    "dawn": {"label": "Dawn", "generation": "Sinnoh", "sprite": "https://archives.bulbagarden.net/media/upload/0/00/Spr_DP_Dawn.png"},
+}
+DEFAULT_CHARACTER = "red"
+
+
+def xp_for_level(level: int) -> int:
+    return 50 + level * 25
+
+
+def compute_level(total_xp: int) -> tuple[int, int, int]:
+    level = 1
+    remaining = total_xp
+    while remaining >= xp_for_level(level):
+        remaining -= xp_for_level(level)
+        level += 1
+    return level, remaining, xp_for_level(level)
+
+
 with open(DATA_PATH, encoding="utf-8") as f:
     POKEDEX: dict[int, dict] = {p["id"]: p for p in json.load(f)}
 
@@ -107,16 +135,105 @@ def exchange_token(body: ExchangeRequest):
 def get_me(user_id: int = Depends(get_current_user_id)):
     with db() as conn:
         trainer = conn.execute("SELECT * FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
-    if not trainer:
-        raise HTTPException(404, "Trainer not found")
+        if not trainer:
+            raise HTTPException(404, "Trainer not found")
+
+        xp_row = conn.execute(
+            "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (user_id,)
+        ).fetchone()
+        total_xp = xp_row["qty"] if xp_row else 0
+
+        total_caught = conn.execute(
+            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
+        unique_species = conn.execute(
+            "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
+
     starter = POKEDEX.get(trainer["starter_id"])
+    level, xp_into_level, xp_needed = compute_level(total_xp)
+
+    character_key = trainer["character"] or DEFAULT_CHARACTER
+    character = TRAINER_CHARACTERS.get(character_key, TRAINER_CHARACTERS[DEFAULT_CHARACTER])
+
+    favorite = None
+    if trainer["favorite_dex_id"] is not None:
+        fav_mon = POKEDEX.get(trainer["favorite_dex_id"])
+        if fav_mon:
+            favorite = {
+                "dex_id": fav_mon["id"],
+                "name": fav_mon["name"],
+                "types": fav_mon["types"],
+                "artwork": fav_mon.get("artwork"),
+                "sprite": fav_mon.get("sprite"),
+            }
+
+    dex_total = len(POKEDEX)
+
     return {
         "user_id": user_id,
         "username": trainer["username"],
         "avatar_url": trainer["avatar_url"],
         "starter": starter["name"] if starter else None,
         "created_at": trainer["created_at"],
+        "character": {"key": character_key, **character},
+        "favorite": favorite,
+        "level": level,
+        "total_xp": total_xp,
+        "xp_into_level": xp_into_level,
+        "xp_needed_for_level": xp_needed,
+        "collection": {
+            "total_caught": total_caught,
+            "unique_species": unique_species,
+            "dex_total": dex_total,
+            "dex_percent": round(unique_species / dex_total * 100, 1) if dex_total else 0,
+        },
+        # Battling isn't built yet — always accurate at 0 until it is.
+        "battle_record": {"wins": 0, "games": 0},
     }
+
+
+# ---------- Trainer character ----------
+
+@app.get("/api/characters")
+def list_characters():
+    return [{"key": key, **cfg} for key, cfg in TRAINER_CHARACTERS.items()]
+
+
+class CharacterRequest(BaseModel):
+    character: str
+
+
+@app.post("/api/character")
+def set_character(body: CharacterRequest, user_id: int = Depends(get_current_user_id)):
+    if body.character not in TRAINER_CHARACTERS:
+        raise HTTPException(400, "Unknown character")
+    with db() as conn:
+        conn.execute("UPDATE poke_trainers SET character = ? WHERE user_id = ?", (body.character, user_id))
+    return {"ok": True}
+
+
+# ---------- Favorite Pokémon ----------
+
+class FavoriteRequest(BaseModel):
+    dex_id: int | None  # null clears the favorite
+
+
+@app.post("/api/favorite")
+def set_favorite(body: FavoriteRequest, user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        if body.dex_id is not None:
+            owned = conn.execute(
+                "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?",
+                (user_id, body.dex_id),
+            ).fetchone()[0]
+            if owned < 1:
+                name = POKEDEX.get(body.dex_id, {}).get("name", f"#{body.dex_id}")
+                raise HTTPException(400, f"You don't own a {name}")
+        conn.execute(
+            "UPDATE poke_trainers SET favorite_dex_id = ? WHERE user_id = ?", (body.dex_id, user_id)
+        )
+    return {"ok": True}
 
 
 # ---------- Pokédex ----------

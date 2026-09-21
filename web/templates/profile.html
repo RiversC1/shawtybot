@@ -1,16 +1,114 @@
 {% extends "base.html" %}
 {% block title %}Profile — ShawtyBot Pokémon{% endblock %}
 {% block content %}
-<div class="card">
-    <div class="profile-header">
-        {% if trainer.avatar_url %}
-        <img src="{{ trainer.avatar_url }}" alt="avatar" class="avatar">
+<div class="trainer-card">
+    <div class="trainer-visual">
+        <div class="trainer-sprite-frame">
+            <div class="level-watermark">LV.{{ trainer.level }}</div>
+            <img src="{{ trainer.character.sprite }}" alt="{{ trainer.character.label }}" class="trainer-sprite">
+        </div>
+        <div class="trainer-vertical-name">{{ trainer.username or "TRAINER" }}</div>
+    </div>
+
+    <div class="favorite-visual">
+        {% if trainer.favorite %}
+        <div class="favorite-circle">
+            <img src="{{ trainer.favorite.artwork }}" alt="{{ trainer.favorite.name }}">
+        </div>
+        <div class="favorite-label">Favorite Pokémon</div>
+        <div class="favorite-name">{{ trainer.favorite.name }}</div>
+        <div class="favorite-types">
+            {% for t in trainer.favorite.types %}
+            <span class="type-badge type-{{ t }}">{{ t|capitalize }}</span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="favorite-circle favorite-empty">?</div>
+        <div class="favorite-label">Favorite Pokémon</div>
+        <div class="favorite-name muted">None selected</div>
         {% endif %}
+    </div>
+
+    <div class="trainer-info">
+        <div class="section-label">Your Trainer Card</div>
+        <h1>{{ trainer.username or "Trainer" }}</h1>
+        <p class="trainer-tagline">Your companion. Your style. Your story.</p>
+        <p class="trainer-level-tag">Level {{ trainer.level }}</p>
+
+        <hr>
+
+        <div class="trainer-stats">
+            <div class="stat">
+                <div class="stat-value">{{ trainer.collection.total_caught }}</div>
+                <div class="stat-label">Pokémon in collection</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">{{ trainer.collection.dex_percent }}%</div>
+                <div class="stat-label">Pokédex · {{ trainer.collection.unique_species }} species</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">{{ trainer.battle_record.wins }}</div>
+                <div class="stat-label">Wins / {{ trainer.battle_record.games }} games</div>
+            </div>
+        </div>
+
+        <button id="customize-btn" class="btn-primary">Customize ✦</button>
+    </div>
+
+    {% if trainer.avatar_url %}
+    <img src="{{ trainer.avatar_url }}" alt="avatar" class="trainer-discord-avatar">
+    {% endif %}
+</div>
+
+<div class="card trajectory-card">
+    <div class="trajectory-header">
         <div>
-            <h1>{{ trainer.username or "Trainer" }}</h1>
-            <p class="muted">Trainer since {{ trainer.created_at[:10] }}</p>
+            <div class="section-label">Trajectory</div>
+            <h2>Level {{ trainer.level }}</h2>
+        </div>
+        <div class="muted">{{ trainer.total_xp }} total XP</div>
+    </div>
+    <div class="xp-bar">
+        <div class="xp-bar-fill" style="width: {{ (trainer.xp_into_level / trainer.xp_needed_for_level * 100) | round(1) }}%"></div>
+    </div>
+    <div class="xp-caption">
+        <span>{{ trainer.xp_into_level }} / {{ trainer.xp_needed_for_level }} XP</span>
+        <span>{{ trainer.xp_needed_for_level - trainer.xp_into_level }} XP to go</span>
+    </div>
+
+    <hr>
+
+    <div class="section-label">Permanent Achievements</div>
+    <p class="muted">Coming soon — this will track milestones across your whole journey.</p>
+</div>
+
+<div id="customize-modal" class="modal-overlay" hidden>
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Customize Your Trainer</h2>
+            <button id="modal-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <section>
+                <h3>Your Character</h3>
+                <p class="muted">Pick your character. This is shown on your profile and doesn't change your team.</p>
+                <div id="character-grid" class="picker-grid"></div>
+            </section>
+
+            <hr>
+
+            <section>
+                <h3>Your Favorite Pokémon</h3>
+                <p class="muted">Shown as your companion on your profile.</p>
+                <div class="favorite-actions">
+                    <input type="text" id="favorite-search" placeholder="Search your catches..." class="search-input">
+                    <button id="favorite-clear" class="btn-secondary">No favorite</button>
+                </div>
+                <div id="favorite-grid" class="picker-grid"></div>
+            </section>
         </div>
     </div>
-    <p><strong>Starter Pokémon:</strong> {{ trainer.starter }}</p>
 </div>
+
+<script src="/static/profile.js"></script>
 {% endblock %}

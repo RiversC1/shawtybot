@@ -13,7 +13,7 @@ import logging
 
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -35,6 +35,17 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 async def api_get(session: str, path: str) -> tuple[int, dict | list]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(f"{API_BASE_URL}{path}", headers={"Authorization": f"Bearer {session}"})
+    try:
+        return resp.status_code, resp.json()
+    except ValueError:
+        return resp.status_code, {}
+
+
+async def api_post(session: str, path: str, payload: dict) -> tuple[int, dict | list]:
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{API_BASE_URL}{path}", json=payload, headers={"Authorization": f"Bearer {session}"}
+        )
     try:
         return resp.status_code, resp.json()
     except ValueError:
@@ -127,3 +138,45 @@ async def team(request: Request):
         return clear_session(RedirectResponse("/"))
 
     return templates.TemplateResponse(request, "team.html", {"team": data})
+
+
+# ---------- JSON proxy endpoints for the customize modal's JS ----------
+# These exist so client-side JS never sees the internal API's session token
+# or hostname directly — it only ever talks to this same-origin app.
+
+@app.get("/api/proxy/characters")
+async def proxy_characters(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/characters")
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/character")
+async def proxy_set_character(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, "/api/character", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/pokedex")
+async def proxy_pokedex(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/pokedex")
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/favorite")
+async def proxy_set_favorite(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, "/api/favorite", body)
+    return JSONResponse(data, status_code=status)

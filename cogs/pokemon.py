@@ -24,6 +24,45 @@ STARTERS = [
     "Chimchar", "Turtwig", "Piplup",
 ]
 
+# Main protagonist characters, one male/female pair per generation 1-4, for the
+# web profile's trainer customization. Sprites are official game art (Bulbagarden
+# Archives), used only for the web trainer-card feature, not sold/traded in-bot.
+TRAINER_CHARACTERS = {
+    "red": {"label": "Red", "generation": "Kanto", "sprite": "https://archives.bulbagarden.net/media/upload/e/e8/Spr_HGSS_Red.png"},
+    "leaf": {"label": "Leaf", "generation": "Kanto", "sprite": "https://archives.bulbagarden.net/media/upload/2/2b/Spr_FRLG_Leaf.png"},
+    "gold": {"label": "Gold", "generation": "Johto", "sprite": "https://archives.bulbagarden.net/media/upload/a/a5/Spr_HGSS_Ethan.png"},
+    "kris": {"label": "Kris", "generation": "Johto", "sprite": "https://archives.bulbagarden.net/media/upload/9/9e/Spr_C_Kris.png"},
+    "brendan": {"label": "Brendan", "generation": "Hoenn", "sprite": "https://archives.bulbagarden.net/media/upload/6/68/Spr_RS_Brendan.png"},
+    "may": {"label": "May", "generation": "Hoenn", "sprite": "https://archives.bulbagarden.net/media/upload/3/38/Spr_RS_May.png"},
+    "lucas": {"label": "Lucas", "generation": "Sinnoh", "sprite": "https://archives.bulbagarden.net/media/upload/6/6b/Spr_Pt_Lucas.png"},
+    "dawn": {"label": "Dawn", "generation": "Sinnoh", "sprite": "https://archives.bulbagarden.net/media/upload/0/00/Spr_DP_Dawn.png"},
+}
+DEFAULT_CHARACTER = "red"
+
+# ---------- XP / Level ----------
+
+XP_PER_CATCH = 10
+XP_SHINY_BONUS = 50
+XP_LEGENDARY_BONUS = 30
+XP_PER_EVOLUTION = 20
+XP_PER_STARTER = 10
+XP_PER_COFFER = {"silver": 5, "golden": 10, "diamond": 15}
+
+
+def xp_for_level(level: int) -> int:
+    """XP required to advance from `level` to `level + 1`."""
+    return 50 + level * 25
+
+
+def compute_level(total_xp: int) -> tuple[int, int, int]:
+    """Returns (level, xp_into_current_level, xp_needed_for_next_level)."""
+    level = 1
+    remaining = total_xp
+    while remaining >= xp_for_level(level):
+        remaining -= xp_for_level(level)
+        level += 1
+    return level, remaining, xp_for_level(level)
+
 # Base catch rates before rarity/summoner adjustments. Master Ball always succeeds.
 BALLS = {
     "pokeball": {"label": "Poké Ball", "catch_rate": 0.10},
@@ -340,12 +379,20 @@ class CatchPanelView(discord.ui.View):
             family_name = self.cog.pokedex.get(family_id, mon)["name"]
             candy_qty = random.randint(2, 5)
             self.cog.add_item(self.catcher_id, f"famcandy_{family_id}", candy_qty)
+
+            xp_gain = XP_PER_CATCH
+            if mon.get("is_shiny"):
+                xp_gain += XP_SHINY_BONUS
+            if is_rare(mon):
+                xp_gain += XP_LEGENDARY_BONUS
+            self.cog.add_xp(self.catcher_id, xp_gain)
+
             await self.spawn_view.mark_caught(
                 interaction.user.display_name, interaction.user.mention, BALLS[ball_key]["label"]
             )
             result = (
                 f"🎉 Gotcha! **{mon['name']}** was caught with a {BALLS[ball_key]['label']}!\n"
-                f"You also got **{candy_qty}x {family_name} Candy**."
+                f"You also got **{candy_qty}x {family_name} Candy** and **{xp_gain} XP**."
             )
         else:
             result = f"The {mon['name']} broke free from the {BALLS[ball_key]['label']}!"
@@ -469,6 +516,7 @@ class CofferView(discord.ui.View):
         rewards = roll_coffer_rewards(self.coffer_key)
         for item, qty in rewards.items():
             self.cog.add_item(interaction.user.id, item, qty)
+        self.cog.add_xp(interaction.user.id, XP_PER_COFFER[self.coffer_key])
 
         if self.message:
             embed = self.message.embeds[0]
@@ -514,6 +562,9 @@ class StarterSelectView(discord.ui.View):
         self.cog.create_trainer(self.user_id, mon["id"])
         self.cog.add_item(self.user_id, "pokeball", 10)
         self.cog.add_to_collection(self.user_id, mon["id"])
+        self.cog.add_xp(self.user_id, XP_PER_STARTER)
+        self.cog.set_character(self.user_id, DEFAULT_CHARACTER)
+        self.cog.set_favorite(self.user_id, mon["id"])
 
         embed = discord.Embed(
             title=f"You chose {mon['name']}!",
@@ -773,6 +824,11 @@ class Pokemon(commands.Cog):
                 conn.execute("ALTER TABLE poke_trainers ADD COLUMN username TEXT")
             if "avatar_url" not in cols:
                 conn.execute("ALTER TABLE poke_trainers ADD COLUMN avatar_url TEXT")
+            # Migration for DBs created before the trainer card feature existed
+            if "character" not in cols:
+                conn.execute("ALTER TABLE poke_trainers ADD COLUMN character TEXT")
+            if "favorite_dex_id" not in cols:
+                conn.execute("ALTER TABLE poke_trainers ADD COLUMN favorite_dex_id INTEGER")
 
     # ---------- DB helpers ----------
 
@@ -878,6 +934,45 @@ class Pokemon(commands.Cog):
                 (username, avatar_url, user_id),
             )
         return token
+
+    def get_xp(self, user_id: int) -> int:
+        return self.get_item_qty(user_id, "xp")
+
+    def add_xp(self, user_id: int, amount: int):
+        self.add_item(user_id, "xp", amount)
+
+    def set_character(self, user_id: int, character: str) -> bool:
+        if character not in TRAINER_CHARACTERS:
+            return False
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("UPDATE poke_trainers SET character = ? WHERE user_id = ?", (character, user_id))
+        return True
+
+    def set_favorite(self, user_id: int, dex_id: int) -> bool:
+        if self.count_owned(user_id, dex_id) < 1:
+            return False
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("UPDATE poke_trainers SET favorite_dex_id = ? WHERE user_id = ?", (dex_id, user_id))
+        return True
+
+    def clear_favorite(self, user_id: int):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("UPDATE poke_trainers SET favorite_dex_id = NULL WHERE user_id = ?", (user_id,))
+
+    def get_collection_stats(self, user_id: int) -> dict:
+        with sqlite3.connect(DB_PATH) as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
+            unique = conn.execute(
+                "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
+        return {
+            "total_caught": total,
+            "unique_species": unique,
+            "dex_total": len(self.pokedex),
+            "dex_percent": round(unique / len(self.pokedex) * 100, 1) if self.pokedex else 0,
+        }
 
     def add_item(self, user_id: int, item: str, delta: int):
         with sqlite3.connect(DB_PATH) as conn:
@@ -1171,6 +1266,7 @@ class Pokemon(commands.Cog):
     async def perform_evolution(self, interaction: discord.Interaction, from_mon: dict, to_mon: dict, candy_key: str):
         self.add_item(interaction.user.id, candy_key, -EVOLUTION_CANDY_COST)
         self.evolve_one(interaction.user.id, from_mon["id"], to_mon["id"])
+        self.add_xp(interaction.user.id, XP_PER_EVOLUTION)
 
         embed = discord.Embed(
             title=f"{from_mon['name']} evolved into {to_mon['name']}!",
