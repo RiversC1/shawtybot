@@ -114,10 +114,17 @@ a { color: inherit; }
 }
 
 .sidebar-icon {
-    font-size: 1.15em;
-    width: 1.3em;
-    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
     flex-shrink: 0;
+}
+
+.sidebar-icon svg {
+    width: 20px;
+    height: 20px;
 }
 
 .sidebar-footer {
