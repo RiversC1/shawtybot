@@ -17,3 +17,6 @@ __pycache__/
 # Runtime databases — contain live user data, never commit
 *.db
 tmp_*/
+
+# Stray logs from local testing
+*.log
