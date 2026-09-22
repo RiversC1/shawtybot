@@ -398,6 +398,32 @@ def add_xp_and_coins(user_id: int, xp: int, coin: int):
             )
 
 
+# Keep in sync with cogs/pokemon.py's / webapi.py's TRAINER_CHARACTERS —
+# duplicated here (this module has zero discord/fastapi deps) so a battle's
+# HUD can show a human trainer's chosen character sprite without either
+# process reaching into the other's constants.
+TRAINER_CHARACTER_SPRITE_BASE = "https://shawtypoke-web.duckdns.org/static/trainers"
+TRAINER_CHARACTER_KEYS = ["red", "leaf", "gold", "kris", "brendan", "may", "lucas", "dawn"]
+DEFAULT_TRAINER_CHARACTER = "red"
+
+
+def avatar_for_side(battle_row: sqlite3.Row, side: str) -> str | None:
+    """A small portrait for the battle-room HUD: the human's chosen trainer
+    character for a real user, the gym leader's artwork for a gym battle, or
+    that trainer class's sprite for a random-trainer battle."""
+    user_id = battle_row["side_a_user_id"] if side == "A" else battle_row["side_b_user_id"]
+    if user_id:
+        with db() as conn:
+            row = conn.execute("SELECT character FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
+        character = row["character"] if row and row["character"] in TRAINER_CHARACTER_KEYS else DEFAULT_TRAINER_CHARACTER
+        return f"{TRAINER_CHARACTER_SPRITE_BASE}/{character}.png"
+    npc_key = battle_row["side_b_npc_key"]
+    if battle_row["battle_type"] == "gym":
+        return GYMS.get(npc_key, {}).get("leader_image")
+    tclass = TRAINER_CLASS_BY_KEY.get(npc_key)
+    return tclass.get("sprite") if tclass else None
+
+
 def display_name_for_side(battle_row: sqlite3.Row, side: str) -> str:
     user_id = battle_row["side_a_user_id"] if side == "A" else battle_row["side_b_user_id"]
     if user_id:
@@ -642,7 +668,9 @@ def summarize_battle(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
         winner_name = name_a if row["winner_side"] == "A" else name_b
     return {
         "battle_id": row["battle_id"], "battle_type": row["battle_type"], "status": row["status"],
-        "name_a": name_a, "name_b": name_b, "turn_number": row["current_turn_number"],
+        "name_a": name_a, "name_b": name_b,
+        "avatar_a": avatar_for_side(row, "A"), "avatar_b": avatar_for_side(row, "B"),
+        "turn_number": row["current_turn_number"],
         "winner_name": winner_name, "created_at": row["created_at"], "finished_at": row["finished_at"],
     }
 
@@ -706,7 +734,9 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
 
     payload = {
         "battle_id": battle_id, "battle_type": battle_row["battle_type"], "status": battle_row["status"],
-        "name_a": name_a, "name_b": name_b, "roster_a": roster_a, "roster_b": roster_b,
+        "name_a": name_a, "name_b": name_b,
+        "avatar_a": avatar_for_side(battle_row, "A"), "avatar_b": avatar_for_side(battle_row, "B"),
+        "roster_a": roster_a, "roster_b": roster_b,
         "turn_number": battle_row["current_turn_number"], "winner_side": battle_row["winner_side"],
         "winner_name": winner_name, "events": events,
     }

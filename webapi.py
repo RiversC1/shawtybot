@@ -452,6 +452,18 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
 
     dex_total = len(POKEDEX)
 
+    earned_badges = battle_store.get_badges(target_id)
+    badges = [
+        {
+            "gym_key": k,
+            "leader_name": battle_store.GYMS[k]["leader_name"],
+            "badge_name": battle_store.GYMS[k]["badge_name"],
+            "badge_image": battle_store.GYMS[k].get("badge_image"),
+            "earned": k in earned_badges,
+        }
+        for k in battle_store.GYM_ORDER
+    ]
+
     return {
         "user_id": target_id,
         "username": trainer["username"],
@@ -478,6 +490,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
                 (target_id, target_id),
             ).fetchone()[0],
         },
+        "badges": badges,
         "achievements": {"unlocked": unlocked_count, "total": TOTAL_ACHIEVEMENT_TIERS},
     }
 

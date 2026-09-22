@@ -579,6 +579,36 @@ code {
     font-size: 0.85em;
 }
 
+.badge-case {
+    margin-bottom: 20px;
+}
+
+.badge-case-label {
+    color: var(--text-muted);
+    font-size: 0.85em;
+    margin-bottom: 8px;
+}
+
+.badge-case-icons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.badge-case-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px;
+    box-sizing: border-box;
+}
+
+.badge-case-icon.is-unearned {
+    filter: grayscale(100%);
+    opacity: 0.35;
+}
+
 .trainer-discord-avatar {
     position: absolute;
     top: 20px;
@@ -1467,9 +1497,24 @@ code {
     box-shadow: 0 0 0 1px var(--yellow);
 }
 
+.battle-hud-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.battle-hud-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
 .battle-hud-name {
     font-weight: bold;
-    margin-bottom: 4px;
 }
 
 @media (max-width: 640px) {

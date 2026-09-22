@@ -65,10 +65,13 @@
     return null;
   }
 
-  function renderHud(hudEl, name, roster, isWinner) {
+  function renderHud(hudEl, name, avatar, roster, isWinner) {
+    const avatarHtml = avatar ? `<img class="battle-hud-avatar" src="${avatar}" alt="${name}">` : "";
     const active = roster.find((m) => m.is_active) || roster[0];
     if (!active) {
-      hudEl.innerHTML = `<div class="battle-hud-name">${name}</div><p class="muted">No Pokémon</p>`;
+      hudEl.innerHTML = `
+        <div class="battle-hud-header">${avatarHtml}<div class="battle-hud-name">${name}</div></div>
+        <p class="muted">No Pokémon</p>`;
       return;
     }
     const pct = active.max_hp > 0 ? Math.max(0, Math.min(100, (active.current_hp / active.max_hp) * 100)) : 0;
@@ -81,7 +84,7 @@
 
     hudEl.classList.toggle("is-winner", !!isWinner);
     hudEl.innerHTML = `
-        <div class="battle-hud-name">${name}</div>
+        <div class="battle-hud-header">${avatarHtml}<div class="battle-hud-name">${name}</div></div>
         <div>${active.name}${active.status ? ` · ${active.status}` : ""}${active.is_fainted ? " (fainted)" : ""}</div>
         <div class="hp-bar-track"><div class="hp-bar-fill ${hpClass(active.current_hp, active.max_hp)}" style="width:${pct}%"></div></div>
         <div class="muted">${Math.max(0, active.current_hp)}/${active.max_hp} HP</div>
@@ -330,8 +333,8 @@
     const newEvents = animate ? battle.events.slice(animatedEventCount >= 0 ? animatedEventCount : 0) : [];
     animatedEventCount = battle.events.length;
 
-    renderHud(hudA, battle.name_a, battle.roster_a, battle.winner_side === "A");
-    renderHud(hudB, battle.name_b, battle.roster_b, battle.winner_side === "B");
+    renderHud(hudA, battle.name_a, battle.avatar_a, battle.roster_a, battle.winner_side === "A");
+    renderHud(hudB, battle.name_b, battle.avatar_b, battle.roster_b, battle.winner_side === "B");
     const activeA = battle.roster_a.find((m) => m.is_active);
     const activeB = battle.roster_b.find((m) => m.is_active);
     renderSprite(spriteA, battle.roster_a, pickAnimationForSide(newEvents, "A", !!(activeA && activeA.is_fainted)));
