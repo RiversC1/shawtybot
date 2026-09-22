@@ -1552,6 +1552,7 @@ code {
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
+    object-position: top;
     background: rgba(255, 255, 255, 0.08);
     flex-shrink: 0;
 }
@@ -2074,6 +2075,11 @@ code {
     text-decoration: none;
     font-weight: bold;
     font-size: 0.9em;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
 }
 
 .link-accent:hover {
@@ -2216,6 +2222,7 @@ code {
     height: 28px;
     border-radius: 50%;
     object-fit: cover;
+    object-position: top;
     background: rgba(255, 255, 255, 0.08);
     flex-shrink: 0;
 }

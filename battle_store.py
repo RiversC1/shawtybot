@@ -715,7 +715,10 @@ def summarize_battle(conn: sqlite3.Connection, row: sqlite3.Row, viewer_user_id:
         "battle_id": row["battle_id"], "battle_type": row["battle_type"], "status": row["status"],
         "name_a": name_a, "name_b": name_b,
         "avatar_a": avatar_for_side(row, "A"), "avatar_b": avatar_for_side(row, "B"),
-        "side_a_user_id": row["side_a_user_id"], "side_b_user_id": row["side_b_user_id"],
+        # Stringified — Discord snowflake IDs exceed JS's safe integer range,
+        # so a plain JSON number would get silently corrupted by the browser.
+        "side_a_user_id": str(row["side_a_user_id"]) if row["side_a_user_id"] else None,
+        "side_b_user_id": str(row["side_b_user_id"]) if row["side_b_user_id"] else None,
         "is_participant": viewer_side is not None,
         "turn_number": row["current_turn_number"],
         "winner_name": winner_name, "your_result": your_result,

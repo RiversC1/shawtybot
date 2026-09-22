@@ -2,19 +2,25 @@
   const REFRESH_INTERVAL_MS = 10000;
 
   const tabBtnLive = document.getElementById("tab-btn-live");
+  const tabBtnRecent = document.getElementById("tab-btn-recent");
   const tabBtnMine = document.getElementById("tab-btn-mine");
   const tabLive = document.getElementById("tab-live");
+  const tabRecent = document.getElementById("tab-recent");
   const tabMine = document.getElementById("tab-mine");
   const liveList = document.getElementById("live-battles-list");
+  const recentList = document.getElementById("recent-battles-list");
   const mineList = document.getElementById("mine-battles-list");
 
   tabBtnLive.addEventListener("click", () => switchTab("live"));
+  tabBtnRecent.addEventListener("click", () => switchTab("recent"));
   tabBtnMine.addEventListener("click", () => switchTab("mine"));
 
   function switchTab(which) {
     tabBtnLive.classList.toggle("active", which === "live");
+    tabBtnRecent.classList.toggle("active", which === "recent");
     tabBtnMine.classList.toggle("active", which === "mine");
     tabLive.hidden = which !== "live";
+    tabRecent.hidden = which !== "recent";
     tabMine.hidden = which !== "mine";
   }
 
@@ -54,7 +60,7 @@
                   <img class="battle-list-avatar" src="${b.avatar_b}" alt="">
                   <span>${b.name_b}</span>
               </div>
-              <div class="muted battle-list-date">${new Date(b.created_at).toLocaleString()}</div>
+              <div class="muted battle-list-date">${new Date(b.finished_at || b.created_at).toLocaleString()}</div>
           </div>
           <div class="battle-list-side">
               ${resultHtml}
@@ -67,6 +73,7 @@
     const res = await fetch("/api/proxy/battles");
     if (!res.ok) {
       liveList.innerHTML = "<p class='error'>Couldn't load battles.</p>";
+      recentList.innerHTML = "<p class='error'>Couldn't load battles.</p>";
       mineList.innerHTML = "<p class='error'>Couldn't load battles.</p>";
       return;
     }
@@ -75,6 +82,10 @@
     liveList.innerHTML = (data.live || []).length
       ? data.live.map(battleRow).join("")
       : "<p class='battle-empty'>No battles happening right now.</p>";
+
+    recentList.innerHTML = (data.recent || []).length
+      ? data.recent.map(battleRow).join("")
+      : "<p class='battle-empty'>No finished battles yet.</p>";
 
     mineList.innerHTML = (data.mine || []).length
       ? data.mine.map(battleRow).join("")

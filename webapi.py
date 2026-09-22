@@ -480,7 +480,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
     ]
 
     return {
-        "user_id": target_id,
+        "user_id": str(target_id),  # Discord snowflake — see the note in list_trainers()
         "username": trainer["username"],
         "avatar_url": trainer["avatar_url"],
         "starter": starter["name"] if starter else None,
@@ -538,7 +538,12 @@ def list_trainers(user_id: int = Depends(get_current_user_id)):
             character_key = row["character"] or DEFAULT_CHARACTER
             character = TRAINER_CHARACTERS.get(character_key, TRAINER_CHARACTERS[DEFAULT_CHARACTER])
             results.append({
-                "user_id": row["user_id"],
+                # Discord snowflake IDs (18-19 digits) exceed JavaScript's safe
+                # integer range (2^53) — serialize as a string so a JS client
+                # round-tripping this through JSON doesn't silently corrupt it
+                # (which would send trade proposals/collection lookups to the
+                # wrong, or a nonexistent, user).
+                "user_id": str(row["user_id"]),
                 "username": row["username"] or "Trainer",
                 "avatar_url": row["avatar_url"],
                 "level": level,

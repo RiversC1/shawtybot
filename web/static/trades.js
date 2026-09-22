@@ -476,10 +476,7 @@
     );
   }
 
-  refreshLink.addEventListener("click", (e) => {
-    e.preventDefault();
-    loadTrades();
-  });
+  refreshLink.addEventListener("click", () => loadTrades());
 
   loadTrades();
 })();

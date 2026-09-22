@@ -9,12 +9,16 @@
 
 <div class="battle-tabs">
     <button class="battle-tab-btn active" id="tab-btn-live" type="button">Live</button>
+    <button class="battle-tab-btn" id="tab-btn-recent" type="button">Recent</button>
     <button class="battle-tab-btn" id="tab-btn-mine" type="button">My Battles</button>
 </div>
 <p class="muted">Auto-refreshing every 10 seconds.</p>
 
 <div id="tab-live">
     <div class="battle-list" id="live-battles-list"><p class="muted">Loading...</p></div>
+</div>
+<div id="tab-recent" hidden>
+    <div class="battle-list" id="recent-battles-list"><p class="muted">Loading...</p></div>
 </div>
 <div id="tab-mine" hidden>
     <div class="battle-list" id="mine-battles-list"><p class="muted">Loading...</p></div>
