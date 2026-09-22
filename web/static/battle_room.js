@@ -5,14 +5,18 @@
   const titleEl = document.getElementById("br-title");
   const subtitleEl = document.getElementById("br-subtitle");
   const resultEl = document.getElementById("br-result");
-  const sideAEl = document.getElementById("br-side-a");
-  const sideBEl = document.getElementById("br-side-b");
+  const turnBadgeEl = document.getElementById("br-turn-badge");
+  const hudA = document.getElementById("br-hud-a");
+  const hudB = document.getElementById("br-hud-b");
+  const spriteA = document.getElementById("br-sprite-a");
+  const spriteB = document.getElementById("br-sprite-b");
   const logEl = document.getElementById("br-log");
   const actionPanel = document.getElementById("br-action-panel");
   const connectionStatusEl = document.getElementById("br-connection-status");
   const forfeitBtn = document.getElementById("br-forfeit-btn");
 
   let current = JSON.parse(document.getElementById("battle-data").textContent);
+  let animatedEventCount = 0; // events at/before this index have already had their animation played
   let pollTimer = null;
   let ws = null;
   let wsConnectTimer = null;
@@ -40,10 +44,31 @@
     return "hp-low";
   }
 
-  function renderSide(el, name, roster, isWinner) {
+  // Picks a single animation class for `side` from the events that happened
+  // since the last render — faint beats a switch-in beats getting hit beats
+  // attacking, since that's roughly their visual importance if more than one
+  // happened in the same batch (e.g. you attack and then get KO'd).
+  // `activeIsFainted`: whether the side's CURRENTLY displayed (post-render)
+  // mon is the fainted one. When an NPC's forced switch auto-resolves in the
+  // same batch as the faint (gym/trainer battles never wait a turn on that),
+  // the sprite is already showing the freshly-arrived mon by the time this
+  // runs — so switch-in must win, or anim-faint's fill-forwards would leave
+  // the *new*, perfectly healthy Pokémon stuck invisible.
+  function pickAnimationForSide(newEvents, side, activeIsFainted) {
+    const mine = newEvents.filter((e) => e.side === side);
+    if (mine.some((e) => e.type === "switch_in")) return "anim-switch-in";
+    if (activeIsFainted && mine.some((e) => e.type === "faint")) return "anim-faint";
+    if (mine.some((e) => e.type === "damage" || e.type === "confusion_self_hit" || e.type === "status_damage" || e.type === "recoil")) {
+      return "anim-hit";
+    }
+    if (mine.some((e) => e.type === "move_used")) return side === "A" ? "anim-attack-a" : "anim-attack-b";
+    return null;
+  }
+
+  function renderHud(hudEl, name, roster, isWinner) {
     const active = roster.find((m) => m.is_active) || roster[0];
     if (!active) {
-      el.innerHTML = `<div class="battle-side-name">${name}</div><p class="muted">No Pokémon</p>`;
+      hudEl.innerHTML = `<div class="battle-hud-name">${name}</div><p class="muted">No Pokémon</p>`;
       return;
     }
     const pct = active.max_hp > 0 ? Math.max(0, Math.min(100, (active.current_hp / active.max_hp) * 100)) : 0;
@@ -54,15 +79,46 @@
       )
       .join("");
 
-    el.classList.toggle("is-winner", !!isWinner);
-    el.innerHTML = `
-        <div class="battle-side-name">${name}</div>
-        <img class="battle-active-art" src="${active.artwork}" alt="${active.name}">
+    hudEl.classList.toggle("is-winner", !!isWinner);
+    hudEl.innerHTML = `
+        <div class="battle-hud-name">${name}</div>
         <div>${active.name}${active.status ? ` · ${active.status}` : ""}${active.is_fainted ? " (fainted)" : ""}</div>
         <div class="hp-bar-track"><div class="hp-bar-fill ${hpClass(active.current_hp, active.max_hp)}" style="width:${pct}%"></div></div>
         <div class="muted">${Math.max(0, active.current_hp)}/${active.max_hp} HP</div>
         <div class="battle-roster-strip">${rosterStrip}</div>
     `;
+  }
+
+  function renderSprite(spriteEl, roster, animClass) {
+    const active = roster.find((m) => m.is_active) || roster[0];
+    if (!active) {
+      spriteEl.style.visibility = "hidden";
+      return;
+    }
+    spriteEl.style.visibility = "visible";
+    const desiredSrc = active.is_fainted && animClass !== "anim-faint" ? "" : active.sprite;
+    if (desiredSrc && spriteEl.dataset.mon !== `${active.dex_id}:${active.sprite}`) {
+      spriteEl.src = active.sprite;
+      spriteEl.onerror = () => {
+        spriteEl.onerror = null;
+        spriteEl.src = active.artwork;
+      };
+      spriteEl.dataset.mon = `${active.dex_id}:${active.sprite}`;
+    }
+    spriteEl.alt = active.name;
+
+    // Base visibility is driven by fainted-state alone, independent of any
+    // one-shot animation class below — anim-switch-in doesn't use
+    // fill-mode:forwards (it should snap back to normal, visible styling
+    // once it finishes), so opacity has to be set here rather than left for
+    // the animation to leave behind.
+    spriteEl.style.opacity = active.is_fainted && animClass !== "anim-faint" ? "0" : "1";
+
+    if (animClass) {
+      spriteEl.classList.remove("anim-attack-a", "anim-attack-b", "anim-hit", "anim-faint", "anim-switch-in");
+      void spriteEl.offsetWidth; // force reflow so the animation restarts even if the same class was just used
+      spriteEl.classList.add(animClass);
+    }
   }
 
   function typeBadge(t) {
@@ -122,7 +178,7 @@
           return `<button class="btn-secondary br-switch-option" data-index="${i}">${m.name}</button>`;
         })
         .join("");
-      actionPanel.innerHTML = `<p><strong>${myRoster.find((m) => m.is_fainted && m.is_active)?.name || "Your Pokémon"} fainted!</strong> Choose your next Pokémon:</p>
+      actionPanel.innerHTML = `<p><strong>Your Pokémon fainted!</strong> Choose your next Pokémon:</p>
           <div class="battle-action-buttons">${options}</div>`;
       actionPanel.querySelectorAll(".br-switch-option").forEach((btn) =>
         btn.addEventListener("click", async () => {
@@ -198,9 +254,8 @@
     switch (t) {
       case "turn_start":
       case "switch_out":
-        return null;
       case "battle_end":
-        return event.reason === "forfeit" ? null : null;
+        return null;
       case "switch_in":
         return `🔁 ${side} sends out <strong>${event.name}</strong>!`;
       case "move_used":
@@ -261,7 +316,7 @@
     }
   }
 
-  function render(battle) {
+  function render(battle, animate) {
     current = battle;
     titleEl.textContent = `${battle.name_a} vs ${battle.name_b}`;
     const typeLabel = battle.battle_type.charAt(0).toUpperCase() + battle.battle_type.slice(1);
@@ -270,9 +325,17 @@
       : battle.status === "abandoned" ? `${typeLabel} battle · Abandoned`
       : battle.status === "pending" ? `${typeLabel} battle · Awaiting response`
       : `${typeLabel} battle · Turn ${battle.turn_number}`;
+    turnBadgeEl.textContent = battle.status === "pending" ? "Challenge" : `Turn ${battle.turn_number}`;
 
-    renderSide(sideAEl, battle.name_a, battle.roster_a, battle.winner_side === "A");
-    renderSide(sideBEl, battle.name_b, battle.roster_b, battle.winner_side === "B");
+    const newEvents = animate ? battle.events.slice(animatedEventCount >= 0 ? animatedEventCount : 0) : [];
+    animatedEventCount = battle.events.length;
+
+    renderHud(hudA, battle.name_a, battle.roster_a, battle.winner_side === "A");
+    renderHud(hudB, battle.name_b, battle.roster_b, battle.winner_side === "B");
+    const activeA = battle.roster_a.find((m) => m.is_active);
+    const activeB = battle.roster_b.find((m) => m.is_active);
+    renderSprite(spriteA, battle.roster_a, pickAnimationForSide(newEvents, "A", !!(activeA && activeA.is_fainted)));
+    renderSprite(spriteB, battle.roster_b, pickAnimationForSide(newEvents, "B", !!(activeB && activeB.is_fainted)));
 
     if (battle.status === "finished") {
       const lastEvent = battle.events[battle.events.length - 1];
@@ -298,7 +361,7 @@
   }
 
   function applyUpdate(battle) {
-    render(battle);
+    render(battle, true);
   }
 
   async function poll() {
@@ -342,6 +405,10 @@
       stopPolling();
       connectionStatusEl.textContent = "Live";
       try {
+        // render()'s own event-count diffing already skips animating
+        // anything already accounted for by the initial static render, so a
+        // reconnect's first push doesn't replay history — it only animates
+        // whatever genuinely happened since we last saw this battle.
         applyUpdate(JSON.parse(event.data));
       } catch (e) {
         // ignore malformed frame
@@ -361,7 +428,8 @@
     });
   }
 
-  render(current);
+  render(current, false);
+  animatedEventCount = current.events.length;
   if (current.status !== "finished" && current.status !== "abandoned") {
     connectWs();
   } else {

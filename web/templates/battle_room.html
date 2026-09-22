@@ -14,12 +14,23 @@
 
 <div id="br-result" class="battle-result-banner" hidden></div>
 
-<div class="battle-room-sides" id="br-sides">
-    <div class="card battle-side-card" id="br-side-a">
-        <div class="battle-side-name">{{ battle.name_a }}</div>
+<div class="battle-scene" id="br-scene">
+    <div class="battle-turn-badge" id="br-turn-badge">Turn {{ battle.turn_number }}</div>
+
+    <div class="battle-scene-row battle-scene-row-top">
+        <div class="battle-hud" id="br-hud-b"></div>
+        <div class="battle-sprite-slot">
+            <div class="battle-platform"></div>
+            <img class="battle-sprite" id="br-sprite-b" alt="">
+        </div>
     </div>
-    <div class="card battle-side-card" id="br-side-b">
-        <div class="battle-side-name">{{ battle.name_b }}</div>
+
+    <div class="battle-scene-row battle-scene-row-bottom">
+        <div class="battle-sprite-slot">
+            <div class="battle-platform"></div>
+            <img class="battle-sprite" id="br-sprite-a" alt="">
+        </div>
+        <div class="battle-hud" id="br-hud-a"></div>
     </div>
 </div>
 

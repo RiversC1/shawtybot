@@ -19,10 +19,33 @@ real participants.
 import json
 import os
 import random
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
 import battle_engine as be
+
+SHOWDOWN_SPRITE_BASE = "https://play.pokemonshowdown.com/sprites"
+
+
+def showdown_sprite_slug(name: str) -> str:
+    """Pokémon Showdown's animated-sprite filenames are the species name
+    lowercased with every non-alphanumeric character stripped (hyphens,
+    apostrophes, spaces, periods all just vanish — 'Mr. Mime' -> 'mrmime',
+    'Porygon-Z' -> 'porygonz', "Farfetch'd" -> 'farfetchd', 'Ho-oh' ->
+    'hooh'), except the gender symbols on Nidoran, which become a literal
+    f/m ('Nidoran♀' -> 'nidoranf'). Verified against the live CDN for a
+    sample including every one of these edge cases in our Gen 1-4 dataset."""
+    name = name.replace("♀", "f").replace("♂", "m")
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+def animated_sprite_urls(name: str) -> tuple[str, str]:
+    """Returns (front, back) animated sprite GIF URLs. Not every species has
+    a back sprite on the CDN; the front URL is safe for all of them. The
+    client falls back to the static artwork on a 404 either way."""
+    slug = showdown_sprite_slug(name)
+    return f"{SHOWDOWN_SPRITE_BASE}/ani/{slug}.gif", f"{SHOWDOWN_SPRITE_BASE}/ani-back/{slug}.gif"
 
 DB_PATH = "pokemon.db"
 DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "pokemon.json")
@@ -640,10 +663,24 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             (battle_id,),
         ).fetchall()
 
-    def mon_summary(r: sqlite3.Row, reveal_moves: bool) -> dict:
+    # Battle-scene sprite orientation: YOUR OWN side is always shown from
+    # behind (as in the real games), the other side faces you. A spectator
+    # (no recognized side) gets a neutral default of A-back/B-front.
+    viewer_side = None
+    if viewer_user_id is not None:
+        if battle_row["side_a_user_id"] == viewer_user_id:
+            viewer_side = "A"
+        elif battle_row["side_b_user_id"] == viewer_user_id:
+            viewer_side = "B"
+    back_side = viewer_side or "A"
+
+    def mon_summary(r: sqlite3.Row, reveal_moves: bool, side: str) -> dict:
         mon = POKEDEX.get(r["dex_id"], {})
+        name = mon.get("name", f"#{r['dex_id']}")
+        sprite_front, sprite_back = animated_sprite_urls(name)
         out = {
-            "dex_id": r["dex_id"], "name": mon.get("name", f"#{r['dex_id']}"), "artwork": mon.get("artwork"),
+            "dex_id": r["dex_id"], "name": name, "artwork": mon.get("artwork"),
+            "sprite": sprite_back if side == back_side else sprite_front,
             "types": mon.get("types", []), "current_hp": r["current_hp"], "max_hp": r["max_hp"],
             "status": r["status"], "is_active": bool(r["is_active"]), "is_fainted": bool(r["is_fainted"]),
         }
@@ -659,8 +696,8 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
 
     reveal_a = viewer_user_id is not None and battle_row["side_a_user_id"] == viewer_user_id
     reveal_b = viewer_user_id is not None and battle_row["side_b_user_id"] == viewer_user_id
-    roster_a = [mon_summary(r, reveal_a) for r in side_rows if r["side"] == "A"]
-    roster_b = [mon_summary(r, reveal_b) for r in side_rows if r["side"] == "B"]
+    roster_a = [mon_summary(r, reveal_a, "A") for r in side_rows if r["side"] == "A"]
+    roster_b = [mon_summary(r, reveal_b, "B") for r in side_rows if r["side"] == "B"]
     events = [json.loads(r["payload"]) for r in reversed(event_rows)]
 
     winner_name = None
