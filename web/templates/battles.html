@@ -13,9 +13,9 @@
     <a class="card battle-card" href="/battles/{{ b.battle_id }}">
         <div class="battle-type-tag">{{ b.battle_type }}</div>
         <div class="battle-card-vs">
-            <span>{% if b.status != 'pending' %}<span class="battle-live-dot"></span>{% endif %}{{ b.name_a }}</span>
+            <span class="battle-card-vs-name" title="{{ b.name_a }}">{% if b.status != 'pending' %}<span class="battle-live-dot"></span>{% endif %}{{ b.name_a }}</span>
             <span class="battle-card-vs-sep">vs</span>
-            <span>{{ b.name_b }}</span>
+            <span class="battle-card-vs-name" title="{{ b.name_b }}">{{ b.name_b }}</span>
         </div>
         <p class="muted">{{ 'Awaiting response' if b.status == 'pending' else ('Choosing next move' if b.status == 'awaiting_forced_switch' else 'Turn ' ~ b.turn_number) }}</p>
     </a>
@@ -30,9 +30,9 @@
     <a class="card battle-card" href="/battles/{{ b.battle_id }}">
         <div class="battle-type-tag">{{ b.battle_type }}</div>
         <div class="battle-card-vs">
-            <span>{{ b.name_a }}</span>
+            <span class="battle-card-vs-name" title="{{ b.name_a }}">{{ b.name_a }}</span>
             <span class="battle-card-vs-sep">vs</span>
-            <span>{{ b.name_b }}</span>
+            <span class="battle-card-vs-name" title="{{ b.name_b }}">{{ b.name_b }}</span>
         </div>
         <p class="muted">{{ '🏆 ' ~ b.winner_name ~ ' won' if b.winner_name else 'Ended in a draw' }}</p>
     </a>

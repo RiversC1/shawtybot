@@ -13,9 +13,9 @@
     <a class="card battle-card" href="/trades/{{ t.trade_id }}">
         <div class="battle-type-tag">trade</div>
         <div class="battle-card-vs">
-            <span>{% if t.status != 'pending' %}<span class="battle-live-dot"></span>{% endif %}{{ t.name_a }}</span>
+            <span class="battle-card-vs-name" title="{{ t.name_a }}">{% if t.status != 'pending' %}<span class="battle-live-dot"></span>{% endif %}{{ t.name_a }}</span>
             <span class="battle-card-vs-sep">⇄</span>
-            <span>{{ t.name_b }}</span>
+            <span class="battle-card-vs-name" title="{{ t.name_b }}">{{ t.name_b }}</span>
         </div>
         <p class="muted">{{ 'Awaiting response' if t.status == 'pending' else 'Choosing Pokémon' }}</p>
     </a>
@@ -30,9 +30,9 @@
     <a class="card battle-card" href="/trades/{{ t.trade_id }}">
         <div class="battle-type-tag">trade</div>
         <div class="battle-card-vs">
-            <span>{{ t.name_a }}</span>
+            <span class="battle-card-vs-name" title="{{ t.name_a }}">{{ t.name_a }}</span>
             <span class="battle-card-vs-sep">⇄</span>
-            <span>{{ t.name_b }}</span>
+            <span class="battle-card-vs-name" title="{{ t.name_b }}">{{ t.name_b }}</span>
         </div>
         <p class="muted">
             {% if t.status == 'completed' %}✅ Completed
