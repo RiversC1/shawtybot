@@ -1401,6 +1401,8 @@ def list_gyms(user_id: int = Depends(get_current_user_id)):
             "location": battle_store.GYMS[k]["location"],
             "badge_name": battle_store.GYMS[k]["badge_name"],
             "flavor": battle_store.GYMS[k]["flavor"],
+            "leader_image": battle_store.GYMS[k].get("leader_image"),
+            "badge_image": battle_store.GYMS[k].get("badge_image"),
             "earned": k in earned,
             "is_next": k == next_key,
         }
@@ -1435,6 +1437,8 @@ def get_gym_detail(gym_key: str, user_id: int = Depends(get_current_user_id)):
         "location": gym["location"],
         "badge_name": gym["badge_name"],
         "flavor": gym["flavor"],
+        "leader_image": gym.get("leader_image"),
+        "badge_image": gym.get("badge_image"),
         "earned": earned,
         "roster": roster,
     }

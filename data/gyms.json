@@ -8,13 +8,69 @@
     "badge_name": "Stone Badge",
     "flavor": "A studious Rock-type specialist who believes battling is the best teacher.",
     "roster": [
-      {"dex_id": 185, "ability": "rock-head", "moves": ["Stone Edge", "Wood Hammer", "Hammer Arm", "Sucker Punch"]},
-      {"dex_id": 95, "ability": "sturdy", "moves": ["Stone Edge", "Dig", "Iron Tail", "Curse"]},
-      {"dex_id": 213, "ability": "sturdy", "moves": ["Stone Edge", "Bug Bite", "Shell Smash", "Sticky Web"]},
-      {"dex_id": 346, "ability": "storm-drain", "moves": ["Energy Ball", "Ancient Power", "Wring Out", "Amnesia"]},
-      {"dex_id": 348, "ability": "battle-armor", "moves": ["X Scissor", "Rock Blast", "Ancient Power", "Protect"]},
-      {"dex_id": 409, "ability": "mold-breaker", "moves": ["Head Smash", "Zen Headbutt", "Crunch", "Swords Dance"]}
-    ]
+      {
+        "dex_id": 185,
+        "ability": "rock-head",
+        "moves": [
+          "Stone Edge",
+          "Wood Hammer",
+          "Hammer Arm",
+          "Sucker Punch"
+        ]
+      },
+      {
+        "dex_id": 95,
+        "ability": "sturdy",
+        "moves": [
+          "Stone Edge",
+          "Dig",
+          "Iron Tail",
+          "Curse"
+        ]
+      },
+      {
+        "dex_id": 213,
+        "ability": "sturdy",
+        "moves": [
+          "Stone Edge",
+          "Bug Bite",
+          "Shell Smash",
+          "Sticky Web"
+        ]
+      },
+      {
+        "dex_id": 346,
+        "ability": "storm-drain",
+        "moves": [
+          "Energy Ball",
+          "Ancient Power",
+          "Wring Out",
+          "Amnesia"
+        ]
+      },
+      {
+        "dex_id": 348,
+        "ability": "battle-armor",
+        "moves": [
+          "X Scissor",
+          "Rock Blast",
+          "Ancient Power",
+          "Protect"
+        ]
+      },
+      {
+        "dex_id": 409,
+        "ability": "mold-breaker",
+        "moves": [
+          "Head Smash",
+          "Zen Headbutt",
+          "Crunch",
+          "Swords Dance"
+        ]
+      }
+    ],
+    "leader_image": "/static/gym_leaders/roxanne.png",
+    "badge_image": "/static/badges/stone.png"
   },
   {
     "gym_key": "brawly",
@@ -25,13 +81,69 @@
     "badge_name": "Knuckle Badge",
     "flavor": "A surfer and Fighting-type gym leader who trains on a tiny island town.",
     "roster": [
-      {"dex_id": 106, "ability": "reckless", "moves": ["High Jump Kick", "Mega Kick", "Blaze Kick", "Focus Energy"]},
-      {"dex_id": 107, "ability": "iron-fist", "moves": ["Close Combat", "Thunder Punch", "Ice Punch", "Sky Uppercut"]},
-      {"dex_id": 237, "ability": "technician", "moves": ["Close Combat", "Triple Kick", "Gyro Ball", "Endeavor"]},
-      {"dex_id": 214, "ability": "guts", "moves": ["Close Combat", "Megahorn", "Swords Dance", "Throat Chop"]},
-      {"dex_id": 68, "ability": "guts", "moves": ["Cross Chop", "Dynamic Punch", "Superpower", "Bulk Up"]},
-      {"dex_id": 297, "ability": "thick-fat", "moves": ["Close Combat", "Heavy Slam", "Belly Drum", "Wake Up Slap"]}
-    ]
+      {
+        "dex_id": 106,
+        "ability": "reckless",
+        "moves": [
+          "High Jump Kick",
+          "Mega Kick",
+          "Blaze Kick",
+          "Focus Energy"
+        ]
+      },
+      {
+        "dex_id": 107,
+        "ability": "iron-fist",
+        "moves": [
+          "Close Combat",
+          "Thunder Punch",
+          "Ice Punch",
+          "Sky Uppercut"
+        ]
+      },
+      {
+        "dex_id": 237,
+        "ability": "technician",
+        "moves": [
+          "Close Combat",
+          "Triple Kick",
+          "Gyro Ball",
+          "Endeavor"
+        ]
+      },
+      {
+        "dex_id": 214,
+        "ability": "guts",
+        "moves": [
+          "Close Combat",
+          "Megahorn",
+          "Swords Dance",
+          "Throat Chop"
+        ]
+      },
+      {
+        "dex_id": 68,
+        "ability": "guts",
+        "moves": [
+          "Cross Chop",
+          "Dynamic Punch",
+          "Superpower",
+          "Bulk Up"
+        ]
+      },
+      {
+        "dex_id": 297,
+        "ability": "thick-fat",
+        "moves": [
+          "Close Combat",
+          "Heavy Slam",
+          "Belly Drum",
+          "Wake Up Slap"
+        ]
+      }
+    ],
+    "leader_image": "/static/gym_leaders/brawly.png",
+    "badge_image": "/static/badges/knuckle.png"
   },
   {
     "gym_key": "wattson",
@@ -42,13 +154,69 @@
     "badge_name": "Dynamo Badge",
     "flavor": "An eccentric inventor who shocks challengers with his Electric-type team.",
     "roster": [
-      {"dex_id": 82, "ability": "sturdy", "moves": ["Thunder", "Discharge", "Gyro Ball", "Light Screen"]},
-      {"dex_id": 101, "ability": "static", "moves": ["Thunderbolt", "Discharge", "Swift", "Explosion"]},
-      {"dex_id": 310, "ability": "static", "moves": ["Wild Charge", "Thunder Fang", "Bite", "Discharge"]},
-      {"dex_id": 181, "ability": "static", "moves": ["Thunder", "Dragon Pulse", "Power Gem", "Discharge"]},
-      {"dex_id": 405, "ability": "rivalry", "moves": ["Wild Charge", "Crunch", "Thunder Wave", "Thunder"]},
-      {"dex_id": 466, "ability": "motor-drive", "moves": ["Thunderbolt", "Low Kick", "Discharge", "Giga Impact"]}
-    ]
+      {
+        "dex_id": 82,
+        "ability": "sturdy",
+        "moves": [
+          "Thunder",
+          "Discharge",
+          "Gyro Ball",
+          "Light Screen"
+        ]
+      },
+      {
+        "dex_id": 101,
+        "ability": "static",
+        "moves": [
+          "Thunderbolt",
+          "Discharge",
+          "Swift",
+          "Explosion"
+        ]
+      },
+      {
+        "dex_id": 310,
+        "ability": "static",
+        "moves": [
+          "Wild Charge",
+          "Thunder Fang",
+          "Bite",
+          "Discharge"
+        ]
+      },
+      {
+        "dex_id": 181,
+        "ability": "static",
+        "moves": [
+          "Thunder",
+          "Dragon Pulse",
+          "Power Gem",
+          "Discharge"
+        ]
+      },
+      {
+        "dex_id": 405,
+        "ability": "rivalry",
+        "moves": [
+          "Wild Charge",
+          "Crunch",
+          "Thunder Wave",
+          "Thunder"
+        ]
+      },
+      {
+        "dex_id": 466,
+        "ability": "motor-drive",
+        "moves": [
+          "Thunderbolt",
+          "Low Kick",
+          "Discharge",
+          "Giga Impact"
+        ]
+      }
+    ],
+    "leader_image": "/static/gym_leaders/wattson.png",
+    "badge_image": "/static/badges/dynamo.png"
   },
   {
     "gym_key": "flannery",
@@ -59,13 +227,69 @@
     "badge_name": "Heat Badge",
     "flavor": "A young, fiery gym leader determined to prove herself with her Fire-type team.",
     "roster": [
-      {"dex_id": 324, "ability": "white-smoke", "moves": ["Eruption", "Heat Wave", "Shell Smash", "Amnesia"]},
-      {"dex_id": 323, "ability": "solid-rock", "moves": ["Eruption", "Earth Power", "Rock Slide", "Lava Plume"]},
-      {"dex_id": 219, "ability": "flame-body", "moves": ["Flamethrower", "Rock Slide", "Recover", "Shell Smash"]},
-      {"dex_id": 38, "ability": "drought", "moves": ["Fire Blast", "Extrasensory", "Nasty Plot", "Quick Attack"]},
-      {"dex_id": 467, "ability": "vital-spirit", "moves": ["Fire Blast", "Fire Punch", "Low Kick", "Sunny Day"]},
-      {"dex_id": 257, "ability": "blaze", "moves": ["Flare Blitz", "Sky Uppercut", "Blaze Kick", "Bulk Up"]}
-    ]
+      {
+        "dex_id": 324,
+        "ability": "white-smoke",
+        "moves": [
+          "Eruption",
+          "Heat Wave",
+          "Shell Smash",
+          "Amnesia"
+        ]
+      },
+      {
+        "dex_id": 323,
+        "ability": "solid-rock",
+        "moves": [
+          "Eruption",
+          "Earth Power",
+          "Rock Slide",
+          "Lava Plume"
+        ]
+      },
+      {
+        "dex_id": 219,
+        "ability": "flame-body",
+        "moves": [
+          "Flamethrower",
+          "Rock Slide",
+          "Recover",
+          "Shell Smash"
+        ]
+      },
+      {
+        "dex_id": 38,
+        "ability": "drought",
+        "moves": [
+          "Fire Blast",
+          "Extrasensory",
+          "Nasty Plot",
+          "Quick Attack"
+        ]
+      },
+      {
+        "dex_id": 467,
+        "ability": "vital-spirit",
+        "moves": [
+          "Fire Blast",
+          "Fire Punch",
+          "Low Kick",
+          "Sunny Day"
+        ]
+      },
+      {
+        "dex_id": 257,
+        "ability": "blaze",
+        "moves": [
+          "Flare Blitz",
+          "Sky Uppercut",
+          "Blaze Kick",
+          "Bulk Up"
+        ]
+      }
+    ],
+    "leader_image": "/static/gym_leaders/flannery.png",
+    "badge_image": "/static/badges/heat.png"
   },
   {
     "gym_key": "norman",
@@ -76,13 +300,69 @@
     "badge_name": "Balance Badge",
     "flavor": "A calm, veteran gym leader (and your rival's dad) fielding a tough Normal-type team.",
     "roster": [
-      {"dex_id": 288, "ability": "vital-spirit", "moves": ["Slash", "Focus Punch", "Chip Away", "Endure"]},
-      {"dex_id": 264, "ability": "pickup", "moves": ["Belly Drum", "Double Edge", "Slash", "Rest"]},
-      {"dex_id": 115, "ability": "scrappy", "moves": ["Double Hit", "Sucker Punch", "Outrage", "Last Resort"]},
-      {"dex_id": 295, "ability": "scrappy", "moves": ["Boomburst", "Hyper Voice", "Screech", "Rest"]},
-      {"dex_id": 143, "ability": "thick-fat", "moves": ["Body Slam", "Crunch", "Superpower", "Giga Impact"]},
-      {"dex_id": 289, "ability": "truant", "moves": ["Hammer Arm", "Mega Kick", "Sucker Punch", "Chip Away"]}
-    ]
+      {
+        "dex_id": 288,
+        "ability": "vital-spirit",
+        "moves": [
+          "Slash",
+          "Focus Punch",
+          "Chip Away",
+          "Endure"
+        ]
+      },
+      {
+        "dex_id": 264,
+        "ability": "pickup",
+        "moves": [
+          "Belly Drum",
+          "Double Edge",
+          "Slash",
+          "Rest"
+        ]
+      },
+      {
+        "dex_id": 115,
+        "ability": "scrappy",
+        "moves": [
+          "Double Hit",
+          "Sucker Punch",
+          "Outrage",
+          "Last Resort"
+        ]
+      },
+      {
+        "dex_id": 295,
+        "ability": "scrappy",
+        "moves": [
+          "Boomburst",
+          "Hyper Voice",
+          "Screech",
+          "Rest"
+        ]
+      },
+      {
+        "dex_id": 143,
+        "ability": "thick-fat",
+        "moves": [
+          "Body Slam",
+          "Crunch",
+          "Superpower",
+          "Giga Impact"
+        ]
+      },
+      {
+        "dex_id": 289,
+        "ability": "truant",
+        "moves": [
+          "Hammer Arm",
+          "Mega Kick",
+          "Sucker Punch",
+          "Chip Away"
+        ]
+      }
+    ],
+    "leader_image": "/static/gym_leaders/norman.png",
+    "badge_image": "/static/badges/balance.png"
   },
   {
     "gym_key": "winona",
@@ -93,13 +373,69 @@
     "badge_name": "Feather Badge",
     "flavor": "A graceful gym leader who commands the skies with her Flying-type team.",
     "roster": [
-      {"dex_id": 277, "ability": "guts", "moves": ["Brave Bird", "Air Slash", "Agility", "Aerial Ace"]},
-      {"dex_id": 279, "ability": "drizzle", "moves": ["Hurricane", "Hydro Pump", "Tailwind", "Roost"]},
-      {"dex_id": 227, "ability": "sturdy", "moves": ["Brave Bird", "Steel Wing", "Autotomize", "Iron Defense"]},
-      {"dex_id": 334, "ability": "natural-cure", "moves": ["Dragon Pulse", "Moonblast", "Dragon Dance", "Sky Attack"]},
-      {"dex_id": 169, "ability": "infiltrator", "moves": ["Air Slash", "Poison Fang", "Venoshock", "Leech Life"]},
-      {"dex_id": 373, "ability": "intimidate", "moves": ["Outrage", "Dragon Claw", "Flamethrower", "Fly"]}
-    ]
+      {
+        "dex_id": 277,
+        "ability": "guts",
+        "moves": [
+          "Brave Bird",
+          "Air Slash",
+          "Agility",
+          "Aerial Ace"
+        ]
+      },
+      {
+        "dex_id": 279,
+        "ability": "drizzle",
+        "moves": [
+          "Hurricane",
+          "Hydro Pump",
+          "Tailwind",
+          "Roost"
+        ]
+      },
+      {
+        "dex_id": 227,
+        "ability": "sturdy",
+        "moves": [
+          "Brave Bird",
+          "Steel Wing",
+          "Autotomize",
+          "Iron Defense"
+        ]
+      },
+      {
+        "dex_id": 334,
+        "ability": "natural-cure",
+        "moves": [
+          "Dragon Pulse",
+          "Moonblast",
+          "Dragon Dance",
+          "Sky Attack"
+        ]
+      },
+      {
+        "dex_id": 169,
+        "ability": "infiltrator",
+        "moves": [
+          "Air Slash",
+          "Poison Fang",
+          "Venoshock",
+          "Leech Life"
+        ]
+      },
+      {
+        "dex_id": 373,
+        "ability": "intimidate",
+        "moves": [
+          "Outrage",
+          "Dragon Claw",
+          "Flamethrower",
+          "Fly"
+        ]
+      }
+    ],
+    "leader_image": "/static/gym_leaders/winona.png",
+    "badge_image": "/static/badges/feather.png"
   },
   {
     "gym_key": "tate_and_liza",
@@ -110,13 +446,69 @@
     "badge_name": "Mind Badge",
     "flavor": "Telepathic twins who share one mind in battle, fielding a fearsome Psychic-type team.",
     "roster": [
-      {"dex_id": 178, "ability": "magic-bounce", "moves": ["Psychic", "Future Sight", "Ominous Wind", "Confuse Ray"]},
-      {"dex_id": 199, "ability": "regenerator", "moves": ["Psychic", "Nasty Plot", "Trump Card", "Heal Pulse"]},
-      {"dex_id": 196, "ability": "magic-bounce", "moves": ["Psychic", "Morning Sun", "Future Sight", "Psybeam"]},
-      {"dex_id": 282, "ability": "trace", "moves": ["Moonblast", "Future Sight", "Hypnosis", "Recover"]},
-      {"dex_id": 65, "ability": "magic-guard", "moves": ["Psychic", "Calm Mind", "Psycho Cut", "Recover"]},
-      {"dex_id": 376, "ability": "clear-body", "moves": ["Meteor Mash", "Zen Headbutt", "Psychic", "Agility"]}
-    ]
+      {
+        "dex_id": 178,
+        "ability": "magic-bounce",
+        "moves": [
+          "Psychic",
+          "Future Sight",
+          "Ominous Wind",
+          "Confuse Ray"
+        ]
+      },
+      {
+        "dex_id": 199,
+        "ability": "regenerator",
+        "moves": [
+          "Psychic",
+          "Nasty Plot",
+          "Trump Card",
+          "Heal Pulse"
+        ]
+      },
+      {
+        "dex_id": 196,
+        "ability": "magic-bounce",
+        "moves": [
+          "Psychic",
+          "Morning Sun",
+          "Future Sight",
+          "Psybeam"
+        ]
+      },
+      {
+        "dex_id": 282,
+        "ability": "trace",
+        "moves": [
+          "Moonblast",
+          "Future Sight",
+          "Hypnosis",
+          "Recover"
+        ]
+      },
+      {
+        "dex_id": 65,
+        "ability": "magic-guard",
+        "moves": [
+          "Psychic",
+          "Calm Mind",
+          "Psycho Cut",
+          "Recover"
+        ]
+      },
+      {
+        "dex_id": 376,
+        "ability": "clear-body",
+        "moves": [
+          "Meteor Mash",
+          "Zen Headbutt",
+          "Psychic",
+          "Agility"
+        ]
+      }
+    ],
+    "leader_image": "/static/gym_leaders/tate_and_liza.png",
+    "badge_image": "/static/badges/mind.png"
   },
   {
     "gym_key": "juan",
@@ -127,12 +519,68 @@
     "badge_name": "Rain Badge",
     "flavor": "An elegant, artistic Water-type master who sees battling as a performance.",
     "roster": [
-      {"dex_id": 340, "ability": "oblivious", "moves": ["Earthquake", "Muddy Water", "Aqua Tail", "Rest"]},
-      {"dex_id": 272, "ability": "swift-swim", "moves": ["Hydro Pump", "Bubble Beam", "Mega Drain", "Mist"]},
-      {"dex_id": 319, "ability": "rough-skin", "moves": ["Liquidation", "Crunch", "Night Slash", "Agility"]},
-      {"dex_id": 260, "ability": "torrent", "moves": ["Hydro Pump", "Earthquake", "Hammer Arm", "Protect"]},
-      {"dex_id": 230, "ability": "sniper", "moves": ["Hydro Pump", "Dragon Pulse", "Dragon Dance", "Wave Crash"]},
-      {"dex_id": 350, "ability": "marvel-scale", "moves": ["Hydro Pump", "Surf", "Coil", "Aqua Ring"]}
-    ]
+      {
+        "dex_id": 340,
+        "ability": "oblivious",
+        "moves": [
+          "Earthquake",
+          "Muddy Water",
+          "Aqua Tail",
+          "Rest"
+        ]
+      },
+      {
+        "dex_id": 272,
+        "ability": "swift-swim",
+        "moves": [
+          "Hydro Pump",
+          "Bubble Beam",
+          "Mega Drain",
+          "Mist"
+        ]
+      },
+      {
+        "dex_id": 319,
+        "ability": "rough-skin",
+        "moves": [
+          "Liquidation",
+          "Crunch",
+          "Night Slash",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 260,
+        "ability": "torrent",
+        "moves": [
+          "Hydro Pump",
+          "Earthquake",
+          "Hammer Arm",
+          "Protect"
+        ]
+      },
+      {
+        "dex_id": 230,
+        "ability": "sniper",
+        "moves": [
+          "Hydro Pump",
+          "Dragon Pulse",
+          "Dragon Dance",
+          "Wave Crash"
+        ]
+      },
+      {
+        "dex_id": 350,
+        "ability": "marvel-scale",
+        "moves": [
+          "Hydro Pump",
+          "Surf",
+          "Coil",
+          "Aqua Ring"
+        ]
+      }
+    ],
+    "leader_image": "/static/gym_leaders/juan.png",
+    "badge_image": "/static/badges/rain.png"
   }
 ]

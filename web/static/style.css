@@ -1614,13 +1614,54 @@ code {
     transform: translateY(-2px);
 }
 
-.gym-card.is-locked {
-    opacity: 0.55;
+.gym-card.is-locked .gym-card-portrait img:first-child {
+    filter: grayscale(100%) brightness(0.6);
 }
 
-.gym-badge-icon {
-    font-size: 2em;
-    margin-bottom: 4px;
+.gym-card-portrait {
+    position: relative;
+    height: 140px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    margin-bottom: 8px;
+    background: radial-gradient(ellipse at 50% 100%, rgba(239, 51, 64, 0.16), transparent 70%);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.gym-card-portrait img:first-child {
+    max-height: 140px;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.gym-card-badge-overlay {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 3px;
+    object-fit: contain;
+}
+
+.gym-card-badge-overlay.is-dim {
+    filter: grayscale(100%);
+    opacity: 0.5;
+}
+
+.gym-card-lock {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8em;
+    background: rgba(0, 0, 0, 0.35);
 }
 
 .gym-card-name {
@@ -1630,6 +1671,83 @@ code {
 .gym-card-location {
     color: var(--text-muted);
     font-size: 0.85em;
+}
+
+/* ---------- Gym detail hero (modal) ---------- */
+
+.gym-hero {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    padding: 20px;
+    background:
+        radial-gradient(ellipse at 25% 30%, rgba(239, 51, 64, 0.14), transparent 55%),
+        radial-gradient(ellipse at 75% 70%, rgba(126, 200, 255, 0.10), transparent 55%),
+        linear-gradient(180deg, #1c1c2c 0%, #14141f 100%);
+    border: 1px solid var(--border);
+}
+
+.gym-hero-type-tag {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 2;
+}
+
+.gym-hero-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding-top: 16px;
+}
+
+.gym-hero-leader {
+    max-height: 220px;
+    max-width: 45%;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.5));
+}
+
+.gym-hero-badge-showcase {
+    text-align: center;
+}
+
+.gym-hero-badge-img {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+
+.gym-hero-badge-label {
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+.gym-hero-badge-name {
+    font-weight: bold;
+    font-size: 1.05em;
+}
+
+.gym-hero-info {
+    padding-top: 16px;
+}
+
+.gym-hero-eyebrow {
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--red);
+    font-weight: bold;
+}
+
+.gym-hero-title {
+    margin: 2px 0 8px;
 }
 
 .gym-roster-grid {

@@ -30,7 +30,7 @@
       return;
     }
     const gym = await res.json();
-    title.textContent = `${gym.leader_name} — ${gym.badge_name}`;
+    title.textContent = `${gym.location} Gym`;
 
     const rosterHtml = gym.roster
       .map(
@@ -43,10 +43,29 @@
       )
       .join("");
 
+    const typeLabel = gym.type_theme.charAt(0).toUpperCase() + gym.type_theme.slice(1);
+    const statusLine = gym.earned
+      ? "✅ You've earned this badge."
+      : "Challenge this gym with <code>/poke gym</code> in Discord.";
+
     body.innerHTML = `
-        <p class="muted">${gym.flavor}</p>
-        <p><strong>${gym.location}</strong> · ${gym.type_theme.charAt(0).toUpperCase() + gym.type_theme.slice(1)}-type gym</p>
-        <p class="muted">${gym.earned ? "✅ You've earned this badge." : "Challenge this gym with <code>/poke gym</code> in Discord."}</p>
+        <div class="gym-hero">
+            <span class="type-badge type-${gym.type_theme} gym-hero-type-tag">${typeLabel}</span>
+            <div class="gym-hero-main">
+                <img class="gym-hero-leader" src="${gym.leader_image}" alt="${gym.leader_name}">
+                <div class="gym-hero-badge-showcase">
+                    <img class="gym-hero-badge-img" src="${gym.badge_image}" alt="${gym.badge_name}">
+                    <div class="gym-hero-badge-label">Gym Badge</div>
+                    <div class="gym-hero-badge-name">${gym.badge_name}</div>
+                </div>
+            </div>
+        </div>
+        <div class="gym-hero-info">
+            <div class="gym-hero-eyebrow">${gym.location} · ${typeLabel}-type Gym</div>
+            <h2 class="gym-hero-title">${gym.leader_name}</h2>
+            <p class="muted">${gym.flavor}</p>
+            <p class="muted">${statusLine}</p>
+        </div>
         <hr>
         <h3>Gym Team</h3>
         <div class="gym-roster-grid">${rosterHtml}</div>

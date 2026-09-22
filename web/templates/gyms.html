@@ -10,7 +10,11 @@
 <div class="grid" id="gyms-grid">
     {% for g in gyms %}
     <div class="card gym-card{{ '' if (g.earned or g.is_next) else ' is-locked' }}" data-gym-key="{{ g.gym_key }}">
-        <div class="gym-badge-icon">{{ '🏅' if g.earned else ('⚔️' if g.is_next else '🔒') }}</div>
+        <div class="gym-card-portrait">
+            <img src="{{ g.leader_image }}" alt="{{ g.leader_name }}">
+            <img class="gym-card-badge-overlay{{ '' if g.earned else ' is-dim' }}" src="{{ g.badge_image }}" alt="{{ g.badge_name }}">
+            {% if not g.earned and not g.is_next %}<div class="gym-card-lock">🔒</div>{% endif %}
+        </div>
         <div class="gym-card-name">{{ g.leader_name }}</div>
         <div class="muted">{{ g.type_theme|capitalize }}-type</div>
         <div class="gym-card-location">{{ g.location }}</div>
