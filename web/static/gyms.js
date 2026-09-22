@@ -44,9 +44,20 @@
       .join("");
 
     const typeLabel = gym.type_theme.charAt(0).toUpperCase() + gym.type_theme.slice(1);
-    const statusLine = gym.earned
-      ? "✅ You've earned this badge."
-      : "Challenge this gym with <code>/poke gym</code> in Discord.";
+    let statusLine;
+    let actionsHtml = "";
+    if (gym.earned) {
+      statusLine = "✅ You've earned this badge.";
+    } else if (gym.is_next) {
+      statusLine = "This is your next gym — challenge it from Discord or right here on the web.";
+      actionsHtml = `
+        <div class="gym-hero-actions">
+            <button id="gm-fight-btn" class="btn-primary">Fight ${gym.leader_name}</button>
+        </div>
+        <p class="error" id="gm-fight-error" hidden></p>`;
+    } else {
+      statusLine = "🔒 Beat the earlier gyms first to unlock this challenge.";
+    }
 
     body.innerHTML = `
         <div class="gym-hero">
@@ -65,10 +76,39 @@
             <h2 class="gym-hero-title">${gym.leader_name}</h2>
             <p class="muted">${gym.flavor}</p>
             <p class="muted">${statusLine}</p>
+            ${actionsHtml}
         </div>
         <hr>
         <h3>Gym Team</h3>
         <div class="gym-roster-grid">${rosterHtml}</div>
     `;
+
+    const fightBtn = document.getElementById("gm-fight-btn");
+    if (fightBtn) {
+      fightBtn.addEventListener("click", () => startGymFight(gymKey, fightBtn));
+    }
+  }
+
+  async function startGymFight(gymKey, btn) {
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Starting battle...";
+    const errorEl = document.getElementById("gm-fight-error");
+
+    try {
+      const res = await fetch(`/api/proxy/battles/gym/${gymKey}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Couldn't start this battle.");
+      }
+      window.location.href = `/battles/${data.battle_id}`;
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+      if (errorEl) {
+        errorEl.textContent = err.message;
+        errorEl.hidden = false;
+      }
+    }
   }
 })();

@@ -432,6 +432,15 @@ async def proxy_get_gym(request: Request, gym_key: str):
     return JSONResponse(data, status_code=status)
 
 
+@app.post("/api/proxy/battles/gym/{gym_key}")
+async def proxy_start_gym_battle(request: Request, gym_key: str):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/battles/gym/{gym_key}", {})
+    return JSONResponse(data, status_code=status)
+
+
 @app.post("/api/proxy/battles/{battle_id}/accept")
 async def proxy_accept_battle(request: Request, battle_id: int):
     session = request.cookies.get(SESSION_COOKIE)

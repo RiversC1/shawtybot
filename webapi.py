@@ -123,6 +123,16 @@ ACHIEVEMENTS = {
             "diamond": {"threshold": 50, "rewards": {"masterball": 2, "coin": 300}},
         },
     },
+    "battles": {
+        "label": "Battler", "description": "Win battles (PvP, gyms, or trainers)", "stat": "battle_wins",
+        "tiers": {
+            "bronze": {"threshold": 5, "rewards": {"coin": 50}},
+            "silver": {"threshold": 20, "rewards": {"greatball": 10, "coin": 100}},
+            "gold": {"threshold": 50, "rewards": {"ultraball": 10, "coin": 200}},
+            "platinum": {"threshold": 100, "rewards": {"masterball": 1, "coin": 300}},
+            "diamond": {"threshold": 250, "rewards": {"masterball": 2, "coin": 500}},
+        },
+    },
 }
 
 TOTAL_ACHIEVEMENT_TIERS = sum(len(cat["tiers"]) for cat in ACHIEVEMENTS.values())
@@ -185,6 +195,28 @@ def add_item_sql(conn: sqlite3.Connection, user_id: int, item: str, delta: int):
     )
 
 
+def get_battle_wins(conn: sqlite3.Connection, target_id: int) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) FROM poke_battles WHERE status = 'finished' AND "
+        "((side_a_user_id = ? AND winner_side = 'A') OR (side_b_user_id = ? AND winner_side = 'B'))",
+        (target_id, target_id),
+    ).fetchone()
+    return row[0] if row else 0
+
+
+def unlock_achievements_for_battle_winner(battle: "be.BattleState", battle_row: sqlite3.Row):
+    """Called right when a battle ends so the Battler achievement (and its
+    rewards) lands immediately, instead of waiting for the winner's next
+    profile view to backfill it."""
+    if battle.winner_side not in ("A", "B"):
+        return
+    winner_user_id = battle_row["side_a_user_id"] if battle.winner_side == "A" else battle_row["side_b_user_id"]
+    if not winner_user_id:
+        return
+    with db() as conn:
+        check_and_unlock_achievements(conn, winner_user_id)
+
+
 def check_and_unlock_achievements(conn: sqlite3.Connection, target_id: int) -> list[dict]:
     """Compares current stats against every achievement tier and unlocks any
     newly-earned ones, granting rewards exactly once. Mirrors
@@ -215,6 +247,7 @@ def check_and_unlock_achievements(conn: sqlite3.Connection, target_id: int) -> l
         "shiny_count": shiny_count,
         "evolution_count": evolution_count,
         "level": level,
+        "battle_wins": get_battle_wins(conn, target_id),
     }
 
     unlocked = {
@@ -437,8 +470,14 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
             "dex_total": dex_total,
             "dex_percent": round(unique_species / dex_total * 100, 1) if dex_total else 0,
         },
-        # Battling isn't built yet — always accurate at 0 until it is.
-        "battle_record": {"wins": 0, "games": 0},
+        "battle_record": {
+            "wins": get_battle_wins(conn, target_id),
+            "games": conn.execute(
+                "SELECT COUNT(*) FROM poke_battles WHERE status = 'finished' "
+                "AND (side_a_user_id = ? OR side_b_user_id = ?)",
+                (target_id, target_id),
+            ).fetchone()[0],
+        },
         "achievements": {"unlocked": unlocked_count, "total": TOTAL_ACHIEVEMENT_TIERS},
     }
 
@@ -529,6 +568,7 @@ def build_achievements_payload(target_id: int, conn: sqlite3.Connection) -> dict
         "shiny_count": shiny_count,
         "evolution_count": evolution_count,
         "level": level,
+        "battle_wins": get_battle_wins(conn, target_id),
     }
 
     categories = []
@@ -1324,12 +1364,14 @@ async def submit_battle_action(battle_id: int, body: BattleActionRequest, user_i
 
         action_a = action if side == "A" else other_action
         action_b = other_action if side == "A" else action
-        battle_store.resolve_battle_turn(battle_id, action_a, action_b)
-        return None, None
+        battle, battle_row, _events, _reward = battle_store.resolve_battle_turn(battle_id, action_a, action_b)
+        return None, (battle, battle_row) if battle.status == "finished" else None
 
-    error, _ = await asyncio.to_thread(_do)
+    error, finished = await asyncio.to_thread(_do)
     if error:
         raise HTTPException(400, error)
+    if finished:
+        unlock_achievements_for_battle_winner(*finished)
     await battle_connections.broadcast(battle_id)
     return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
 
@@ -1364,6 +1406,8 @@ async def forfeit_battle(battle_id: int, user_id: int = Depends(get_current_user
         raise HTTPException(403, "You're not a participant in this battle")
 
     battle, battle_row, _reward = await asyncio.to_thread(battle_store.apply_forfeit, battle_id, side)
+    if battle and battle.status == "finished":
+        unlock_achievements_for_battle_winner(battle, battle_row)
     await battle_connections.broadcast(battle_id)
     return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
 
@@ -1416,6 +1460,7 @@ def get_gym_detail(gym_key: str, user_id: int = Depends(get_current_user_id)):
     if not gym:
         raise HTTPException(404, "Unknown gym")
     earned = gym_key in battle_store.get_badges(user_id)
+    is_next = gym_key == battle_store.next_gym_key(user_id)
 
     roster = []
     for entry in gym["roster"]:
@@ -1440,5 +1485,32 @@ def get_gym_detail(gym_key: str, user_id: int = Depends(get_current_user_id)):
         "leader_image": gym.get("leader_image"),
         "badge_image": gym.get("badge_image"),
         "earned": earned,
+        "is_next": is_next,
         "roster": roster,
     }
+
+
+@app.post("/api/battles/gym/{gym_key}")
+async def start_gym_battle(gym_key: str, user_id: int = Depends(get_current_user_id)):
+    gym = battle_store.GYMS.get(gym_key)
+    if not gym:
+        raise HTTPException(404, "Unknown gym")
+    if battle_store.has_active_battle(user_id):
+        raise HTTPException(400, "You're already in a battle!")
+    roster_a = battle_store.build_roster_for_player(user_id)
+    if not roster_a:
+        raise HTTPException(400, "You need to set your team first — use the Team page.")
+    next_key = battle_store.next_gym_key(user_id)
+    if next_key is None:
+        raise HTTPException(400, "You've already earned all 8 badges!")
+    if gym_key != next_key:
+        raise HTTPException(400, "You need to beat the earlier gyms first, in order.")
+
+    def _do():
+        roster_b = battle_store.build_roster_for_gym(gym_key)
+        battle_id = battle_store.create_battle("gym", user_id, None, gym_key, 0, 0)
+        battle_store.start_battle_sides(battle_id, roster_a, roster_b)
+        return battle_id
+
+    battle_id = await asyncio.to_thread(_do)
+    return {"battle_id": battle_id}

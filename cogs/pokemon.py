@@ -136,6 +136,18 @@ ACHIEVEMENTS = {
             "diamond": {"threshold": 50, "rewards": {"masterball": 2, "coin": 300}},
         },
     },
+    "battles": {
+        "label": "Battler",
+        "description": "Win battles (PvP, gyms, or trainers)",
+        "stat": "battle_wins",
+        "tiers": {
+            "bronze": {"threshold": 5, "rewards": {"coin": 50}},
+            "silver": {"threshold": 20, "rewards": {"greatball": 10, "coin": 100}},
+            "gold": {"threshold": 50, "rewards": {"ultraball": 10, "coin": 200}},
+            "platinum": {"threshold": 100, "rewards": {"masterball": 1, "coin": 300}},
+            "diamond": {"threshold": 250, "rewards": {"masterball": 2, "coin": 500}},
+        },
+    },
 }
 
 TOTAL_ACHIEVEMENT_TIERS = sum(len(cat["tiers"]) for cat in ACHIEVEMENTS.values())
@@ -1212,6 +1224,15 @@ class Pokemon(commands.Cog):
     def get_evolution_count(self, user_id: int) -> int:
         return self.get_item_qty(user_id, "stat_evolutions")
 
+    def get_battle_wins(self, user_id: int) -> int:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM poke_battles WHERE status = 'finished' AND "
+                "((side_a_user_id = ? AND winner_side = 'A') OR (side_b_user_id = ? AND winner_side = 'B'))",
+                (user_id, user_id),
+            ).fetchone()
+        return row[0] if row else 0
+
     def get_achievement_stats(self, user_id: int) -> dict:
         stats = self.get_collection_stats(user_id)
         level, _, _ = compute_level(self.get_xp(user_id))
@@ -1221,6 +1242,7 @@ class Pokemon(commands.Cog):
             "shiny_count": self.get_shiny_count(user_id),
             "evolution_count": self.get_evolution_count(user_id),
             "level": level,
+            "battle_wins": self.get_battle_wins(user_id),
         }
 
     def get_unlocked_achievements(self, user_id: int) -> set[str]:
