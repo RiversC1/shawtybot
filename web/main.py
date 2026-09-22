@@ -12,10 +12,12 @@ import asyncio
 import os
 import json
 import logging
+from contextlib import asynccontextmanager
 
 import httpx
 import websockets
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -31,7 +33,26 @@ SESSION_MAX_AGE = 7 * 24 * 60 * 60  # 7 days, matches the API's JWT expiry
 
 BASE_DIR = os.path.dirname(__file__)
 
-app = FastAPI(title="ShawtyBot Pokémon Web")
+# A fresh httpx.AsyncClient() per request pays a full new TCP+TLS handshake to
+# the internal API on every single call — that's the dominant cost of a page
+# load when this app and the API are on different machines. One shared,
+# connection-pooled client (created at startup, reused for the process's
+# lifetime) turns that into one handshake and cheap keep-alive requests after.
+http_client: httpx.AsyncClient | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global http_client
+    http_client = httpx.AsyncClient(
+        timeout=15.0, limits=httpx.Limits(max_keepalive_connections=20, max_connections=50)
+    )
+    yield
+    await http_client.aclose()
+
+
+app = FastAPI(title="ShawtyBot Pokémon Web", lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
@@ -50,8 +71,7 @@ async def no_cache_static(request: Request, call_next):
 
 
 async def api_get(session: str, path: str) -> tuple[int, dict | list]:
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{API_BASE_URL}{path}", headers={"Authorization": f"Bearer {session}"})
+    resp = await http_client.get(f"{API_BASE_URL}{path}", headers={"Authorization": f"Bearer {session}"})
     try:
         return resp.status_code, resp.json()
     except ValueError:
@@ -59,10 +79,9 @@ async def api_get(session: str, path: str) -> tuple[int, dict | list]:
 
 
 async def api_post(session: str, path: str, payload: dict) -> tuple[int, dict | list]:
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{API_BASE_URL}{path}", json=payload, headers={"Authorization": f"Bearer {session}"}
-        )
+    resp = await http_client.post(
+        f"{API_BASE_URL}{path}", json=payload, headers={"Authorization": f"Bearer {session}"}
+    )
     try:
         return resp.status_code, resp.json()
     except ValueError:
@@ -83,8 +102,7 @@ def landing(request: Request):
 
 @app.get("/login")
 async def login(request: Request, token: str):
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{API_BASE_URL}/api/auth/exchange", json={"token": token})
+    resp = await http_client.post(f"{API_BASE_URL}/api/auth/exchange", json={"token": token})
 
     if resp.status_code != 200:
         detail = resp.json().get("detail", "This link is invalid or has expired.")
@@ -111,11 +129,11 @@ async def profile(request: Request):
     if not session:
         return RedirectResponse("/")
 
-    status, data = await api_get(session, "/api/me")
+    (status, data), (_, achievements) = await asyncio.gather(
+        api_get(session, "/api/me"), api_get(session, "/api/achievements")
+    )
     if status == 401:
         return clear_session(RedirectResponse("/"))
-
-    _, achievements = await api_get(session, "/api/achievements")
 
     return templates.TemplateResponse(
         request, "profile.html", {"trainer": data, "achievements": achievements, "is_own": True}
@@ -141,13 +159,14 @@ async def view_trainer(request: Request, target_id: int):
     if not session:
         return RedirectResponse("/")
 
-    status, data = await api_get(session, f"/api/trainer/{target_id}")
+    (status, data), (_, achievements) = await asyncio.gather(
+        api_get(session, f"/api/trainer/{target_id}"),
+        api_get(session, f"/api/trainer/{target_id}/achievements"),
+    )
     if status == 401:
         return clear_session(RedirectResponse("/"))
     if status == 404:
         return templates.TemplateResponse(request, "landing.html", {"error": "That trainer doesn't exist."})
-
-    _, achievements = await api_get(session, f"/api/trainer/{target_id}/achievements")
 
     return templates.TemplateResponse(
         request, "profile.html", {"trainer": data, "achievements": achievements, "is_own": False}

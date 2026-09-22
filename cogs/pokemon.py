@@ -843,6 +843,12 @@ class Pokemon(commands.Cog):
 
     def _init_db(self):
         with sqlite3.connect(DB_PATH) as conn:
+            # WAL mode is a persistent property of the DB file itself — set it
+            # once here and every other connection (webapi.py, battle_store.py,
+            # trade_store.py) benefits, since the bot and the web API hit this
+            # same file concurrently and the default rollback-journal mode
+            # blocks readers during a write.
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS poke_trainers (
                     user_id INTEGER PRIMARY KEY,
@@ -867,6 +873,10 @@ class Pokemon(commands.Cog):
                     is_shiny INTEGER NOT NULL DEFAULT 0
                 )
             """)
+            # Every collection/team/pokedex/battle-roster lookup filters by
+            # user_id — this table has no other index, so those were full
+            # table scans.
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_collection_user ON poke_collection (user_id)")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS poke_spawn_usage (
                     user_id INTEGER PRIMARY KEY,
@@ -1010,6 +1020,8 @@ class Pokemon(commands.Cog):
                     finished_at TEXT
                 )
             """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_battles_side_a ON poke_battles (side_a_user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_battles_side_b ON poke_battles (side_b_user_id)")
             # One row per team slot per side, snapshotted at battle start and
             # mutated turn to turn. Stats are never stored — recomputed fresh
             # from base_stats each load, since they're a pure function of it.
@@ -1101,6 +1113,8 @@ class Pokemon(commands.Cog):
                     completed_at TEXT
                 )
             """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_side_a ON poke_trades (side_a_user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_side_b ON poke_trades (side_b_user_id)")
 
     # ---------- DB helpers ----------
 

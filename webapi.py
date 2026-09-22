@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from fastapi import FastAPI, HTTPException, Depends, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 
 import battle_engine as be
@@ -360,6 +361,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ShawtyBot Pokémon API", lifespan=lifespan)
 
+app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(
     CORSMiddleware,
     # Comma-separated list of allowed web-app origins, e.g. "https://poke.example.com"
