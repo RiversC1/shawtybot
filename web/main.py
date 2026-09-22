@@ -203,6 +203,49 @@ async def collection(request: Request):
     return templates.TemplateResponse(request, "collection.html", {"collection": data})
 
 
+@app.get("/battles")
+async def battles(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/battles")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "battles.html", {"battles": data})
+
+
+@app.get("/battles/{battle_id}")
+async def battle_room(request: Request, battle_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, f"/api/battles/{battle_id}")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+    if status == 404:
+        return templates.TemplateResponse(request, "landing.html", {"error": "That battle doesn't exist."})
+
+    return templates.TemplateResponse(
+        request, "battle_room.html", {"battle": data, "battle_id": battle_id, "battle_json": json.dumps(data)}
+    )
+
+
+@app.get("/gyms")
+async def gyms(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/gyms")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "gyms.html", {"gyms": data})
+
+
 # ---------- JSON proxy endpoints for the customize modal's JS ----------
 # These exist so client-side JS never sees the internal API's session token
 # or hostname directly — it only ever talks to this same-origin app.
@@ -347,4 +390,40 @@ async def proxy_set_pokemon_config(request: Request, dex_id: int):
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     body = await request.json()
     status, data = await api_post(session, f"/api/pokemon-config/{dex_id}", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/battles")
+async def proxy_list_battles(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/battles")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/battles/{battle_id}")
+async def proxy_get_battle(request: Request, battle_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/battles/{battle_id}")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/gyms")
+async def proxy_list_gyms(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/gyms")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/gyms/{gym_key}")
+async def proxy_get_gym(request: Request, gym_key: str):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/gyms/{gym_key}")
     return JSONResponse(data, status_code=status)

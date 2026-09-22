@@ -242,6 +242,15 @@ def check_and_unlock_achievements(conn: sqlite3.Connection, target_id: int) -> l
 with open(DATA_PATH, encoding="utf-8") as f:
     POKEDEX: dict[int, dict] = {p["id"]: p for p in json.load(f)}
 
+GYMS_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "gyms.json")
+with open(GYMS_DATA_PATH, encoding="utf-8") as f:
+    GYMS: dict[str, dict] = {g["gym_key"]: g for g in json.load(f)}
+GYM_ORDER: list[str] = sorted(GYMS.keys(), key=lambda k: GYMS[k]["order"])
+
+TRAINER_CLASSES_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "trainer_classes.json")
+with open(TRAINER_CLASSES_DATA_PATH, encoding="utf-8") as f:
+    TRAINER_CLASS_BY_KEY: dict[str, dict] = {c["class_key"]: c for c in json.load(f)}
+
 app = FastAPI(title="ShawtyBot Pokémon API")
 
 app.add_middleware(
@@ -1149,3 +1158,180 @@ def set_team(body: TeamRequest, user_id: int = Depends(get_current_user_id)):
             )
 
     return {"ok": True}
+
+
+# ---------- Battles ----------
+# Read-mostly: all actual battling (choosing moves) happens through the
+# Discord bot, which is the only process driving real-time turn resolution.
+# This API just exposes the same poke_battles/poke_battle_sides/
+# poke_battle_events tables (written by cogs/pokemon.py) for the web app's
+# spectate/browse pages, polled every few seconds — no websockets needed for
+# a turn-based game this slow-paced.
+
+def trainer_display_name(conn: sqlite3.Connection, user_id: int | None) -> str:
+    if not user_id:
+        return "Trainer"
+    row = conn.execute("SELECT username FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
+    return row["username"] if row and row["username"] else "Trainer"
+
+
+def battle_side_names(conn: sqlite3.Connection, row: sqlite3.Row) -> tuple[str, str]:
+    name_a = trainer_display_name(conn, row["side_a_user_id"])
+    if row["side_b_user_id"]:
+        name_b = trainer_display_name(conn, row["side_b_user_id"])
+    elif row["battle_type"] == "gym":
+        name_b = GYMS.get(row["side_b_npc_key"], {}).get("leader_name", "Gym Leader")
+    else:
+        tclass = TRAINER_CLASS_BY_KEY.get(row["side_b_npc_key"])
+        name_b = tclass["display_name"] if tclass else "Wild Trainer"
+    return name_a, name_b
+
+
+def summarize_battle(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+    name_a, name_b = battle_side_names(conn, row)
+    winner_name = None
+    if row["winner_side"] in ("A", "B"):
+        winner_name = name_a if row["winner_side"] == "A" else name_b
+    return {
+        "battle_id": row["battle_id"],
+        "battle_type": row["battle_type"],
+        "status": row["status"],
+        "name_a": name_a,
+        "name_b": name_b,
+        "turn_number": row["current_turn_number"],
+        "winner_name": winner_name,
+        "created_at": row["created_at"],
+        "finished_at": row["finished_at"],
+    }
+
+
+@app.get("/api/battles")
+def list_battles(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        live_rows = conn.execute(
+            "SELECT * FROM poke_battles WHERE status IN ('active', 'awaiting_forced_switch') ORDER BY updated_at DESC"
+        ).fetchall()
+        recent_rows = conn.execute(
+            "SELECT * FROM poke_battles WHERE status = 'finished' ORDER BY finished_at DESC LIMIT 20"
+        ).fetchall()
+        return {
+            "live": [summarize_battle(conn, r) for r in live_rows],
+            "recent": [summarize_battle(conn, r) for r in recent_rows],
+        }
+
+
+@app.get("/api/battles/{battle_id}")
+def get_battle_detail(battle_id: int, user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        row = conn.execute("SELECT * FROM poke_battles WHERE battle_id = ?", (battle_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Battle not found")
+        name_a, name_b = battle_side_names(conn, row)
+
+        side_rows = conn.execute(
+            "SELECT * FROM poke_battle_sides WHERE battle_id = ? ORDER BY side, slot", (battle_id,)
+        ).fetchall()
+
+        def mon_summary(r: sqlite3.Row) -> dict:
+            mon = POKEDEX.get(r["dex_id"], {})
+            return {
+                "dex_id": r["dex_id"],
+                "name": mon.get("name", f"#{r['dex_id']}"),
+                "artwork": mon.get("artwork"),
+                "types": mon.get("types", []),
+                "current_hp": r["current_hp"],
+                "max_hp": r["max_hp"],
+                "status": r["status"],
+                "is_active": bool(r["is_active"]),
+                "is_fainted": bool(r["is_fainted"]),
+            }
+
+        roster_a = [mon_summary(r) for r in side_rows if r["side"] == "A"]
+        roster_b = [mon_summary(r) for r in side_rows if r["side"] == "B"]
+
+        event_rows = conn.execute(
+            "SELECT event_type, payload FROM poke_battle_events WHERE battle_id = ? "
+            "ORDER BY turn_number DESC, seq DESC LIMIT 40",
+            (battle_id,),
+        ).fetchall()
+        events = [json.loads(r["payload"]) for r in reversed(event_rows)]
+
+    winner_name = None
+    if row["winner_side"] in ("A", "B"):
+        winner_name = name_a if row["winner_side"] == "A" else name_b
+
+    return {
+        "battle_id": battle_id,
+        "battle_type": row["battle_type"],
+        "status": row["status"],
+        "name_a": name_a,
+        "name_b": name_b,
+        "roster_a": roster_a,
+        "roster_b": roster_b,
+        "turn_number": row["current_turn_number"],
+        "winner_side": row["winner_side"],
+        "winner_name": winner_name,
+        "events": events,
+    }
+
+
+# ---------- Gyms ----------
+
+@app.get("/api/gyms")
+def list_gyms(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        earned = {
+            r["gym_key"] for r in conn.execute(
+                "SELECT gym_key FROM poke_badges WHERE user_id = ?", (user_id,)
+            ).fetchall()
+        }
+    next_key = next((k for k in GYM_ORDER if k not in earned), None)
+    return [
+        {
+            "gym_key": k,
+            "order": GYMS[k]["order"],
+            "leader_name": GYMS[k]["leader_name"],
+            "type_theme": GYMS[k]["type_theme"],
+            "location": GYMS[k]["location"],
+            "badge_name": GYMS[k]["badge_name"],
+            "flavor": GYMS[k]["flavor"],
+            "earned": k in earned,
+            "is_next": k == next_key,
+        }
+        for k in GYM_ORDER
+    ]
+
+
+@app.get("/api/gyms/{gym_key}")
+def get_gym_detail(gym_key: str, user_id: int = Depends(get_current_user_id)):
+    gym = GYMS.get(gym_key)
+    if not gym:
+        raise HTTPException(404, "Unknown gym")
+    with db() as conn:
+        earned = conn.execute(
+            "SELECT 1 FROM poke_badges WHERE user_id = ? AND gym_key = ?", (user_id, gym_key)
+        ).fetchone() is not None
+
+    roster = []
+    for entry in gym["roster"]:
+        mon = POKEDEX.get(entry["dex_id"], {})
+        roster.append({
+            "dex_id": entry["dex_id"],
+            "name": mon.get("name", f"#{entry['dex_id']}"),
+            "artwork": mon.get("artwork"),
+            "types": mon.get("types", []),
+            "moves": entry["moves"],
+            "ability": format_ability_name(entry["ability"]) if entry.get("ability") else None,
+        })
+
+    return {
+        "gym_key": gym_key,
+        "order": gym["order"],
+        "leader_name": gym["leader_name"],
+        "type_theme": gym["type_theme"],
+        "location": gym["location"],
+        "badge_name": gym["badge_name"],
+        "flavor": gym["flavor"],
+        "earned": earned,
+        "roster": roster,
+    }

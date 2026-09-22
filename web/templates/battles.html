@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Battles — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Battles</h1>
+<p class="muted">
+    Start a battle in Discord with <code>/poke challenge</code>, <code>/poke gym</code>, or
+    <code>/poke trainer</code> — then spectate it live here.
+</p>
+
+<h2>Live Battles</h2>
+<div class="grid" id="live-battles-grid">
+    {% for b in battles.live %}
+    <a class="card battle-card" href="/battles/{{ b.battle_id }}">
+        <div class="battle-type-tag">{{ b.battle_type }}</div>
+        <div class="battle-card-vs">
+            <span><span class="battle-live-dot"></span>{{ b.name_a }}</span>
+            <span class="battle-card-vs-sep">vs</span>
+            <span>{{ b.name_b }}</span>
+        </div>
+        <p class="muted">Turn {{ b.turn_number }}</p>
+    </a>
+    {% else %}
+    <p class="battle-empty">No battles happening right now.</p>
+    {% endfor %}
+</div>
+
+<h2 style="margin-top: 28px;">Recent Battles</h2>
+<div class="grid">
+    {% for b in battles.recent %}
+    <a class="card battle-card" href="/battles/{{ b.battle_id }}">
+        <div class="battle-type-tag">{{ b.battle_type }}</div>
+        <div class="battle-card-vs">
+            <span>{{ b.name_a }}</span>
+            <span class="battle-card-vs-sep">vs</span>
+            <span>{{ b.name_b }}</span>
+        </div>
+        <p class="muted">{{ '🏆 ' ~ b.winner_name ~ ' won' if b.winner_name else 'Ended in a draw' }}</p>
+    </a>
+    {% else %}
+    <p class="battle-empty">No finished battles yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}

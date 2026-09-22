@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Gyms — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Challenges &amp; Gyms</h1>
+<p class="muted" id="gyms-count">
+    {{ gyms|selectattr("earned")|list|length }} / {{ gyms|length }} badges earned —
+    challenge your next gym in Discord with <code>/poke gym</code>.
+</p>
+
+<div class="grid" id="gyms-grid">
+    {% for g in gyms %}
+    <div class="card gym-card{{ '' if (g.earned or g.is_next) else ' is-locked' }}" data-gym-key="{{ g.gym_key }}">
+        <div class="gym-badge-icon">{{ '🏅' if g.earned else ('⚔️' if g.is_next else '🔒') }}</div>
+        <div class="gym-card-name">{{ g.leader_name }}</div>
+        <div class="muted">{{ g.type_theme|capitalize }}-type</div>
+        <div class="gym-card-location">{{ g.location }}</div>
+        <p class="muted" style="margin-top:6px;">{{ g.badge_name }}</p>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="gym-modal" class="modal-overlay" hidden>
+    <div class="modal collection-modal">
+        <div class="modal-header">
+            <h2 id="gm-title">Gym</h2>
+            <button id="gm-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="gm-body">
+            <p class="muted">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script src="/static/move-tooltip.js"></script>
+<script src="/static/gyms.js"></script>
+{% endblock %}

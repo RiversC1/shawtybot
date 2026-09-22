@@ -1318,3 +1318,233 @@ code {
     height: 36px;
     border-radius: 50%;
 }
+
+/* ---------- Battles ---------- */
+
+.battle-card {
+    display: block;
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.battle-card:hover {
+    border-color: var(--red);
+    transform: translateY(-2px);
+}
+
+.battle-card-vs {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-weight: bold;
+    font-size: 1.05em;
+}
+
+.battle-card-vs-sep {
+    color: var(--text-dim);
+    font-weight: normal;
+    font-size: 0.85em;
+}
+
+.battle-live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3ddc70;
+    box-shadow: 0 0 6px 1px rgba(61, 220, 112, 0.7);
+    margin-right: 6px;
+    animation: battle-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes battle-live-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.battle-type-tag {
+    display: inline-block;
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    background: var(--surface-hover);
+    border-radius: 6px;
+    padding: 2px 8px;
+    margin-bottom: 6px;
+}
+
+.battle-empty {
+    color: var(--text-muted);
+    padding: 12px 0;
+}
+
+/* ---------- Battle room (spectate) ---------- */
+
+.battle-room-sides {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 700px) {
+    .battle-room-sides {
+        grid-template-columns: 1fr;
+    }
+}
+
+.battle-side-card {
+    text-align: center;
+}
+
+.battle-side-card.is-winner {
+    border-color: var(--yellow);
+    box-shadow: 0 0 0 1px var(--yellow);
+}
+
+.battle-side-name {
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.battle-active-art {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    margin: 0 auto 6px;
+    display: block;
+}
+
+.hp-bar-track {
+    background: #0c0c14;
+    border-radius: 20px;
+    height: 10px;
+    overflow: hidden;
+    margin: 6px 0 4px;
+}
+
+.hp-bar-fill {
+    height: 100%;
+    border-radius: 20px;
+    transition: width 0.3s ease;
+}
+
+.hp-bar-fill.hp-high { background: #3ddc70; }
+.hp-bar-fill.hp-mid { background: var(--yellow); }
+.hp-bar-fill.hp-low { background: var(--red); }
+
+.battle-roster-strip {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.battle-roster-mon {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    opacity: 1;
+}
+
+.battle-roster-mon.is-fainted {
+    opacity: 0.3;
+    filter: grayscale(100%);
+}
+
+.battle-roster-mon.is-active {
+    border-color: var(--red);
+}
+
+.battle-log {
+    background: var(--surface-alt);
+    border-radius: 10px;
+    padding: 12px 14px;
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 6px;
+    font-size: 0.92em;
+}
+
+.battle-log-line {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+}
+
+.battle-log-line:first-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.battle-result-banner {
+    text-align: center;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--yellow);
+    padding: 10px 0;
+}
+
+/* ---------- Gyms ---------- */
+
+.gym-card {
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+    text-align: center;
+}
+
+.gym-card:hover {
+    border-color: var(--red);
+    transform: translateY(-2px);
+}
+
+.gym-card.is-locked {
+    opacity: 0.55;
+}
+
+.gym-badge-icon {
+    font-size: 2em;
+    margin-bottom: 4px;
+}
+
+.gym-card-name {
+    font-weight: bold;
+}
+
+.gym-card-location {
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
+.gym-roster-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.gym-roster-mon {
+    text-align: center;
+    background: var(--surface-alt);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.gym-roster-mon img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+.gym-roster-mon-name {
+    font-size: 0.82em;
+    font-weight: bold;
+    margin-top: 4px;
+}
