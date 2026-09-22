@@ -76,9 +76,17 @@
   }
 
   muteBtn.addEventListener("click", () => {
-    BattleAudio.setMuted(!BattleAudio.isMuted());
+    try {
+      BattleAudio.setMuted(!BattleAudio.isMuted());
+    } catch (e) {
+      console.error("BattleAudio.setMuted failed:", e);
+    }
     updateMuteBtn();
-    syncMusicAndResult();
+    try {
+      syncMusicAndResult();
+    } catch (e) {
+      console.error("syncMusicAndResult failed:", e);
+    }
   });
   updateMuteBtn();
   // A click anywhere (a move button, accept, etc.) also counts as the user

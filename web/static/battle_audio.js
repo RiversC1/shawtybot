@@ -9,26 +9,50 @@ window.BattleAudio = (function () {
   let ctx = null;
   let musicGain = null;
   let sfxGain = null;
-  let muted = localStorage.getItem("sb_battle_muted") !== "0";
-  let wantMusic = false;
   let musicPlaying = false;
   let musicTimer = null;
   let musicStep = 0;
 
-  function ensureCtx() {
-    if (!ctx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return null;
-      ctx = new AC();
-      musicGain = ctx.createGain();
-      musicGain.gain.value = 0.16;
-      musicGain.connect(ctx.destination);
-      sfxGain = ctx.createGain();
-      sfxGain.gain.value = 0.35;
-      sfxGain.connect(ctx.destination);
+  // Some browsers throw on localStorage access entirely (strict cookie/site-
+  // data blocking, private-mode edge cases) rather than just returning null —
+  // never let that take down the mute button or the rest of the module.
+  function readMutedPref() {
+    try {
+      return localStorage.getItem("sb_battle_muted") !== "0";
+    } catch (e) {
+      return true;
     }
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
-    return ctx;
+  }
+
+  function writeMutedPref(value) {
+    try {
+      localStorage.setItem("sb_battle_muted", value ? "1" : "0");
+    } catch (e) {
+      // No persistence this session — the in-memory `muted` flag still works.
+    }
+  }
+
+  let muted = readMutedPref();
+  let wantMusic = false;
+
+  function ensureCtx() {
+    try {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+        musicGain = ctx.createGain();
+        musicGain.gain.value = 0.16;
+        musicGain.connect(ctx.destination);
+        sfxGain = ctx.createGain();
+        sfxGain.gain.value = 0.35;
+        sfxGain.connect(ctx.destination);
+      }
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      return ctx;
+    } catch (e) {
+      return null;
+    }
   }
 
   function isMuted() {
@@ -37,7 +61,7 @@ window.BattleAudio = (function () {
 
   function setMuted(value) {
     muted = value;
-    localStorage.setItem("sb_battle_muted", muted ? "1" : "0");
+    writeMutedPref(value);
     if (muted) {
       stopMusic();
     } else if (ensureCtx() && wantMusic) {
