@@ -249,6 +249,36 @@ async def gyms(request: Request):
     return templates.TemplateResponse(request, "gyms.html", {"gyms": data})
 
 
+@app.get("/trades")
+async def trades(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/trades")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "trades.html", {"trades": data})
+
+
+@app.get("/trades/{trade_id}")
+async def trade_room(request: Request, trade_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, f"/api/trades/{trade_id}")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+    if status == 404:
+        return templates.TemplateResponse(request, "landing.html", {"error": "That trade doesn't exist."})
+
+    return templates.TemplateResponse(
+        request, "trade_room.html", {"trade": data, "trade_id": trade_id, "trade_json": json.dumps(data)}
+    )
+
+
 # ---------- JSON proxy endpoints for the customize modal's JS ----------
 # These exist so client-side JS never sees the internal API's session token
 # or hostname directly — it only ever talks to this same-origin app.
@@ -488,6 +518,97 @@ async def proxy_forfeit_battle(request: Request, battle_id: int):
     return JSONResponse(data, status_code=status)
 
 
+@app.get("/api/proxy/collection")
+async def proxy_list_collection(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/collection")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/collection/by-species/{dex_id}")
+async def proxy_collection_by_species(request: Request, dex_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/collection/by-species/{dex_id}")
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/trades/start/{target_user_id}")
+async def proxy_start_trade(request: Request, target_user_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/trades/start/{target_user_id}", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/trades")
+async def proxy_list_trades(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/trades")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/trades/{trade_id}")
+async def proxy_get_trade(request: Request, trade_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/trades/{trade_id}")
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/trades/{trade_id}/accept")
+async def proxy_accept_trade(request: Request, trade_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/trades/{trade_id}/accept", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/trades/{trade_id}/decline")
+async def proxy_decline_trade(request: Request, trade_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/trades/{trade_id}/decline", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/trades/{trade_id}/cancel")
+async def proxy_cancel_trade(request: Request, trade_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/trades/{trade_id}/cancel", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/trades/{trade_id}/offer")
+async def proxy_offer_trade(request: Request, trade_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, f"/api/trades/{trade_id}/offer", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/trades/{trade_id}/confirm")
+async def proxy_confirm_trade(request: Request, trade_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/trades/{trade_id}/confirm", {})
+    return JSONResponse(data, status_code=status)
+
+
 # ---------- WebSocket relay ----------
 # The browser only ever talks to this same-origin app (auth via its own
 # httponly session cookie, exactly like every HTTP route above) — this proxy
@@ -536,6 +657,48 @@ async def battle_websocket_relay(websocket: WebSocket, battle_id: int):
         pass
     except Exception as e:
         log.warning(f"Battle WebSocket relay closed early for battle {battle_id}: {e}")
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
+@app.websocket("/ws/trades/{trade_id}")
+async def trade_websocket_relay(websocket: WebSocket, trade_id: int):
+    session = websocket.cookies.get(SESSION_COOKIE)
+    if not session:
+        await websocket.close(code=4401)
+        return
+
+    await websocket.accept()
+    upstream_url = f"{API_WS_BASE_URL}/ws/trades/{trade_id}?token={session}"
+
+    try:
+        async with websockets.connect(upstream_url, open_timeout=10) as upstream:
+            async def pump_upstream_to_client():
+                async for message in upstream:
+                    await websocket.send_text(message)
+
+            async def pump_client_to_upstream():
+                while True:
+                    await websocket.receive_text()
+
+            pump_task = asyncio.ensure_future(pump_upstream_to_client())
+            recv_task = asyncio.ensure_future(pump_client_to_upstream())
+            try:
+                done, pending = await asyncio.wait(
+                    {pump_task, recv_task}, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in pending:
+                    task.cancel()
+            finally:
+                pump_task.cancel()
+                recv_task.cancel()
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        log.warning(f"Trade WebSocket relay closed early for trade {trade_id}: {e}")
     finally:
         try:
             await websocket.close()

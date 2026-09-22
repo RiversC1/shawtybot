@@ -68,7 +68,9 @@
                 data-character-key="{{ trainer.character.key }}"
                 data-favorite-dex-id="{{ trainer.favorite.dex_id if trainer.favorite else '' }}">Customize ✦</button>
         {% else %}
+        <button id="trade-btn" class="btn-primary" data-target-user-id="{{ trainer.user_id }}">Trade ⇄</button>
         <a href="/trainers" class="btn-secondary">← Back to Trainers</a>
+        <p class="error" id="trade-error" hidden></p>
         {% endif %}
     </div>
 
@@ -155,5 +157,29 @@
 </div>
 
 <script src="/static/profile.js"></script>
+{% endif %}
+{% if not is_own %}
+<script>
+(function () {
+  const btn = document.getElementById("trade-btn");
+  const errorEl = document.getElementById("trade-error");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Starting trade...";
+    try {
+      const res = await fetch(`/api/proxy/trades/start/${btn.dataset.targetUserId}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Couldn't start a trade.");
+      window.location.href = `/trades/${data.trade_id}`;
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "Trade ⇄";
+      errorEl.textContent = err.message;
+      errorEl.hidden = false;
+    }
+  });
+})();
+</script>
 {% endif %}
 {% endblock %}

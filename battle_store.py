@@ -112,6 +112,37 @@ def get_battle_pokemon_config(user_id: int, dex_id: int) -> tuple[list[str], str
     return moves, ability
 
 
+IV_COLUMNS = ("iv_hp", "iv_attack", "iv_defense", "iv_sp_attack", "iv_sp_defense", "iv_speed")
+
+
+def ivs_from_collection_row(row: sqlite3.Row) -> dict:
+    """Reads the iv_* columns off a poke_collection row into the {hp, attack,
+    ...} shape battle_engine expects. Existing rows caught before IVs existed
+    were backfilled to max (31) so nobody's Pokémon got retroactively
+    weaker — see the migration in cogs/pokemon.py's _init_db."""
+    return {
+        key: row[col] if row[col] is not None else 31
+        for key, col in zip(be.IV_STAT_KEYS, IV_COLUMNS)
+    }
+
+
+def get_best_ivs_for_species(user_id: int, dex_id: int) -> dict | None:
+    """The IVs of whichever individual of this species (by total IV) the
+    player owns — used anywhere a species-keyed feature (the team, the
+    per-species move/ability config) needs to show/use 'your' stats for
+    that species, since poke_team/poke_pokemon_config aren't per-catch.
+    Returns None if the player owns none of this species."""
+    with db() as conn:
+        rows = conn.execute(
+            f"SELECT {', '.join(IV_COLUMNS)} FROM poke_collection WHERE user_id = ? AND dex_id = ?",
+            (user_id, dex_id),
+        ).fetchall()
+    if not rows:
+        return None
+    best = max(rows, key=lambda r: sum(ivs_from_collection_row(r).values()))
+    return ivs_from_collection_row(best)
+
+
 def trainer_display_name(conn: sqlite3.Connection, user_id: int | None) -> str:
     if not user_id:
         return "Trainer"
@@ -131,7 +162,8 @@ def build_roster_for_player(user_id: int) -> list["be.BattlerState"] | None:
         if not mon:
             continue
         moves, ability = get_battle_pokemon_config(user_id, dex_id)
-        roster.append(be.build_battler_state(mon, moves, ability))
+        ivs = get_best_ivs_for_species(user_id, dex_id)
+        roster.append(be.build_battler_state(mon, moves, ability, ivs=ivs))
     return roster or None
 
 
@@ -220,14 +252,15 @@ def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster
                 fields = be.battler_state_to_row_fields(b)
                 conn.execute(
                     "INSERT INTO poke_battle_sides (battle_id, side, slot, dex_id, ability, current_hp, max_hp, "
-                    "status, status_counter, stat_stages, confusion_counter, moves, is_active, is_fainted, volatile) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "status, status_counter, stat_stages, confusion_counter, moves, is_active, is_fainted, volatile, ivs) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         battle_id, side_label, slot, fields["dex_id"], b.ability, fields["current_hp"],
                         fields["max_hp"], fields["status"], fields["status_counter"],
                         json.dumps(fields["stat_stages"]), fields["confusion_counter"],
                         json.dumps(fields["moves"]), 1 if slot == 0 else 0,
                         1 if fields["is_fainted"] else 0, json.dumps(fields["volatile"]),
+                        json.dumps(fields["ivs"]),
                     ),
                 )
         conn.execute(
@@ -255,6 +288,7 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
             "status": r["status"], "status_counter": r["status_counter"],
             "stat_stages": json.loads(r["stat_stages"]), "confusion_counter": r["confusion_counter"],
             "moves": json.loads(r["moves"]), "is_fainted": r["is_fainted"], "volatile": json.loads(r["volatile"]),
+            "ivs": json.loads(r["ivs"]) if r["ivs"] else dict(be.MAX_IVS),
         }
         battler = be.battler_state_from_row(mon, row_dict, ability=r["ability"])
         if r["side"] == "A":

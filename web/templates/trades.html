@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Trades — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Trades</h1>
+<p class="muted">
+    Start a trade from any trainer's profile page (the "Trade ⇄" button), or with
+    <code>/poke trade @user</code> in Discord — then pick who gives what and play it out right here.
+</p>
+
+<h2>Active Trades</h2>
+<div class="grid" id="live-trades-grid">
+    {% for t in trades.live %}
+    <a class="card battle-card" href="/trades/{{ t.trade_id }}">
+        <div class="battle-type-tag">trade</div>
+        <div class="battle-card-vs">
+            <span>{% if t.status != 'pending' %}<span class="battle-live-dot"></span>{% endif %}{{ t.name_a }}</span>
+            <span class="battle-card-vs-sep">⇄</span>
+            <span>{{ t.name_b }}</span>
+        </div>
+        <p class="muted">{{ 'Awaiting response' if t.status == 'pending' else 'Choosing Pokémon' }}</p>
+    </a>
+    {% else %}
+    <p class="battle-empty">No trades happening right now.</p>
+    {% endfor %}
+</div>
+
+<h2 style="margin-top: 28px;">Recent Trades</h2>
+<div class="grid">
+    {% for t in trades.recent %}
+    <a class="card battle-card" href="/trades/{{ t.trade_id }}">
+        <div class="battle-type-tag">trade</div>
+        <div class="battle-card-vs">
+            <span>{{ t.name_a }}</span>
+            <span class="battle-card-vs-sep">⇄</span>
+            <span>{{ t.name_b }}</span>
+        </div>
+        <p class="muted">
+            {% if t.status == 'completed' %}✅ Completed
+            {% elif t.status == 'declined' %}Declined
+            {% else %}Cancelled{% endif %}
+        </p>
+    </a>
+    {% else %}
+    <p class="battle-empty">No finished trades yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}

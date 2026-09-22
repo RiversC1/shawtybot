@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 import battle_engine as be
 import battle_store
+import trade_store
 
 log = logging.getLogger("webapi")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -178,13 +179,13 @@ def format_ability_name(raw: str) -> str:
     return raw.replace("-", " ").title()
 
 
-def stat_at_level_100(base: int, is_hp: bool) -> int:
-    """Displays a representative stat at level 100 (max IVs, no EV investment,
-    neutral nature) using the standard stat formula — there's no real IV/EV/
-    nature tracking yet, so this is a stand-in until the battle system exists."""
+def stat_at_level_100(base: int, iv: int, is_hp: bool) -> int:
+    """A stat at level 100 (no EV investment, neutral nature) using the
+    standard stat formula, with a real per-individual IV (0-31, see
+    poke_collection's iv_* columns). Mirrors battle_engine.py's copy."""
     if is_hp:
-        return 2 * base + 141
-    return 2 * base + 36
+        return 2 * base + iv + 110
+    return 2 * base + iv + 5
 
 
 def add_item_sql(conn: sqlite3.Connection, user_id: int, item: str, delta: int):
@@ -287,42 +288,44 @@ with open(DATA_PATH, encoding="utf-8") as f:
 # persistent event loop that can hold WebSocket connections open.
 
 BATTLE_SWEEP_INTERVAL_SECONDS = 20
+TRADE_SWEEP_INTERVAL_SECONDS = 20
 
 
-class BattleConnectionManager:
-    """Tracks live WebSocket viewers per battle_id so a state change (a move
-    resolving, a forced switch, a timeout auto-resolve) can be pushed to
-    everyone watching that battle instantly, instead of them polling for it.
-    In-memory only — fine as long as this runs as a single uvicorn process
-    (no multi-worker), which is how it's deployed."""
+class ConnectionManager:
+    """Tracks live WebSocket viewers per session id (a battle_id or trade_id)
+    so a state change can be pushed to everyone watching instantly instead of
+    them polling for it. In-memory only — fine as long as this runs as a
+    single uvicorn process (no multi-worker), which is how it's deployed."""
 
-    def __init__(self):
+    def __init__(self, serialize_fn):
+        self._serialize_fn = serialize_fn
         self._connections: dict[int, set[tuple[WebSocket, int | None]]] = {}
 
-    async def connect(self, battle_id: int, websocket: WebSocket, viewer_user_id: int | None):
+    async def connect(self, session_id: int, websocket: WebSocket, viewer_user_id: int | None):
         await websocket.accept()
-        self._connections.setdefault(battle_id, set()).add((websocket, viewer_user_id))
+        self._connections.setdefault(session_id, set()).add((websocket, viewer_user_id))
 
-    def disconnect(self, battle_id: int, websocket: WebSocket, viewer_user_id: int | None):
-        conns = self._connections.get(battle_id)
+    def disconnect(self, session_id: int, websocket: WebSocket, viewer_user_id: int | None):
+        conns = self._connections.get(session_id)
         if conns:
             conns.discard((websocket, viewer_user_id))
             if not conns:
-                self._connections.pop(battle_id, None)
+                self._connections.pop(session_id, None)
 
-    async def broadcast(self, battle_id: int):
-        conns = self._connections.get(battle_id)
+    async def broadcast(self, session_id: int):
+        conns = self._connections.get(session_id)
         if not conns:
             return
         for websocket, viewer_user_id in list(conns):
             try:
-                payload = await asyncio.to_thread(battle_store.serialize_battle_detail, battle_id, viewer_user_id)
+                payload = await asyncio.to_thread(self._serialize_fn, session_id, viewer_user_id)
                 await websocket.send_json(payload)
             except Exception:
-                self.disconnect(battle_id, websocket, viewer_user_id)
+                self.disconnect(session_id, websocket, viewer_user_id)
 
 
-battle_connections = BattleConnectionManager()
+battle_connections = ConnectionManager(battle_store.serialize_battle_detail)
+trade_connections = ConnectionManager(trade_store.serialize_trade_detail)
 
 
 async def _battle_sweep_loop():
@@ -336,11 +339,23 @@ async def _battle_sweep_loop():
             log.error(f"Battle sweep failed: {e}", exc_info=True)
 
 
+async def _trade_sweep_loop():
+    while True:
+        await asyncio.sleep(TRADE_SWEEP_INTERVAL_SECONDS)
+        try:
+            changed_ids = await asyncio.to_thread(trade_store.sweep_trades)
+            for trade_id in changed_ids:
+                await trade_connections.broadcast(trade_id)
+        except Exception as e:
+            log.error(f"Trade sweep failed: {e}", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(_battle_sweep_loop())
+    tasks = [asyncio.create_task(_battle_sweep_loop()), asyncio.create_task(_trade_sweep_loop())]
     yield
-    task.cancel()
+    for task in tasks:
+        task.cancel()
 
 
 app = FastAPI(title="ShawtyBot Pokémon API", lifespan=lifespan)
@@ -763,6 +778,7 @@ def get_species_detail(dex_id: int, user_id: int = Depends(get_current_user_id))
             "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
         ).fetchone()[0]
         evolution = build_evolution_info(dex_id, user_id, conn)
+        ivs = battle_store.get_best_ivs_for_species(user_id, dex_id) if count > 0 else None
         if count > 0:
             config = resolve_pokemon_config(conn, user_id, dex_id)
         else:
@@ -784,7 +800,7 @@ def get_species_detail(dex_id: int, user_id: int = Depends(get_current_user_id))
         "artwork": mon.get("artwork"),
         "owned": bool(seen_row),
         "count": count,
-        "base_stats": resolved_base_stats(mon),
+        "base_stats": resolved_base_stats(mon, ivs),
         "evolution": evolution,
         **config,
     }
@@ -905,7 +921,11 @@ def resolve_pokemon_config(conn: sqlite3.Connection, user_id: int, dex_id: int) 
     }
 
 
-def resolved_base_stats(mon: dict) -> list[dict]:
+def resolved_base_stats(mon: dict, ivs: dict | None = None) -> list[dict]:
+    """ivs: that specific individual's real 0-31-per-stat values. Omit to show
+    the species' max-potential (31-IV) stats — used for a species you don't
+    own yet, where no individual exists to draw real IVs from."""
+    ivs = ivs or be.MAX_IVS
     base_stats = mon.get("base_stats", {})
     labels = [
         ("hp", "HP", True), ("attack", "Attack", False), ("defense", "Defense", False),
@@ -915,7 +935,8 @@ def resolved_base_stats(mon: dict) -> list[dict]:
         {
             "key": key, "label": label,
             "base": base_stats.get(key, 0),
-            "at_level_100": stat_at_level_100(base_stats.get(key, 0), is_hp),
+            "iv": ivs.get(key, 31),
+            "at_level_100": stat_at_level_100(base_stats.get(key, 0), ivs.get(key, 31), is_hp),
         }
         for key, label, is_hp in labels
     ]
@@ -933,10 +954,11 @@ def get_pokemon_config(dex_id: int, user_id: int = Depends(get_current_user_id))
         if owned < 1:
             raise HTTPException(404, "You don't own this Pokémon")
         config = resolve_pokemon_config(conn, user_id, dex_id)
+    ivs = battle_store.get_best_ivs_for_species(user_id, dex_id)
     return {
         "dex_id": dex_id,
         "name": mon["name"],
-        "base_stats": resolved_base_stats(mon),
+        "base_stats": resolved_base_stats(mon, ivs),
         **config,
     }
 
@@ -1031,8 +1053,9 @@ def get_collection(user_id: int = Depends(get_current_user_id)):
     personalized, otherwise the most recently caught one represents the group."""
     with db() as conn:
         rows = conn.execute(
-            "SELECT id, dex_id, nickname, is_shiny, caught_at FROM poke_collection "
-            "WHERE user_id = ? ORDER BY caught_at DESC",
+            "SELECT id, dex_id, nickname, is_shiny, caught_at, "
+            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed "
+            "FROM poke_collection WHERE user_id = ? ORDER BY caught_at DESC",
             (user_id,),
         ).fetchall()
 
@@ -1044,6 +1067,7 @@ def get_collection(user_id: int = Depends(get_current_user_id)):
     for dex_id, group in groups.items():
         mon = POKEDEX.get(dex_id, {})
         representative = next((r for r in group if r["nickname"]), group[0])
+        best_iv_total = max(sum(battle_store.ivs_from_collection_row(r).values()) for r in group)
         result.append({
             "id": representative["id"],
             "dex_id": dex_id,
@@ -1056,9 +1080,40 @@ def get_collection(user_id: int = Depends(get_current_user_id)):
             "is_shiny": bool(representative["is_shiny"]),
             "caught_at": representative["caught_at"],
             "count": len(group),
+            "best_iv_percent": round(best_iv_total / (31 * 6) * 100, 1),
         })
 
     result.sort(key=lambda m: m["caught_at"], reverse=True)
+    return result
+
+
+@app.get("/api/collection/by-species/{dex_id}")
+def get_collection_by_species(dex_id: int, user_id: int = Depends(get_current_user_id)):
+    """Every individual you own of one species — unlike /api/collection
+    (species-deduped), this is how a picker (e.g. trading) lets you choose
+    exactly which of your, say, three Charmander to act on, since IVs make
+    them meaningfully different now."""
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, dex_id, nickname, is_shiny, caught_at, "
+            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed "
+            "FROM poke_collection WHERE user_id = ? AND dex_id = ? ORDER BY caught_at DESC",
+            (user_id, dex_id),
+        ).fetchall()
+    mon = POKEDEX.get(dex_id, {})
+    result = []
+    for r in rows:
+        ivs = battle_store.ivs_from_collection_row(r)
+        result.append({
+            "id": r["id"],
+            "dex_id": dex_id,
+            "name": mon.get("name", f"#{dex_id}"),
+            "nickname": r["nickname"],
+            "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if r["is_shiny"] else mon.get("artwork"),
+            "is_shiny": bool(r["is_shiny"]),
+            "caught_at": r["caught_at"],
+            "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
+        })
     return result
 
 
@@ -1066,7 +1121,9 @@ def get_collection(user_id: int = Depends(get_current_user_id)):
 def get_collection_detail(catch_id: int, user_id: int = Depends(get_current_user_id)):
     with db() as conn:
         row = conn.execute(
-            "SELECT id, dex_id, nickname, is_shiny, caught_at FROM poke_collection WHERE id = ? AND user_id = ?",
+            "SELECT id, dex_id, nickname, is_shiny, caught_at, "
+            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed "
+            "FROM poke_collection WHERE id = ? AND user_id = ?",
             (catch_id, user_id),
         ).fetchone()
         if not row:
@@ -1080,6 +1137,7 @@ def get_collection_detail(catch_id: int, user_id: int = Depends(get_current_user
         evolution = build_evolution_info(row["dex_id"], user_id, conn)
         config = resolve_pokemon_config(conn, user_id, row["dex_id"])
 
+    ivs = battle_store.ivs_from_collection_row(row)
     return {
         "id": row["id"],
         "dex_id": row["dex_id"],
@@ -1091,7 +1149,8 @@ def get_collection_detail(catch_id: int, user_id: int = Depends(get_current_user
         "is_shiny": bool(row["is_shiny"]),
         "caught_at": row["caught_at"],
         "count": count,
-        "base_stats": resolved_base_stats(mon),
+        "base_stats": resolved_base_stats(mon, ivs),
+        "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
         "evolution": evolution,
         **config,
     }
@@ -1238,12 +1297,13 @@ def get_team(user_id: int = Depends(get_current_user_id)):
         for r in rows:
             dex_id = r["dex_id"]
             mon = POKEDEX.get(dex_id, {})
+            ivs = battle_store.get_best_ivs_for_species(user_id, dex_id)
             result.append({
                 "dex_id": dex_id,
                 "name": mon.get("name", f"#{dex_id}"),
                 "artwork": mon.get("artwork"),
                 "types": mon.get("types", []),
-                "base_stats": resolved_base_stats(mon),
+                "base_stats": resolved_base_stats(mon, ivs),
                 **resolve_pokemon_config(conn, user_id, dex_id),
             })
     return result
@@ -1441,6 +1501,144 @@ async def battle_websocket(websocket: WebSocket, battle_id: int):
         pass
     finally:
         battle_connections.disconnect(battle_id, websocket, viewer_user_id)
+
+
+# ---------- Trading ----------
+# Like battles, all actual trade actions are submitted here from the web
+# trade UI; the bot only ever creates the session (or, for a web-initiated
+# trade, this API creates it directly) and posts/redirects to a link.
+
+@app.get("/api/trades")
+def list_trades(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM poke_trades WHERE (side_a_user_id = ? OR side_b_user_id = ?) "
+            "AND status IN ('pending', 'active') ORDER BY updated_at DESC",
+            (user_id, user_id),
+        ).fetchall()
+        recent_rows = conn.execute(
+            "SELECT * FROM poke_trades WHERE (side_a_user_id = ? OR side_b_user_id = ?) "
+            "AND status NOT IN ('pending', 'active') ORDER BY updated_at DESC LIMIT 20",
+            (user_id, user_id),
+        ).fetchall()
+    return {
+        "live": [trade_store.summarize_trade(r) for r in rows],
+        "recent": [trade_store.summarize_trade(r) for r in recent_rows],
+    }
+
+
+@app.post("/api/trades/start/{target_user_id}")
+async def start_trade(target_user_id: int, user_id: int = Depends(get_current_user_id)):
+    if target_user_id == user_id:
+        raise HTTPException(400, "You can't trade with yourself.")
+    with db() as conn:
+        target = conn.execute("SELECT 1 FROM poke_trainers WHERE user_id = ?", (target_user_id,)).fetchone()
+    if not target:
+        raise HTTPException(404, "That trainer doesn't exist.")
+    if await asyncio.to_thread(trade_store.has_active_trade, user_id):
+        raise HTTPException(400, "You're already in a trade!")
+    if await asyncio.to_thread(trade_store.has_active_trade, target_user_id):
+        raise HTTPException(400, "That trainer is already in a trade!")
+    trade_id = await asyncio.to_thread(trade_store.create_trade, user_id, target_user_id, None, None)
+    return {"trade_id": trade_id}
+
+
+@app.get("/api/trades/{trade_id}")
+def get_trade_detail(trade_id: int, user_id: int = Depends(get_current_user_id)):
+    payload = trade_store.serialize_trade_detail(trade_id, viewer_user_id=user_id)
+    if not payload:
+        raise HTTPException(404, "Trade not found")
+    return payload
+
+
+@app.post("/api/trades/{trade_id}/accept")
+async def accept_trade(trade_id: int, user_id: int = Depends(get_current_user_id)):
+    row = trade_store.get_trade_row(trade_id)
+    if not row:
+        raise HTTPException(404, "Trade not found")
+    if row["side_b_user_id"] != user_id:
+        raise HTTPException(403, "This trade invite isn't yours to accept")
+    ok, error = await asyncio.to_thread(trade_store.accept_trade, trade_id)
+    if not ok:
+        raise HTTPException(400, error or "Couldn't accept this trade")
+    await trade_connections.broadcast(trade_id)
+    return trade_store.serialize_trade_detail(trade_id, viewer_user_id=user_id)
+
+
+@app.post("/api/trades/{trade_id}/decline")
+async def decline_trade(trade_id: int, user_id: int = Depends(get_current_user_id)):
+    row = trade_store.get_trade_row(trade_id)
+    if not row:
+        raise HTTPException(404, "Trade not found")
+    if user_id not in (row["side_a_user_id"], row["side_b_user_id"]):
+        raise HTTPException(403, "This trade isn't yours to decline")
+    await asyncio.to_thread(trade_store.decline_trade, trade_id)
+    await trade_connections.broadcast(trade_id)
+    return {"ok": True}
+
+
+@app.post("/api/trades/{trade_id}/cancel")
+async def cancel_trade(trade_id: int, user_id: int = Depends(get_current_user_id)):
+    row = trade_store.get_trade_row(trade_id)
+    if not row:
+        raise HTTPException(404, "Trade not found")
+    if user_id not in (row["side_a_user_id"], row["side_b_user_id"]):
+        raise HTTPException(403, "This trade isn't yours to cancel")
+    await asyncio.to_thread(trade_store.cancel_trade, trade_id)
+    await trade_connections.broadcast(trade_id)
+    return trade_store.serialize_trade_detail(trade_id, viewer_user_id=user_id)
+
+
+class TradeOfferRequest(BaseModel):
+    catch_id: int
+
+
+@app.post("/api/trades/{trade_id}/offer")
+async def offer_trade(trade_id: int, body: TradeOfferRequest, user_id: int = Depends(get_current_user_id)):
+    row = trade_store.get_trade_row(trade_id)
+    if not row:
+        raise HTTPException(404, "Trade not found")
+    side = trade_store.side_for_user(row, user_id)
+    if side is None:
+        raise HTTPException(403, "You're not a participant in this trade")
+    ok, error = await asyncio.to_thread(trade_store.set_offer, trade_id, side, body.catch_id)
+    if not ok:
+        raise HTTPException(400, error or "Couldn't offer that Pokémon")
+    await trade_connections.broadcast(trade_id)
+    return trade_store.serialize_trade_detail(trade_id, viewer_user_id=user_id)
+
+
+@app.post("/api/trades/{trade_id}/confirm")
+async def confirm_trade(trade_id: int, user_id: int = Depends(get_current_user_id)):
+    row = trade_store.get_trade_row(trade_id)
+    if not row:
+        raise HTTPException(404, "Trade not found")
+    side = trade_store.side_for_user(row, user_id)
+    if side is None:
+        raise HTTPException(403, "You're not a participant in this trade")
+    ok, error, _completed = await asyncio.to_thread(trade_store.confirm_offer, trade_id, side)
+    if not ok:
+        raise HTTPException(400, error or "Couldn't confirm this trade")
+    await trade_connections.broadcast(trade_id)
+    return trade_store.serialize_trade_detail(trade_id, viewer_user_id=user_id)
+
+
+@app.websocket("/ws/trades/{trade_id}")
+async def trade_websocket(websocket: WebSocket, trade_id: int):
+    viewer_user_id = decode_token_user_id(websocket.query_params.get("token"))
+    await trade_connections.connect(trade_id, websocket, viewer_user_id)
+    try:
+        payload = await asyncio.to_thread(trade_store.serialize_trade_detail, trade_id, viewer_user_id)
+        if payload is None:
+            await websocket.close(code=4404)
+            return
+        await websocket.send_json(payload)
+        while True:
+            await websocket.receive_text()  # only used to detect disconnect; actions go via POST
+    except WebSocketDisconnect:
+        pass
+    finally:
+        trade_connections.disconnect(trade_id, websocket, viewer_user_id)
 
 
 # ---------- Gyms ----------

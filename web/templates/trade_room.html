@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Trade — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<div class="battle-room-header">
+    <div>
+        <h1 id="tr-title">{{ trade.name_a }} ⇄ {{ trade.name_b }}</h1>
+        <p class="muted" id="tr-subtitle">Trade</p>
+    </div>
+    <div class="battle-room-header-actions">
+        <span class="muted" id="tr-connection-status">Connecting...</span>
+        <button id="tr-cancel-btn" class="btn-secondary" hidden>Cancel</button>
+    </div>
+</div>
+
+<div id="tr-result" class="battle-result-banner" hidden></div>
+
+<div class="trade-room-columns">
+    <div class="trade-side" id="tr-side-a">
+        <h3 id="tr-name-a" class="trade-side-name"></h3>
+        <div class="trade-offer-slot" id="tr-slot-a"></div>
+    </div>
+    <div class="trade-swap-icon">⇄</div>
+    <div class="trade-side" id="tr-side-b">
+        <h3 id="tr-name-b" class="trade-side-name"></h3>
+        <div class="trade-offer-slot" id="tr-slot-b"></div>
+    </div>
+</div>
+
+<div class="card" id="tr-action-panel" hidden></div>
+
+<div id="trade-picker-modal" class="modal-overlay" hidden>
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="tp-title">Choose a Pokémon to offer</h2>
+            <button id="tp-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="text" id="tp-search" placeholder="Search your catches..." class="search-input" style="width: 100%; margin-bottom: 12px;">
+            <div id="tp-species-view">
+                <div id="tp-species-grid" class="picker-grid"></div>
+            </div>
+            <div id="tp-individuals-view" hidden>
+                <button id="tp-back" class="btn-secondary" style="margin-bottom: 10px;">&larr; Back to species</button>
+                <div id="tp-individuals-grid" class="picker-grid"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="trade-card-modal" class="modal-overlay" hidden>
+    <div class="modal collection-modal">
+        <div class="modal-header">
+            <h2 id="tc-title">Pokémon</h2>
+            <button id="tc-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="tc-body"></div>
+    </div>
+</div>
+
+<script type="application/json" id="trade-data">{{ trade_json|safe }}</script>
+<script>window.TRADE_ID = {{ trade_id }};</script>
+<script src="/static/trade_room.js"></script>
+{% endblock %}

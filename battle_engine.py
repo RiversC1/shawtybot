@@ -59,11 +59,16 @@ CRIT_TABLE = {0: 1 / 16, 1: 1 / 8, 2: 1 / 2, 3: 1.0}
 STAT_KEYS = ("attack", "defense", "sp_attack", "sp_defense", "speed", "accuracy", "evasion")
 
 
-def stat_at_level_100(base: int, is_hp: bool) -> int:
-    """Mirrors webapi.py's stat_at_level_100 — max IVs, no EVs, neutral
-    nature, level 100. Duplicated here (not imported) so this module stays
-    free of any dependency on webapi.py's FastAPI app construction."""
-    return 2 * base + 141 if is_hp else 2 * base + 36
+IV_STAT_KEYS = ("hp", "attack", "defense", "sp_attack", "sp_defense", "speed")
+MAX_IVS: dict[str, int] = {k: 31 for k in IV_STAT_KEYS}
+
+
+def stat_at_level_100(base: int, iv: int, is_hp: bool) -> int:
+    """Mirrors webapi.py's stat_at_level_100 — no EVs, neutral nature, level
+    100, real per-individual IV (0-31). Duplicated here (not imported) so
+    this module stays free of any dependency on webapi.py's FastAPI app
+    construction."""
+    return 2 * base + iv + 110 if is_hp else 2 * base + iv + 5
 
 
 def type_effectiveness(move_type: str | None, defender_types: list[str]) -> float:
@@ -190,6 +195,7 @@ class BattlerState:
     max_hp: int
     current_hp: int
     ability: Optional[str] = None
+    ivs: dict = field(default_factory=lambda: dict(MAX_IVS))  # same 6 keys, 0-31 each
     moves: list = field(default_factory=list)  # list[MoveSlot], up to 4
     stat_stages: dict = field(default_factory=default_stat_stages)
     status: Optional[str] = None  # burn|paralysis|poison|toxic|sleep|freeze
@@ -250,18 +256,22 @@ class TurnResult:
 # Construction helpers
 # ---------------------------------------------------------------------------
 
-def build_battler_state(mon: dict, moves: list[str] | None, ability: str | None) -> BattlerState:
+def build_battler_state(mon: dict, moves: list[str] | None, ability: str | None,
+                         ivs: dict | None = None) -> BattlerState:
     """mon: one entry from data/pokemon.json (POKEDEX[dex_id]). moves: up to 4
     move names to load from that species' own embedded move pool (falls back
-    to its first 4 known moves if not given/found)."""
+    to its first 4 known moves if not given/found). ivs: that individual's
+    real 0-31-per-stat values; defaults to max (31) for gym/trainer NPCs,
+    which have no owned Pokémon row to draw real IVs from."""
+    ivs = ivs or MAX_IVS
     base_stats = mon.get("base_stats", {})
     stats = {
-        "hp": stat_at_level_100(base_stats.get("hp", 1), True),
-        "attack": stat_at_level_100(base_stats.get("attack", 1), False),
-        "defense": stat_at_level_100(base_stats.get("defense", 1), False),
-        "sp_attack": stat_at_level_100(base_stats.get("sp_attack", 1), False),
-        "sp_defense": stat_at_level_100(base_stats.get("sp_defense", 1), False),
-        "speed": stat_at_level_100(base_stats.get("speed", 1), False),
+        "hp": stat_at_level_100(base_stats.get("hp", 1), ivs.get("hp", 31), True),
+        "attack": stat_at_level_100(base_stats.get("attack", 1), ivs.get("attack", 31), False),
+        "defense": stat_at_level_100(base_stats.get("defense", 1), ivs.get("defense", 31), False),
+        "sp_attack": stat_at_level_100(base_stats.get("sp_attack", 1), ivs.get("sp_attack", 31), False),
+        "sp_defense": stat_at_level_100(base_stats.get("sp_defense", 1), ivs.get("sp_defense", 31), False),
+        "speed": stat_at_level_100(base_stats.get("speed", 1), ivs.get("speed", 31), False),
     }
     pool_by_name = {m["name"]: m for m in mon.get("moves", [])}
     chosen = [n for n in (moves or []) if n in pool_by_name]
@@ -275,7 +285,8 @@ def build_battler_state(mon: dict, moves: list[str] | None, ability: str | None)
 
     return BattlerState(
         dex_id=mon["id"], species_name=mon["name"], types=list(mon.get("types", [])),
-        stats=stats, max_hp=stats["hp"], current_hp=stats["hp"], ability=ability, moves=move_slots,
+        stats=stats, max_hp=stats["hp"], current_hp=stats["hp"], ability=ability,
+        ivs=dict(ivs), moves=move_slots,
     )
 
 
@@ -310,20 +321,23 @@ def battler_state_to_row_fields(b: BattlerState) -> dict:
         "moves": [{"name": ms.move.name, "pp": ms.current_pp} for ms in b.moves],
         "is_fainted": b.is_fainted,
         "volatile": dict(b.volatile),
+        "ivs": dict(b.ivs),
     }
 
 
 def battler_state_from_row(mon: dict, row: dict, ability: str | None = None) -> BattlerState:
     """Rebuild a BattlerState for one roster slot from a poke_battle_sides row
-    (already JSON-decoded) plus the species' pokedex entry."""
+    (already JSON-decoded) plus the species' pokedex entry. IVs are written
+    once at battle start and never change, so they're just read back here."""
+    ivs = row.get("ivs") or MAX_IVS
     base_stats = mon.get("base_stats", {})
     stats = {
-        "hp": stat_at_level_100(base_stats.get("hp", 1), True),
-        "attack": stat_at_level_100(base_stats.get("attack", 1), False),
-        "defense": stat_at_level_100(base_stats.get("defense", 1), False),
-        "sp_attack": stat_at_level_100(base_stats.get("sp_attack", 1), False),
-        "sp_defense": stat_at_level_100(base_stats.get("sp_defense", 1), False),
-        "speed": stat_at_level_100(base_stats.get("speed", 1), False),
+        "hp": stat_at_level_100(base_stats.get("hp", 1), ivs.get("hp", 31), True),
+        "attack": stat_at_level_100(base_stats.get("attack", 1), ivs.get("attack", 31), False),
+        "defense": stat_at_level_100(base_stats.get("defense", 1), ivs.get("defense", 31), False),
+        "sp_attack": stat_at_level_100(base_stats.get("sp_attack", 1), ivs.get("sp_attack", 31), False),
+        "sp_defense": stat_at_level_100(base_stats.get("sp_defense", 1), ivs.get("sp_defense", 31), False),
+        "speed": stat_at_level_100(base_stats.get("speed", 1), ivs.get("speed", 31), False),
     }
     pool_by_name = {m["name"]: m for m in mon.get("moves", [])}
     move_slots = []
@@ -340,7 +354,7 @@ def battler_state_from_row(mon: dict, row: dict, ability: str | None = None) -> 
 
     return BattlerState(
         dex_id=row["dex_id"], species_name=mon.get("name", f"#{row['dex_id']}"), types=list(mon.get("types", [])),
-        stats=stats, max_hp=row.get("max_hp", stats["hp"]), current_hp=row.get("current_hp", stats["hp"]),
+        stats=stats, ivs=dict(ivs), max_hp=row.get("max_hp", stats["hp"]), current_hp=row.get("current_hp", stats["hp"]),
         ability=ability, moves=move_slots, stat_stages=stages,
         status=row.get("status"), status_counter=row.get("status_counter", 0) or 0,
         confusion_counter=row.get("confusion_counter", 0) or 0, volatile=volatile,

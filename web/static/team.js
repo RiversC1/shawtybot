@@ -50,7 +50,7 @@
         <div class="stat-bar-row">
           <span class="stat-bar-label">${s.label}</span>
           <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${Math.min(100, (s.at_level_100 / 400) * 100)}%"></div></div>
-          <span class="stat-bar-value">${s.at_level_100}</span>
+          <span class="stat-bar-value">${s.at_level_100} <span class="muted">(IV ${s.iv})</span></span>
         </div>`
       )
       .join("");

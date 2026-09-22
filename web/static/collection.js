@@ -54,7 +54,7 @@
             <div class="stat-bar-row">
                 <span class="stat-bar-label">${s.label}</span>
                 <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${Math.min(100, (s.at_level_100 / 400) * 100)}%"></div></div>
-                <span class="stat-bar-value">${s.at_level_100}</span>
+                <span class="stat-bar-value">${s.at_level_100} <span class="muted">(IV ${s.iv})</span></span>
             </div>`
       )
       .join("");
@@ -96,7 +96,7 @@
                     <div class="favorite-circle"><img src="${mon.artwork}" alt="${mon.name}"></div>
                 </div>
                 <div class="collection-detail-info">
-                    <div class="muted">#${String(mon.dex_id).padStart(3, "0")} · Your catch${mon.count > 1 ? ` · You have ${mon.count}` : ""}</div>
+                    <div class="muted">#${String(mon.dex_id).padStart(3, "0")} · Your catch${mon.count > 1 ? ` · You have ${mon.count}` : ""} · IV Quality ${mon.iv_percent}%</div>
                     <h2 style="margin: 4px 0;">${mon.nickname || mon.name}${mon.is_shiny ? " ✨" : ""}</h2>
                     ${mon.nickname ? `<div class="muted">${mon.name}</div>` : ""}
                     <div class="favorite-types" style="justify-content: flex-start; margin: 8px 0;">${typeBadges(mon.types)}</div>

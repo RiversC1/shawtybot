@@ -12,6 +12,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import battle_store
+import trade_store
 
 log = logging.getLogger("bot")
 
@@ -941,6 +942,18 @@ class Pokemon(commands.Cog):
             cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_collection)").fetchall()]
             if "nickname" not in cols:
                 conn.execute("ALTER TABLE poke_collection ADD COLUMN nickname TEXT")
+            # Migration for DBs created before IVs existed. Backfilled to max
+            # (31) rather than randomized, so nobody's already-caught Pokémon
+            # gets retroactively weaker the moment this feature ships — only
+            # newly-caught Pokémon (see add_to_collection) roll real IVs.
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_collection)").fetchall()]
+            if "iv_hp" not in cols:
+                for col in ("iv_hp", "iv_attack", "iv_defense", "iv_sp_attack", "iv_sp_defense", "iv_speed"):
+                    conn.execute(f"ALTER TABLE poke_collection ADD COLUMN {col} INTEGER")
+                conn.execute(
+                    "UPDATE poke_collection SET iv_hp=31, iv_attack=31, iv_defense=31, "
+                    "iv_sp_attack=31, iv_sp_defense=31, iv_speed=31 WHERE iv_hp IS NULL"
+                )
             # Per-species moveset/ability loadout, shown on the web team page.
             # Keyed by (user_id, dex_id) rather than per-catch — every individual
             # of a species you own shares one configured loadout for now, since
@@ -1020,6 +1033,10 @@ class Pokemon(commands.Cog):
                     PRIMARY KEY (battle_id, side, slot)
                 )
             """)
+            # Migration for DBs created before per-individual IVs existed.
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_battle_sides)").fetchall()]
+            if "ivs" not in cols:
+                conn.execute("ALTER TABLE poke_battle_sides ADD COLUMN ivs TEXT")
             # The durable turn-by-turn event log — both the Discord embed and
             # the web spectate poll read from this.
             conn.execute("""
@@ -1059,6 +1076,29 @@ class Pokemon(commands.Cog):
                     gym_key TEXT NOT NULL,
                     earned_at TEXT NOT NULL,
                     PRIMARY KEY (user_id, gym_key)
+                )
+            """)
+
+            # ---------- Trading ----------
+            # side_a is always the initiator. side_a/b_catch_id name a specific
+            # poke_collection row (one individual, not a species) each side is
+            # offering; either can change their pick until both are confirmed,
+            # which un-confirms both sides again as a safety-against-swap rule.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_trades (
+                    trade_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    side_a_user_id INTEGER NOT NULL,
+                    side_b_user_id INTEGER NOT NULL,
+                    side_a_catch_id INTEGER,
+                    side_b_catch_id INTEGER,
+                    side_a_confirmed INTEGER NOT NULL DEFAULT 0,
+                    side_b_confirmed INTEGER NOT NULL DEFAULT 0,
+                    guild_id INTEGER NOT NULL,
+                    channel_id INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    completed_at TEXT
                 )
             """)
 
@@ -1120,21 +1160,29 @@ class Pokemon(commands.Cog):
         return result
 
     def evolve_one(self, user_id: int, from_dex_id: int, to_dex_id: int) -> bool:
-        """Converts one caught instance of from_dex_id into to_dex_id, preserving shininess.
-        Returns False if the user doesn't own one."""
+        """Converts one caught instance of from_dex_id into to_dex_id, preserving
+        shininess, nickname, and IVs (evolution never changes an individual's
+        IVs in the real games either). Returns False if the user doesn't own one."""
         with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
             row = conn.execute(
-                "SELECT id, is_shiny FROM poke_collection WHERE user_id = ? AND dex_id = ? ORDER BY id LIMIT 1",
+                "SELECT id, is_shiny, nickname, iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed "
+                "FROM poke_collection WHERE user_id = ? AND dex_id = ? ORDER BY id LIMIT 1",
                 (user_id, from_dex_id),
             ).fetchone()
             if not row:
                 return False
-            row_id, is_shiny = row
-            conn.execute("DELETE FROM poke_collection WHERE id = ?", (row_id,))
+            conn.execute("DELETE FROM poke_collection WHERE id = ?", (row["id"],))
             now = datetime.now(timezone.utc).isoformat()
             conn.execute(
-                "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny) VALUES (?, ?, ?, ?)",
-                (user_id, to_dex_id, now, is_shiny),
+                "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, nickname, "
+                "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    user_id, to_dex_id, now, row["is_shiny"], row["nickname"],
+                    row["iv_hp"], row["iv_attack"], row["iv_defense"],
+                    row["iv_sp_attack"], row["iv_sp_defense"], row["iv_speed"],
+                ),
             )
             # Evolving into a species registers it in the Pokédex too — the
             # species you evolved FROM is already registered from the original
@@ -1291,10 +1339,13 @@ class Pokemon(commands.Cog):
 
     def add_to_collection(self, user_id: int, dex_id: int, is_shiny: bool = False):
         now = datetime.now(timezone.utc).isoformat()
+        ivs = [random.randint(0, 31) for _ in range(6)]
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
-                "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny) VALUES (?, ?, ?, ?)",
-                (user_id, dex_id, now, int(is_shiny)),
+                "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, "
+                "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, dex_id, now, int(is_shiny), *ivs),
             )
             conn.execute(
                 "INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
@@ -1926,6 +1977,47 @@ class Pokemon(commands.Cog):
             color=discord.Color.orange(),
         )
         await interaction.response.send_message(content=opponent.mention, embed=embed)
+
+    def _trade_link(self, trade_id: int) -> str:
+        base_url = os.getenv("WEB_BASE_URL", "http://localhost:8080")
+        return f"{base_url}/trades/{trade_id}"
+
+    @poke.command(name="trade", description="Offer another trainer a Pokémon trade")
+    @app_commands.describe(trainer="The trainer you want to trade with")
+    async def poke_trade(self, interaction: discord.Interaction, trainer: discord.Member):
+        if not self.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+        if trainer.id == interaction.user.id or trainer.bot:
+            await interaction.response.send_message("You can't trade with that trainer.", ephemeral=True)
+            return
+        if not self.get_trainer(trainer.id):
+            await interaction.response.send_message(
+                f"{trainer.display_name} hasn't started their Pokémon journey yet.", ephemeral=True
+            )
+            return
+        if trade_store.has_active_trade(interaction.user.id):
+            await interaction.response.send_message("You're already in a trade!", ephemeral=True)
+            return
+        if trade_store.has_active_trade(trainer.id):
+            await interaction.response.send_message(f"{trainer.display_name} is already in a trade!", ephemeral=True)
+            return
+
+        trade_id = trade_store.create_trade(
+            interaction.user.id, trainer.id, interaction.guild_id, interaction.channel_id
+        )
+        link = self._trade_link(trade_id)
+        embed = discord.Embed(
+            title="Trade Offer!",
+            description=(
+                f"{interaction.user.mention} wants to trade Pokémon with {trainer.mention}!\n\n"
+                f"**[Open the trade]({link})** to accept or decline, then pick your Pokémon live on the web."
+            ),
+            color=discord.Color.blue(),
+        )
+        await interaction.response.send_message(content=trainer.mention, embed=embed)
 
     @poke.command(name="gyms", description="See the 8 Hoenn Gym Leaders and your badge progress")
     async def poke_gyms(self, interaction: discord.Interaction):
