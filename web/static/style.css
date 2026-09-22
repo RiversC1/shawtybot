@@ -1986,3 +1986,297 @@ code {
         transform: rotate(90deg);
     }
 }
+
+/* ---------- Trade proposal builder ---------- */
+
+.trade-propose-card h2 {
+    margin-top: 0;
+}
+
+.trade-propose-columns {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+}
+
+.trade-propose-col {
+    flex: 1 1 200px;
+    min-width: 200px;
+}
+
+.trade-propose-label {
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.trade-propose-slot {
+    width: 100%;
+    min-height: 44px;
+    background: #0c0c14;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    padding: 8px 12px;
+    font-size: 0.95em;
+    text-align: left;
+}
+
+.trade-propose-slot:hover:not(:disabled) {
+    border-color: var(--yellow);
+}
+
+.trade-propose-slot:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.trade-propose-slot.is-filled {
+    border-style: solid;
+    border-color: var(--red);
+}
+
+.trade-propose-slot-text {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.trade-propose-slot-text img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.trade-propose-actions {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.trade-list-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-top: 28px;
+}
+
+.link-accent {
+    color: var(--yellow);
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.link-accent:hover {
+    text-decoration: underline;
+}
+
+.trainer-picker-grid .trainer-picker-item {
+    text-align: center;
+}
+
+.picker-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 12px;
+}
+
+.trade-review-columns {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.trade-review-col {
+    flex: 1 1 160px;
+    min-width: 140px;
+    text-align: center;
+}
+
+.trade-review-col img {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.trade-card-mon {
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 8px;
+    transition: background 0.15s;
+}
+
+.trade-card-mon:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.trade-proposal-card {
+    margin-bottom: 16px;
+}
+
+.trade-proposal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.trade-status-tag {
+    display: inline-block;
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--surface-hover);
+    color: var(--text-muted);
+    font-weight: bold;
+}
+
+.trade-status-tag.is-pending { background: rgba(255, 214, 0, 0.15); color: var(--yellow); }
+.trade-status-tag.is-completed { background: rgba(110, 224, 192, 0.15); color: #6ee0c0; }
+.trade-status-tag.is-declined { background: rgba(239, 51, 64, 0.15); color: var(--red); }
+
+.trade-proposal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.trade-proposal-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* ---------- Battle list rows ---------- */
+
+.battle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.battle-list-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    text-decoration: none;
+    color: var(--text);
+    flex-wrap: wrap;
+}
+
+.battle-list-main {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.battle-list-tag {
+    display: inline-block;
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    background: var(--surface-hover);
+    border-radius: 6px;
+    padding: 2px 8px;
+    margin-bottom: 6px;
+}
+
+.battle-list-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-weight: bold;
+    font-size: 1.05em;
+}
+
+.battle-list-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+.battle-list-vs-sep {
+    color: var(--text-dim);
+    font-weight: normal;
+    font-size: 0.85em;
+}
+
+.battle-list-date {
+    margin-top: 4px;
+    font-size: 0.85em;
+}
+
+.battle-list-side {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.battle-result-tag {
+    font-weight: bold;
+    font-size: 0.9em;
+    padding: 3px 10px;
+    border-radius: 6px;
+}
+
+.battle-result-tag.result-win { background: rgba(110, 224, 192, 0.15); color: #6ee0c0; }
+.battle-result-tag.result-loss { background: rgba(239, 51, 64, 0.15); color: var(--red); }
+
+.battle-tabs {
+    display: flex;
+    gap: 6px;
+    border-bottom: 1px solid var(--border);
+    margin: 16px 0 20px;
+}
+
+.battle-tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-weight: bold;
+    font-size: 0.95em;
+    padding: 8px 4px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+}
+
+.battle-tab-btn.active {
+    color: var(--yellow);
+    border-bottom-color: var(--yellow);
+}
+
+@media (max-width: 640px) {
+    .battle-list-side {
+        margin-left: 0;
+        width: 100%;
+        justify-content: space-between;
+    }
+}

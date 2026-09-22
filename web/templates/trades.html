@@ -3,45 +3,103 @@
 {% block content %}
 <h1>Trades</h1>
 <p class="muted">
-    Start a trade from any trainer's profile page (the "Trade ⇄" button), or with
-    <code>/poke trade @user</code> in Discord — then pick who gives what and play it out right here.
+    Search for a friend, then pick what you'll give and exactly which of their Pokémon you want —
+    both sides must accept before anything changes hands.
 </p>
 
-<h2>Active Trades</h2>
-<div class="grid" id="live-trades-grid">
-    {% for t in trades.live %}
-    <a class="card battle-card" href="/trades/{{ t.trade_id }}">
-        <div class="battle-type-tag">trade</div>
-        <div class="battle-card-vs">
-            <span class="battle-card-vs-name" title="{{ t.name_a }}">{% if t.status != 'pending' %}<span class="battle-live-dot"></span>{% endif %}{{ t.name_a }}</span>
-            <span class="battle-card-vs-sep">⇄</span>
-            <span class="battle-card-vs-name" title="{{ t.name_b }}">{{ t.name_b }}</span>
+<div class="card trade-propose-card">
+    <h2>Propose a Trade</h2>
+    <p class="muted">Each Pokémon is only reserved once your friend accepts.</p>
+
+    <div class="trade-propose-columns">
+        <div class="trade-propose-col">
+            <div class="trade-propose-label">Friend</div>
+            <button id="tp-pick-friend" class="trade-propose-slot" type="button">
+                <span class="trade-propose-slot-text">Choose a friend</span>
+            </button>
         </div>
-        <p class="muted">{{ 'Awaiting response' if t.status == 'pending' else 'Choosing Pokémon' }}</p>
-    </a>
-    {% else %}
-    <p class="battle-empty">No trades happening right now.</p>
-    {% endfor %}
+        <div class="trade-propose-col">
+            <div class="trade-propose-label">You Give</div>
+            <button id="tp-pick-mine" class="trade-propose-slot" type="button">
+                <span class="trade-propose-slot-text">Choose your Pokémon</span>
+            </button>
+        </div>
+        <div class="trade-propose-col">
+            <div class="trade-propose-label">You Receive</div>
+            <button id="tp-pick-theirs" class="trade-propose-slot" type="button" disabled>
+                <span class="trade-propose-slot-text">Choose their Pokémon</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="trade-propose-actions">
+        <button id="tp-send" class="btn-primary" disabled>Review Proposal</button>
+        <p class="error" id="tp-error" hidden></p>
+    </div>
 </div>
 
-<h2 style="margin-top: 28px;">Recent Trades</h2>
-<div class="grid">
-    {% for t in trades.recent %}
-    <a class="card battle-card" href="/trades/{{ t.trade_id }}">
-        <div class="battle-type-tag">trade</div>
-        <div class="battle-card-vs">
-            <span class="battle-card-vs-name" title="{{ t.name_a }}">{{ t.name_a }}</span>
-            <span class="battle-card-vs-sep">⇄</span>
-            <span class="battle-card-vs-name" title="{{ t.name_b }}">{{ t.name_b }}</span>
-        </div>
-        <p class="muted">
-            {% if t.status == 'completed' %}✅ Completed
-            {% elif t.status == 'declined' %}Declined
-            {% else %}Cancelled{% endif %}
-        </p>
-    </a>
-    {% else %}
-    <p class="battle-empty">No finished trades yet.</p>
-    {% endfor %}
+<div class="trade-list-header">
+    <h2>Your Trades</h2>
+    <a href="#" id="trades-refresh" class="link-accent">Refresh</a>
 </div>
+<div id="trade-proposals-list"><p class="muted">Loading...</p></div>
+
+<div id="friend-picker-modal" class="modal-overlay" hidden>
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Choose a friend</h2>
+            <button id="fp-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="text" id="fp-search" class="search-input" placeholder="Search by name or @mention..." style="width:100%; margin-bottom:12px;">
+            <div id="fp-grid" class="picker-grid trainer-picker-grid"></div>
+        </div>
+    </div>
+</div>
+
+<div id="pokemon-picker-modal" class="modal-overlay" hidden>
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="pp-title">Choose a Pokémon</h2>
+            <button id="pp-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="text" id="pp-search" class="search-input" placeholder="Search..." style="width:100%; margin-bottom:12px;">
+            <div id="pp-species-view">
+                <div id="pp-species-grid" class="picker-grid"></div>
+                <div class="picker-pagination" id="pp-pagination" hidden>
+                    <button id="pp-prev" class="btn-secondary">Previous</button>
+                    <span id="pp-page-label" class="muted"></span>
+                    <button id="pp-next" class="btn-secondary">Next</button>
+                </div>
+            </div>
+            <div id="pp-individuals-view" hidden>
+                <button id="pp-back" class="btn-secondary" style="margin-bottom:10px;">&larr; Back to species</button>
+                <div id="pp-individuals-grid" class="picker-grid"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="review-modal" class="modal-overlay" hidden>
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Review Trade</h2>
+            <button id="rv-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="rv-body"></div>
+    </div>
+</div>
+
+<div id="trade-card-modal" class="modal-overlay" hidden>
+    <div class="modal collection-modal">
+        <div class="modal-header">
+            <h2 id="tc-title">Pokémon</h2>
+            <button id="tc-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="tc-body"></div>
+    </div>
+</div>
+
+<script src="/static/trades.js"></script>
 {% endblock %}

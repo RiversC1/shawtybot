@@ -694,18 +694,32 @@ def sweep_battles() -> list[int]:
 
 # ---------- Serialization (shared by the GET endpoint and WS broadcasts) ----------
 
-def summarize_battle(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+def summarize_battle(conn: sqlite3.Connection, row: sqlite3.Row, viewer_user_id: int | None = None) -> dict:
     name_a = trainer_display_name(conn, row["side_a_user_id"])
     name_b = display_name_for_side(row, "B")
     winner_name = None
     if row["winner_side"] in ("A", "B"):
         winner_name = name_a if row["winner_side"] == "A" else name_b
+
+    viewer_side = None
+    if viewer_user_id is not None:
+        if row["side_a_user_id"] == viewer_user_id:
+            viewer_side = "A"
+        elif row["side_b_user_id"] == viewer_user_id:
+            viewer_side = "B"
+    your_result = None
+    if viewer_side and row["winner_side"] in ("A", "B"):
+        your_result = "win" if row["winner_side"] == viewer_side else "loss"
+
     return {
         "battle_id": row["battle_id"], "battle_type": row["battle_type"], "status": row["status"],
         "name_a": name_a, "name_b": name_b,
         "avatar_a": avatar_for_side(row, "A"), "avatar_b": avatar_for_side(row, "B"),
+        "side_a_user_id": row["side_a_user_id"], "side_b_user_id": row["side_b_user_id"],
+        "is_participant": viewer_side is not None,
         "turn_number": row["current_turn_number"],
-        "winner_name": winner_name, "created_at": row["created_at"], "finished_at": row["finished_at"],
+        "winner_name": winner_name, "your_result": your_result,
+        "created_at": row["created_at"], "finished_at": row["finished_at"],
     }
 
 

@@ -212,11 +212,7 @@ async def battles(request: Request):
     if not session:
         return RedirectResponse("/")
 
-    status, data = await api_get(session, "/api/battles")
-    if status == 401:
-        return clear_session(RedirectResponse("/"))
-
-    return templates.TemplateResponse(request, "battles.html", {"battles": data})
+    return templates.TemplateResponse(request, "battles.html", {})
 
 
 @app.get("/battles/{battle_id}")
@@ -255,11 +251,7 @@ async def trades(request: Request):
     if not session:
         return RedirectResponse("/")
 
-    status, data = await api_get(session, "/api/trades")
-    if status == 401:
-        return clear_session(RedirectResponse("/"))
-
-    return templates.TemplateResponse(request, "trades.html", {"trades": data})
+    return templates.TemplateResponse(request, "trades.html", {})
 
 
 @app.get("/trades/{trade_id}")
@@ -533,6 +525,43 @@ async def proxy_collection_by_species(request: Request, dex_id: int):
     if not session:
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     status, data = await api_get(session, f"/api/collection/by-species/{dex_id}")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/trainers")
+async def proxy_list_trainers(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/trainers")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/trainer/{target_id}/collection")
+async def proxy_trainer_collection(request: Request, target_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/trainer/{target_id}/collection")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/trainer/{target_id}/collection/by-species/{dex_id}")
+async def proxy_trainer_collection_by_species(request: Request, target_id: int, dex_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/trainer/{target_id}/collection/by-species/{dex_id}")
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/trades/propose")
+async def proxy_propose_trade(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, "/api/trades/propose", body)
     return JSONResponse(data, status_code=status)
 
 

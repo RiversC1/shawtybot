@@ -7,37 +7,18 @@
     <code>/poke trainer</code> — then play it out and spectate live right here.
 </p>
 
-<h2>Live Battles</h2>
-<div class="grid" id="live-battles-grid">
-    {% for b in battles.live %}
-    <a class="card battle-card" href="/battles/{{ b.battle_id }}">
-        <div class="battle-type-tag">{{ b.battle_type }}</div>
-        <div class="battle-card-vs">
-            <span class="battle-card-vs-name" title="{{ b.name_a }}">{% if b.status != 'pending' %}<span class="battle-live-dot"></span>{% endif %}{{ b.name_a }}</span>
-            <span class="battle-card-vs-sep">vs</span>
-            <span class="battle-card-vs-name" title="{{ b.name_b }}">{{ b.name_b }}</span>
-        </div>
-        <p class="muted">{{ 'Awaiting response' if b.status == 'pending' else ('Choosing next move' if b.status == 'awaiting_forced_switch' else 'Turn ' ~ b.turn_number) }}</p>
-    </a>
-    {% else %}
-    <p class="battle-empty">No battles happening right now.</p>
-    {% endfor %}
+<div class="battle-tabs">
+    <button class="battle-tab-btn active" id="tab-btn-live" type="button">Live</button>
+    <button class="battle-tab-btn" id="tab-btn-mine" type="button">My Battles</button>
+</div>
+<p class="muted">Auto-refreshing every 10 seconds.</p>
+
+<div id="tab-live">
+    <div class="battle-list" id="live-battles-list"><p class="muted">Loading...</p></div>
+</div>
+<div id="tab-mine" hidden>
+    <div class="battle-list" id="mine-battles-list"><p class="muted">Loading...</p></div>
 </div>
 
-<h2 style="margin-top: 28px;">Recent Battles</h2>
-<div class="grid">
-    {% for b in battles.recent %}
-    <a class="card battle-card" href="/battles/{{ b.battle_id }}">
-        <div class="battle-type-tag">{{ b.battle_type }}</div>
-        <div class="battle-card-vs">
-            <span class="battle-card-vs-name" title="{{ b.name_a }}">{{ b.name_a }}</span>
-            <span class="battle-card-vs-sep">vs</span>
-            <span class="battle-card-vs-name" title="{{ b.name_b }}">{{ b.name_b }}</span>
-        </div>
-        <p class="muted">{{ '🏆 ' ~ b.winner_name ~ ' won' if b.winner_name else 'Ended in a draw' }}</p>
-    </a>
-    {% else %}
-    <p class="battle-empty">No finished battles yet.</p>
-    {% endfor %}
-</div>
+<script src="/static/battles.js"></script>
 {% endblock %}

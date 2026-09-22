@@ -66,16 +66,54 @@ def side_for_user(row: sqlite3.Row, user_id: int | None) -> str | None:
     return None
 
 
-def accept_trade(trade_id: int) -> tuple[bool, str | None]:
+def accept_trade(trade_id: int) -> tuple[bool, str | None, bool]:
+    """Returns (ok, error, completed). A fully-specified proposal (both
+    catch_ids already set — see propose_trade) has the initiator's half of
+    the agreement baked in already, so accepting it executes the swap right
+    away instead of waiting for a separate confirm step."""
     row = get_trade_row(trade_id)
     if not row or row["status"] != "pending":
-        return False, "This trade invite is no longer available."
+        return False, "This trade invite is no longer available.", False
     with db() as conn:
         conn.execute(
             "UPDATE poke_trades SET status = 'active', updated_at = ? WHERE trade_id = ?",
             (datetime.now(timezone.utc).isoformat(), trade_id),
         )
-    return True, None
+    if row["side_a_catch_id"] and row["side_b_catch_id"]:
+        confirm_offer(trade_id, "A")
+        return confirm_offer(trade_id, "B")
+    return True, None, False
+
+
+def propose_trade(
+    initiator_user_id: int, target_user_id: int,
+    offer_catch_id: int, request_catch_id: int,
+    guild_id: int | None, channel_id: int | None,
+) -> tuple[int | None, str | None]:
+    """Creates a fully-specified proposal: the initiator already picked both
+    halves of the swap (their own Pokémon to give, and the specific
+    individual they want from the target). Returns (trade_id, error)."""
+    with db() as conn:
+        owns_offer = conn.execute(
+            "SELECT 1 FROM poke_collection WHERE id = ? AND user_id = ?", (offer_catch_id, initiator_user_id)
+        ).fetchone()
+        if not owns_offer:
+            return None, "You don't own that Pokémon."
+        owns_request = conn.execute(
+            "SELECT 1 FROM poke_collection WHERE id = ? AND user_id = ?", (request_catch_id, target_user_id)
+        ).fetchone()
+        if not owns_request:
+            return None, "That trainer doesn't own that Pokémon."
+        now = datetime.now(timezone.utc).isoformat()
+        cur = conn.execute(
+            "INSERT INTO poke_trades (status, side_a_user_id, side_b_user_id, side_a_catch_id, side_b_catch_id, "
+            "guild_id, channel_id, created_at, updated_at) VALUES ('pending', ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                initiator_user_id, target_user_id, offer_catch_id, request_catch_id,
+                guild_id or 0, channel_id or 0, now, now,
+            ),
+        )
+        return cur.lastrowid, None
 
 
 def decline_trade(trade_id: int):
@@ -243,14 +281,22 @@ def mon_card(catch_id: int | None) -> dict | None:
     }
 
 
-def summarize_trade(row: sqlite3.Row) -> dict:
+def summarize_trade(row: sqlite3.Row, viewer_user_id: int | None = None) -> dict:
     with db() as conn:
         name_a = battle_store.trainer_display_name(conn, row["side_a_user_id"])
         name_b = battle_store.trainer_display_name(conn, row["side_b_user_id"])
+
+    side = side_for_user(row, viewer_user_id)
     return {
         "trade_id": row["trade_id"], "status": row["status"],
         "name_a": name_a, "name_b": name_b,
+        "mon_a": mon_card(row["side_a_catch_id"]), "mon_b": mon_card(row["side_b_catch_id"]),
         "created_at": row["created_at"], "completed_at": row["completed_at"],
+        "you": {
+            "side": side,
+            "is_pending_target": side == "B" and row["status"] == "pending",
+            "can_cancel": side is not None and row["status"] in ("pending", "active"),
+        },
     }
 
 

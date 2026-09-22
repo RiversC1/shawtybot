@@ -1046,18 +1046,16 @@ def build_evolution_info(dex_id: int, user_id: int, conn: sqlite3.Connection) ->
     }
 
 
-@app.get("/api/collection")
-def get_collection(user_id: int = Depends(get_current_user_id)):
-    """One card per species you own, not one per individual catch — a
-    nicknamed instance is shown preferentially since it's the one you've
+def build_collection_summary(conn: sqlite3.Connection, target_id: int) -> list[dict]:
+    """One card per species a trainer owns, not one per individual catch — a
+    nicknamed instance is shown preferentially since it's the one they've
     personalized, otherwise the most recently caught one represents the group."""
-    with db() as conn:
-        rows = conn.execute(
-            "SELECT id, dex_id, nickname, is_shiny, caught_at, "
-            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed "
-            "FROM poke_collection WHERE user_id = ? ORDER BY caught_at DESC",
-            (user_id,),
-        ).fetchall()
+    rows = conn.execute(
+        "SELECT id, dex_id, nickname, is_shiny, caught_at, "
+        "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed "
+        "FROM poke_collection WHERE user_id = ? ORDER BY caught_at DESC",
+        (target_id,),
+    ).fetchall()
 
     groups: dict[int, list] = {}
     for r in rows:
@@ -1087,19 +1085,17 @@ def get_collection(user_id: int = Depends(get_current_user_id)):
     return result
 
 
-@app.get("/api/collection/by-species/{dex_id}")
-def get_collection_by_species(dex_id: int, user_id: int = Depends(get_current_user_id)):
-    """Every individual you own of one species — unlike /api/collection
+def build_collection_by_species(conn: sqlite3.Connection, target_id: int, dex_id: int) -> list[dict]:
+    """Every individual a trainer owns of one species — unlike the summary
     (species-deduped), this is how a picker (e.g. trading) lets you choose
-    exactly which of your, say, three Charmander to act on, since IVs make
-    them meaningfully different now."""
-    with db() as conn:
-        rows = conn.execute(
-            "SELECT id, dex_id, nickname, is_shiny, caught_at, "
-            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed "
-            "FROM poke_collection WHERE user_id = ? AND dex_id = ? ORDER BY caught_at DESC",
-            (user_id, dex_id),
-        ).fetchall()
+    exactly which of, say, three Charmander to act on, since IVs make them
+    meaningfully different now."""
+    rows = conn.execute(
+        "SELECT id, dex_id, nickname, is_shiny, caught_at, "
+        "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed "
+        "FROM poke_collection WHERE user_id = ? AND dex_id = ? ORDER BY caught_at DESC",
+        (target_id, dex_id),
+    ).fetchall()
     mon = POKEDEX.get(dex_id, {})
     result = []
     for r in rows:
@@ -1115,6 +1111,38 @@ def get_collection_by_species(dex_id: int, user_id: int = Depends(get_current_us
             "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
         })
     return result
+
+
+@app.get("/api/collection")
+def get_collection(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        return build_collection_summary(conn, user_id)
+
+
+@app.get("/api/collection/by-species/{dex_id}")
+def get_collection_by_species(dex_id: int, user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        return build_collection_by_species(conn, user_id, dex_id)
+
+
+@app.get("/api/trainer/{target_id}/collection")
+def get_trainer_collection(target_id: int, user_id: int = Depends(get_current_user_id)):
+    """Lets one trainer browse another's species — used by the trade
+    proposal builder's 'what do they have' picker."""
+    with db() as conn:
+        trainer = conn.execute("SELECT 1 FROM poke_trainers WHERE user_id = ?", (target_id,)).fetchone()
+        if not trainer:
+            raise HTTPException(404, "Trainer not found")
+        return build_collection_summary(conn, target_id)
+
+
+@app.get("/api/trainer/{target_id}/collection/by-species/{dex_id}")
+def get_trainer_collection_by_species(target_id: int, dex_id: int, user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        trainer = conn.execute("SELECT 1 FROM poke_trainers WHERE user_id = ?", (target_id,)).fetchone()
+        if not trainer:
+            raise HTTPException(404, "Trainer not found")
+        return build_collection_by_species(conn, target_id, dex_id)
 
 
 @app.get("/api/collection/{catch_id}")
@@ -1361,9 +1389,15 @@ def list_battles(user_id: int = Depends(get_current_user_id)):
         recent_rows = conn.execute(
             "SELECT * FROM poke_battles WHERE status = 'finished' ORDER BY finished_at DESC LIMIT 20"
         ).fetchall()
+        mine_rows = conn.execute(
+            "SELECT * FROM poke_battles WHERE side_a_user_id = ? OR side_b_user_id = ? "
+            "ORDER BY updated_at DESC LIMIT 30",
+            (user_id, user_id),
+        ).fetchall()
         return {
-            "live": [battle_store.summarize_battle(conn, r) for r in live_rows],
-            "recent": [battle_store.summarize_battle(conn, r) for r in recent_rows],
+            "live": [battle_store.summarize_battle(conn, r, user_id) for r in live_rows],
+            "recent": [battle_store.summarize_battle(conn, r, user_id) for r in recent_rows],
+            "mine": [battle_store.summarize_battle(conn, r, user_id) for r in mine_rows],
         }
 
 
@@ -1522,8 +1556,8 @@ def list_trades(user_id: int = Depends(get_current_user_id)):
             (user_id, user_id),
         ).fetchall()
     return {
-        "live": [trade_store.summarize_trade(r) for r in rows],
-        "recent": [trade_store.summarize_trade(r) for r in recent_rows],
+        "live": [trade_store.summarize_trade(r, user_id) for r in rows],
+        "recent": [trade_store.summarize_trade(r, user_id) for r in recent_rows],
     }
 
 
@@ -1543,6 +1577,33 @@ async def start_trade(target_user_id: int, user_id: int = Depends(get_current_us
     return {"trade_id": trade_id}
 
 
+class TradeProposalRequest(BaseModel):
+    target_user_id: int
+    offer_catch_id: int
+    request_catch_id: int
+
+
+@app.post("/api/trades/propose")
+async def propose_trade(body: TradeProposalRequest, user_id: int = Depends(get_current_user_id)):
+    if body.target_user_id == user_id:
+        raise HTTPException(400, "You can't trade with yourself.")
+    with db() as conn:
+        target = conn.execute("SELECT 1 FROM poke_trainers WHERE user_id = ?", (body.target_user_id,)).fetchone()
+    if not target:
+        raise HTTPException(404, "That trainer doesn't exist.")
+    if await asyncio.to_thread(trade_store.has_active_trade, user_id):
+        raise HTTPException(400, "You're already in a trade!")
+    if await asyncio.to_thread(trade_store.has_active_trade, body.target_user_id):
+        raise HTTPException(400, "That trainer is already in a trade!")
+    trade_id, error = await asyncio.to_thread(
+        trade_store.propose_trade, user_id, body.target_user_id,
+        body.offer_catch_id, body.request_catch_id, None, None,
+    )
+    if error:
+        raise HTTPException(400, error)
+    return {"trade_id": trade_id}
+
+
 @app.get("/api/trades/{trade_id}")
 def get_trade_detail(trade_id: int, user_id: int = Depends(get_current_user_id)):
     payload = trade_store.serialize_trade_detail(trade_id, viewer_user_id=user_id)
@@ -1558,7 +1619,7 @@ async def accept_trade(trade_id: int, user_id: int = Depends(get_current_user_id
         raise HTTPException(404, "Trade not found")
     if row["side_b_user_id"] != user_id:
         raise HTTPException(403, "This trade invite isn't yours to accept")
-    ok, error = await asyncio.to_thread(trade_store.accept_trade, trade_id)
+    ok, error, _completed = await asyncio.to_thread(trade_store.accept_trade, trade_id)
     if not ok:
         raise HTTPException(400, error or "Couldn't accept this trade")
     await trade_connections.broadcast(trade_id)
