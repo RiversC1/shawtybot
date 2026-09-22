@@ -11,14 +11,12 @@ import asyncio
 import secrets
 from datetime import datetime, timedelta, timezone
 
-import battle_engine as be
+import battle_store
 
 log = logging.getLogger("bot")
 
 DB_PATH = "pokemon.db"
 DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "pokemon.json")
-GYMS_DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "gyms.json")
-TRAINER_CLASSES_DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "trainer_classes.json")
 
 # National dex order, one per evolution line's base stage
 STARTERS = [
@@ -215,24 +213,11 @@ EVOLUTION_CANDY_COST = 20
 # /poke web one-time login link validity.
 WEB_TOKEN_EXPIRE_MINUTES = 10
 
-# ---------- Battles ----------
-# Reuses the existing trainer XP/coin systems for rewards — see the approved
-# battle-system plan: no new per-Pokémon stat-growth mechanic, "getting
-# stronger" means a stronger account (more XP/coins/moveset options), not
-# stat growth on any individual Pokémon.
-TRAINER_BATTLE_REWARDS = {
-    "low": {"xp": 15, "coin": 20},
-    "medium": {"xp": 30, "coin": 40},
-    "high": {"xp": 55, "coin": 80},
-}
-GYM_BATTLE_XP = 100
-GYM_BATTLE_COIN = 250
-PVP_WIN_XP = 25
-PVP_WIN_COIN = 30
-BATTLE_CHALLENGE_TIMEOUT_SECONDS = 120
-BATTLE_TURN_TIMEOUT_SECONDS = 90
-BATTLE_ABANDON_SECONDS = 30 * 60
-BATTLE_LOG_TAIL = 8  # how many recent event lines to show in the battle embed
+# Battle reward/timeout constants, gym/trainer data, and all battle DB/
+# orchestration logic now live in battle_store.py — it's shared with
+# webapi.py, which is where battle actions actually get submitted and
+# resolved from the web battle UI. This cog only ever creates battles and
+# posts a link to play them out on the web.
 
 # ---------- Coffers ----------
 
@@ -270,17 +255,6 @@ def load_pokedex() -> dict[int, dict]:
     with open(DATA_PATH, encoding="utf-8") as f:
         data = json.load(f)
     return {p["id"]: p for p in data}
-
-
-def load_gyms() -> dict[str, dict]:
-    with open(GYMS_DATA_PATH, encoding="utf-8") as f:
-        data = json.load(f)
-    return {g["gym_key"]: g for g in data}
-
-
-def load_trainer_classes() -> list[dict]:
-    with open(TRAINER_CLASSES_DATA_PATH, encoding="utf-8") as f:
-        return json.load(f)
 
 
 def find_by_name(pokedex: dict[int, dict], name: str) -> dict | None:
@@ -419,118 +393,6 @@ def build_catch_panel_embed(cog: "Pokemon", mon: dict, items: dict[str, int], ca
     if result_line:
         embed.add_field(name="Result", value=result_line, inline=False)
     embed.set_thumbnail(url=mon.get("sprite") or mon.get("artwork"))
-    return embed
-
-
-# ---------- Battle rendering ----------
-# Pure formatting helpers over battle_engine's BattleState/event vocabulary —
-# no DB access, no discord.py side effects, so they're easy to reason about
-# in isolation from the (much more stateful) orchestration methods on the cog.
-
-STATUS_ICONS = {
-    "burn": "🔥", "paralysis": "⚡", "poison": "☠️", "toxic": "☠️", "sleep": "💤", "freeze": "❄️",
-}
-
-
-def hp_bar(current: int, max_hp: int, width: int = 12) -> str:
-    if max_hp <= 0:
-        return "?"
-    filled = max(0, min(width, round(width * max(0, current) / max_hp)))
-    return "█" * filled + "░" * (width - filled)
-
-
-def format_battle_event(event: dict, name_by_side: dict[str, str]) -> str | None:
-    t = event["type"]
-    side_name = name_by_side.get(event.get("side"), "")
-
-    if t in ("turn_start", "switch_out", "battle_end"):
-        return None  # battle_end is rendered separately by the caller
-    if t == "switch_in":
-        return f"🔁 {side_name} sends out **{event['name']}**!"
-    if t == "move_used":
-        return f"**{side_name}** used **{event['move_name']}**!"
-    if t == "move_missed":
-        return f"{side_name}'s attack missed!"
-    if t == "move_failed":
-        return f"{side_name}'s move failed!"
-    if t == "cannot_act":
-        reasons = {
-            "recharge": "must recharge!", "asleep": "is fast asleep.", "frozen": "is frozen solid!",
-            "flinched": "flinched and couldn't move!", "paralyzed": "is paralyzed and can't move!",
-        }
-        return f"{side_name} {reasons.get(event['reason'], 'could not act.')}"
-    if t == "confusion_self_hit":
-        return f"{side_name} is confused and hurt itself for **{event['amount']}** damage!"
-    if t == "damage":
-        suffix = {
-            "super_effective": " It's super effective!",
-            "not_very_effective": " It's not very effective...",
-            "no_effect": " It had no effect!",
-        }.get(event.get("effectiveness"), "")
-        crit = " A critical hit!" if event.get("is_crit") else ""
-        return f"{side_name} took **{event['amount']}** damage.{crit}{suffix}"
-    if t == "multi_hit_summary":
-        return f"Hit **{event['hits']}** time(s) for **{event['total_damage']}** total damage!"
-    if t == "status_applied":
-        status = event.get("status")
-        if status in (None, "none"):
-            texts = {"woke_up": "woke up!", "thawed": "thawed out!", "confusion_ended": "snapped out of confusion!"}
-            return f"{side_name} {texts.get(event.get('reason'), 'recovered!')}"
-        labels = {
-            "burn": "was burned!", "paralysis": "was paralyzed!", "poison": "was poisoned!",
-            "toxic": "was badly poisoned!", "sleep": "fell asleep!", "freeze": "was frozen solid!",
-            "confusion": "became confused!",
-        }
-        return f"{side_name} {labels.get(status, f'was afflicted with {status}!')}"
-    if t == "stat_changed":
-        direction = "rose" if event["change"] > 0 else "fell"
-        sharply = "sharply " if abs(event["change"]) >= 2 else ""
-        return f"{side_name}'s {event['stat'].replace('_', ' ').title()} {sharply}{direction}!"
-    if t == "stat_change_fizzled":
-        return f"{side_name}'s {event['stat'].replace('_', ' ').title()} won't go any further!"
-    if t in ("status_damage", "recoil"):
-        label = event.get("status", "recoil")
-        return f"{side_name} was hurt by its {label}! (-{event['amount']})"
-    if t in ("drain", "heal"):
-        return f"{side_name} restored **{event['amount']}** HP!"
-    if t == "charge_start":
-        return f"{side_name} is charging its attack!"
-    if t == "faint":
-        return f"💀 **{event['name']}** fainted!"
-    return None
-
-
-def render_battle_embed(battle_row: sqlite3.Row, battle: "be.BattleState", name_a: str, name_b: str,
-                         events: list[dict], footer_note: str = "") -> discord.Embed:
-    name_by_side = {"A": battle.side_a.active.species_name, "B": battle.side_b.active.species_name}
-    lines = [text for e in events[-BATTLE_LOG_TAIL:] if (text := format_battle_event(e, name_by_side))]
-
-    title_prefix = {"gym": "Gym Battle", "trainer": "Trainer Battle", "pvp": "Battle"}.get(battle_row["battle_type"], "Battle")
-    embed = discord.Embed(
-        title=f"{title_prefix}: {name_a} vs {name_b}",
-        description="\n".join(lines) or "The battle begins!",
-        color=discord.Color.dark_grey() if battle.status == "finished" else discord.Color.blurple(),
-    )
-
-    for side_id, name in (("A", name_a), ("B", name_b)):
-        active = battle.side(side_id).active
-        status_icon = f" {STATUS_ICONS[active.status]}" if active.status in STATUS_ICONS else ""
-        fainted_tag = " (fainted)" if active.is_fainted else ""
-        embed.add_field(
-            name=f"{name}'s {active.species_name}{status_icon}{fainted_tag}",
-            value=f"{hp_bar(active.current_hp, active.max_hp)}\n{max(0, active.current_hp)}/{active.max_hp} HP",
-            inline=True,
-        )
-
-    if battle.status == "finished":
-        winner_name = {"A": name_a, "B": name_b}.get(battle.winner_side)
-        result = f"🏆 **{winner_name} wins!**" if winner_name else "The battle ended in a draw."
-        embed.add_field(name="Result", value=result, inline=False)
-    else:
-        embed.add_field(name="Turn", value=str(battle.turn_number), inline=False)
-
-    if footer_note:
-        embed.set_footer(text=footer_note)
     return embed
 
 
@@ -947,228 +809,10 @@ class TeamView(discord.ui.View):
         return True
 
 
-# ---------- Battle views ----------
-# Two-layer pattern, same as SpawnView -> CatchPanelView above: BattleView is
-# the long-lived public message everyone (including spectators) sees, and
-# MoveSelectView/ForcedSwitchView are per-user ephemeral followups opened by
-# its button — which is what gives us hidden simultaneous move selection
-# (neither trainer can see what button the other one is looking at).
-
-class MoveSelectView(discord.ui.View):
-    def __init__(self, cog: "Pokemon", battle_id: int, side: str, user_id: int):
-        super().__init__(timeout=BATTLE_TURN_TIMEOUT_SECONDS)
-        self.cog = cog
-        self.battle_id = battle_id
-        self.side = side
-        self.user_id = user_id
-        self._build()
-
-    def _build(self):
-        battle, _ = self.cog.load_battle_state(self.battle_id)
-        active = battle.side(self.side).active
-        legal = be.legal_actions(battle, self.side)
-
-        for i, move_slot in enumerate(active.moves):
-            btn = discord.ui.Button(
-                label=f"{move_slot.move.name} ({move_slot.current_pp}/{move_slot.move.max_pp} PP)",
-                style=discord.ButtonStyle.primary,
-                disabled=(i not in legal["usable_move_indices"]),
-                row=i // 2,
-            )
-            btn.callback = self._move_callback(i)
-            self.add_item(btn)
-
-        if not active.moves or not legal["usable_move_indices"]:
-            struggle_btn = discord.ui.Button(label="Struggle (no PP left!)", style=discord.ButtonStyle.danger, row=2)
-            struggle_btn.callback = self._move_callback(None)
-            self.add_item(struggle_btn)
-
-        if legal["can_switch"]:
-            options = [
-                discord.SelectOption(label=f"Switch to {battle.side(self.side).roster[i].species_name}", value=str(i))
-                for i in legal["switchable_indices"]
-            ]
-            select = discord.ui.Select(placeholder="Or switch Pokémon instead...", options=options, row=3)
-            select.callback = self._switch_callback(select)
-            self.add_item(select)
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("This isn't your move to make!", ephemeral=True)
-            return False
-        return True
-
-    def _move_callback(self, move_index: int | None):
-        async def callback(interaction: discord.Interaction):
-            action = be.Action(kind="move", side=self.side, move_index=move_index)
-            await self.cog.submit_battle_action(interaction, self.battle_id, self.side, action)
-        return callback
-
-    def _switch_callback(self, select: discord.ui.Select):
-        async def callback(interaction: discord.Interaction):
-            action = be.Action(kind="switch", side=self.side, switch_to_index=int(select.values[0]))
-            await self.cog.submit_battle_action(interaction, self.battle_id, self.side, action)
-        return callback
-
-
-class ForcedSwitchView(discord.ui.View):
-    def __init__(self, cog: "Pokemon", battle_id: int, side: str, user_id: int):
-        super().__init__(timeout=BATTLE_TURN_TIMEOUT_SECONDS)
-        self.cog = cog
-        self.battle_id = battle_id
-        self.side = side
-        self.user_id = user_id
-        battle, _ = cog.load_battle_state(battle_id)
-        legal = be.legal_actions(battle, side)
-        options = [
-            discord.SelectOption(label=battle.side(side).roster[i].species_name, value=str(i))
-            for i in legal["switchable_indices"]
-        ]
-        select = discord.ui.Select(placeholder="Choose your next Pokémon...", options=options)
-        select.callback = self._callback(select)
-        self.add_item(select)
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("This isn't your Pokémon to send out!", ephemeral=True)
-            return False
-        return True
-
-    def _callback(self, select: discord.ui.Select):
-        async def callback(interaction: discord.Interaction):
-            target_index = int(select.values[0])
-            await interaction.response.edit_message(content="Sending out your next Pokémon...", view=None)
-            await self.cog.handle_forced_switch(self.battle_id, self.side, target_index)
-        return callback
-
-
-class BattleView(discord.ui.View):
-    """The public, spectator-visible battle message. Persistent (timeout=None)
-    since a battle can run for many turns — we simply re-attach a fresh
-    instance of this view every time we edit the message after a turn
-    resolves, so it never needs to survive in memory across a bot restart
-    (an in-progress battle is instead gracefully abandoned by the sweep, the
-    same restart-safety trade-off this cog already makes for spawns/coffers)."""
-
-    def __init__(self, cog: "Pokemon", battle_id: int):
-        super().__init__(timeout=None)
-        self.cog = cog
-        self.battle_id = battle_id
-
-    @discord.ui.button(label="Choose Move", style=discord.ButtonStyle.success, emoji="⚔️")
-    async def choose_move(self, interaction: discord.Interaction, button: discord.ui.Button):
-        battle, battle_row = self.cog.load_battle_state(self.battle_id)
-        if not battle:
-            await interaction.response.send_message("This battle no longer exists.", ephemeral=True)
-            return
-
-        if interaction.user.id == battle_row["side_a_user_id"]:
-            side = "A"
-        elif interaction.user.id == battle_row["side_b_user_id"]:
-            side = "B"
-        else:
-            await interaction.response.send_message(
-                "You're not a participant in this battle — feel free to spectate!", ephemeral=True
-            )
-            return
-
-        if battle.status == "finished":
-            await interaction.response.send_message("This battle has already ended.", ephemeral=True)
-            return
-
-        if battle.status == "awaiting_forced_switch":
-            if side not in battle.forced_switch_sides:
-                await interaction.response.send_message(
-                    "Waiting on your opponent to send out their next Pokémon...", ephemeral=True
-                )
-                return
-            view = ForcedSwitchView(self.cog, self.battle_id, side, interaction.user.id)
-            await interaction.response.send_message("Choose your next Pokémon:", view=view, ephemeral=True)
-            return
-
-        if self.cog.get_pending_action(self.battle_id, side, battle.turn_number) is not None:
-            await interaction.response.send_message("You've already locked in your move this turn!", ephemeral=True)
-            return
-
-        view = MoveSelectView(self.cog, self.battle_id, side, interaction.user.id)
-        await interaction.response.send_message("Choose your move:", view=view, ephemeral=True)
-
-
-class ChallengeView(discord.ui.View):
-    def __init__(self, cog: "Pokemon", battle_id: int, challenger_id: int, target_id: int):
-        super().__init__(timeout=BATTLE_CHALLENGE_TIMEOUT_SECONDS)
-        self.cog = cog
-        self.battle_id = battle_id
-        self.challenger_id = challenger_id
-        self.target_id = target_id
-        self.resolved = False
-        self.message: discord.Message | None = None
-
-    async def on_timeout(self):
-        if self.resolved:
-            return
-        self.resolved = True
-        self.cog.abandon_battle(self.battle_id)
-        for child in self.children:
-            child.disabled = True
-        if self.message:
-            try:
-                await self.message.edit(content="⏱️ This challenge expired.", embed=None, view=self)
-            except discord.HTTPException as e:
-                log.error(f"Failed to mark challenge as expired: {e}")
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.target_id:
-            await interaction.response.send_message("This challenge isn't for you!", ephemeral=True)
-            return False
-        return True
-
-    @discord.ui.button(label="Accept", style=discord.ButtonStyle.success, emoji="✅")
-    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.resolved = True
-        for child in self.children:
-            child.disabled = True
-
-        roster_a = self.cog.build_roster_for_player(self.challenger_id)
-        roster_b = self.cog.build_roster_for_player(self.target_id)
-        if not roster_a or not roster_b:
-            await interaction.response.edit_message(
-                content="One of you doesn't have a team set! Use `/poke team` first.", embed=None, view=self
-            )
-            self.cog.abandon_battle(self.battle_id)
-            return
-
-        self.cog.start_battle_sides(self.battle_id, roster_a, roster_b)
-        battle, battle_row = self.cog.load_battle_state(self.battle_id)
-        name_a = self.cog.display_name_for_side(battle_row, "A")
-        name_b = self.cog.display_name_for_side(battle_row, "B")
-        embed = render_battle_embed(
-            battle_row, battle, name_a, name_b, [],
-            footer_note="Both trainers: use the button below to choose your first move.",
-        )
-        view = BattleView(self.cog, self.battle_id)
-        await interaction.response.edit_message(content=None, embed=embed, view=view)
-        msg = await interaction.original_response()
-        self.cog.set_battle_message(self.battle_id, msg.id)
-
-    @discord.ui.button(label="Decline", style=discord.ButtonStyle.danger, emoji="❌")
-    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.resolved = True
-        for child in self.children:
-            child.disabled = True
-        self.cog.abandon_battle(self.battle_id)
-        await interaction.response.edit_message(
-            content=f"{interaction.user.display_name} declined the challenge.", embed=None, view=self
-        )
-
-
 class Pokemon(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.pokedex = load_pokedex()
-        self.gyms = load_gyms()
-        self.gym_order = sorted(self.gyms.keys(), key=lambda k: self.gyms[k]["order"])
-        self.trainer_classes = load_trainer_classes()
         self.ball_emojis: dict[str, discord.Emoji] = {}
         self._init_db()
         self.tasks = [
@@ -1829,69 +1473,6 @@ class Pokemon(commands.Cog):
             await self._resolve_stale_coffer(channel_id, message_id, coffer_key)
             self.untrack_coffer(message_id)
 
-        await self._sweep_battles()
-
-    async def _sweep_battles(self):
-        """Battle counterpart to the spawn/coffer sweep above. Two jobs, run
-        every 60s (and once at startup): abandon any battle that's gone idle
-        too long (BATTLE_ABANDON_SECONDS — covers a challenge nobody accepted,
-        or a battle interrupted by a bot restart, since we intentionally don't
-        try to resurrect mid-turn interactive Views across a restart, matching
-        this cog's existing spawn/coffer precedent), and auto-resolve any turn
-        whose per-turn timer (BATTLE_TURN_TIMEOUT_SECONDS) elapsed because a
-        human side didn't choose in time (auto-picks a random usable move —
-        never a forfeit)."""
-        now = datetime.now(timezone.utc)
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                "SELECT * FROM poke_battles WHERE status IN ('pending', 'active', 'awaiting_forced_switch')"
-            ).fetchall()
-
-        for row in rows:
-            if (now - datetime.fromisoformat(row["updated_at"])).total_seconds() > BATTLE_ABANDON_SECONDS:
-                self.abandon_battle(row["battle_id"])
-                await self._notify_battle_abandoned(row)
-                continue
-
-            if row["status"] != "active" or not row["turn_deadline"]:
-                continue
-            if now < datetime.fromisoformat(row["turn_deadline"]):
-                continue
-
-            battle, battle_row = self.load_battle_state(row["battle_id"])
-            if not battle or battle.status != "active":
-                continue
-            turn_number = battle.turn_number
-
-            def resolve_side(side_id: str, controller) -> "be.Action":
-                if controller == "npc":
-                    return be.pick_npc_action(battle, side_id)
-                existing = self.get_pending_action(row["battle_id"], side_id, turn_number)
-                if existing is not None:
-                    return existing
-                legal = be.legal_actions(battle, side_id)
-                if legal["usable_move_indices"]:
-                    return be.Action(kind="move", side=side_id, move_index=random.choice(legal["usable_move_indices"]))
-                return be.Action(kind="move", side=side_id, move_index=None)
-
-            action_a = resolve_side("A", battle.side_a.controller)
-            action_b = resolve_side("B", battle.side_b.controller)
-            try:
-                await self.resolve_battle_turn(row["battle_id"], action_a, action_b)
-            except Exception as e:
-                log.error(f"Auto-resolving timed-out battle turn failed (battle {row['battle_id']}): {e}", exc_info=True)
-
-    async def _notify_battle_abandoned(self, battle_row: sqlite3.Row):
-        channel = self.bot.get_channel(battle_row["channel_id"])
-        if not channel or not battle_row["message_id"]:
-            return
-        try:
-            msg = await channel.fetch_message(battle_row["message_id"])
-            await msg.edit(content="⏱️ This battle was abandoned due to inactivity.", embed=None, view=None)
-        except discord.HTTPException:
-            pass
-
     async def _resolve_stale_spawn(self, channel_id: int, message_id: int, mon: dict):
         channel = self.bot.get_channel(channel_id)
         if not channel:
@@ -2003,447 +1584,6 @@ class Pokemon(commands.Cog):
                 continue
             choices.append(app_commands.Choice(name=f"{mon['name']} (x{count})", value=mon["name"]))
         return choices[:25]
-
-    # ---------- Battle system ----------
-
-    def get_battle_pokemon_config(self, user_id: int, dex_id: int) -> tuple[list[str], str | None]:
-        """Bot-side twin of webapi.py's resolve_pokemon_config, trimmed down to
-        just (moves, ability) — the player's own web-configured loadout for a
-        species, defaulting to its first 4 known moves/first ability if never
-        configured."""
-        mon = self.pokedex.get(dex_id, {})
-        pool = mon.get("moves", [])
-        abilities = mon.get("abilities", [])
-        default_moves = [m["name"] for m in pool[:4]]
-        default_ability = abilities[0]["name"] if abilities else None
-
-        with sqlite3.connect(DB_PATH) as conn:
-            row = conn.execute(
-                "SELECT moves, ability FROM poke_pokemon_config WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
-            ).fetchone()
-        moves = json.loads(row[0]) if row and row[0] else default_moves
-        ability = row[1] if row and row[1] else default_ability
-        return moves, ability
-
-    def build_roster_for_player(self, user_id: int) -> list["be.BattlerState"] | None:
-        team = self.get_team(user_id)
-        if not team:
-            return None
-        roster = []
-        for dex_id in team:
-            mon = self.pokedex.get(dex_id)
-            if not mon:
-                continue
-            moves, ability = self.get_battle_pokemon_config(user_id, dex_id)
-            roster.append(be.build_battler_state(mon, moves, ability))
-        return roster or None
-
-    def build_roster_for_gym(self, gym_key: str) -> list["be.BattlerState"]:
-        gym = self.gyms[gym_key]
-        return [
-            be.build_battler_state(self.pokedex[entry["dex_id"]], entry["moves"], entry.get("ability"))
-            for entry in gym["roster"]
-        ]
-
-    def build_roster_for_random_trainer(self, class_key: str) -> list["be.BattlerState"]:
-        tclass = next(c for c in self.trainer_classes if c["class_key"] == class_key)
-        lo, hi = tclass["team_size"]
-        size = random.randint(lo, hi)
-        candidates = [
-            dex_id for dex_id, mon in self.pokedex.items()
-            if not mon.get("is_legendary") and not mon.get("is_mythical")
-            and any(t in tclass["preferred_types"] for t in mon.get("types", []))
-        ]
-        chosen = random.sample(candidates, min(size, len(candidates)))
-        roster = []
-        for dex_id in chosen:
-            mon = self.pokedex[dex_id]
-            pool = mon.get("moves", [])
-            move_names = [m["name"] for m in random.sample(pool, min(4, len(pool)))]
-            abilities = mon.get("abilities", [])
-            ability = random.choice(abilities)["name"] if abilities else None
-            roster.append(be.build_battler_state(mon, move_names, ability))
-        return roster
-
-    def has_active_battle(self, user_id: int) -> bool:
-        with sqlite3.connect(DB_PATH) as conn:
-            row = conn.execute(
-                "SELECT 1 FROM poke_battles WHERE status IN ('pending', 'active', 'awaiting_forced_switch') "
-                "AND (side_a_user_id = ? OR side_b_user_id = ?) LIMIT 1",
-                (user_id, user_id),
-            ).fetchone()
-        return row is not None
-
-    def create_battle(self, battle_type: str, side_a_user_id: int, side_b_user_id: int | None,
-                       side_b_npc_key: str | None, guild_id: int, channel_id: int) -> int:
-        now = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(DB_PATH) as conn:
-            cur = conn.execute(
-                "INSERT INTO poke_battles (battle_type, status, side_a_user_id, side_b_user_id, side_b_npc_key, "
-                "guild_id, channel_id, current_turn_number, created_at, updated_at) "
-                "VALUES (?, 'pending', ?, ?, ?, ?, ?, 0, ?, ?)",
-                (battle_type, side_a_user_id, side_b_user_id, side_b_npc_key, guild_id, channel_id, now, now),
-            )
-            return cur.lastrowid
-
-    def get_battle_row(self, battle_id: int) -> sqlite3.Row | None:
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row
-            return conn.execute("SELECT * FROM poke_battles WHERE battle_id = ?", (battle_id,)).fetchone()
-
-    def set_battle_message(self, battle_id: int, message_id: int):
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.execute("UPDATE poke_battles SET message_id = ? WHERE battle_id = ?", (message_id, battle_id))
-
-    def abandon_battle(self, battle_id: int):
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.execute(
-                "UPDATE poke_battles SET status = 'abandoned', updated_at = ? "
-                "WHERE battle_id = ? AND status IN ('pending', 'active', 'awaiting_forced_switch')",
-                (datetime.now(timezone.utc).isoformat(), battle_id),
-            )
-
-    def start_battle_sides(self, battle_id: int, roster_a: list["be.BattlerState"], roster_b: list["be.BattlerState"]):
-        now = datetime.now(timezone.utc).isoformat()
-        deadline = (datetime.now(timezone.utc) + timedelta(seconds=BATTLE_TURN_TIMEOUT_SECONDS)).isoformat()
-        with sqlite3.connect(DB_PATH) as conn:
-            for side_label, roster in (("A", roster_a), ("B", roster_b)):
-                for slot, b in enumerate(roster):
-                    fields = be.battler_state_to_row_fields(b)
-                    conn.execute(
-                        "INSERT INTO poke_battle_sides (battle_id, side, slot, dex_id, ability, current_hp, max_hp, "
-                        "status, status_counter, stat_stages, confusion_counter, moves, is_active, is_fainted, volatile) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (
-                            battle_id, side_label, slot, fields["dex_id"], b.ability, fields["current_hp"],
-                            fields["max_hp"], fields["status"], fields["status_counter"],
-                            json.dumps(fields["stat_stages"]), fields["confusion_counter"],
-                            json.dumps(fields["moves"]), 1 if slot == 0 else 0,
-                            1 if fields["is_fainted"] else 0, json.dumps(fields["volatile"]),
-                        ),
-                    )
-            conn.execute(
-                "UPDATE poke_battles SET status = 'active', current_turn_number = 1, turn_deadline = ?, "
-                "updated_at = ? WHERE battle_id = ?",
-                (deadline, now, battle_id),
-            )
-
-    def load_battle_state(self, battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | tuple[None, None]:
-        battle_row = self.get_battle_row(battle_id)
-        if not battle_row:
-            return None, None
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row
-            side_rows = conn.execute(
-                "SELECT * FROM poke_battle_sides WHERE battle_id = ? ORDER BY side, slot", (battle_id,)
-            ).fetchall()
-
-        roster_a, roster_b = [], []
-        active_a, active_b = 0, 0
-        for r in side_rows:
-            mon = self.pokedex.get(r["dex_id"], {})
-            row_dict = {
-                "dex_id": r["dex_id"], "current_hp": r["current_hp"], "max_hp": r["max_hp"],
-                "status": r["status"], "status_counter": r["status_counter"],
-                "stat_stages": json.loads(r["stat_stages"]), "confusion_counter": r["confusion_counter"],
-                "moves": json.loads(r["moves"]), "is_fainted": r["is_fainted"], "volatile": json.loads(r["volatile"]),
-            }
-            battler = be.battler_state_from_row(mon, row_dict, ability=r["ability"])
-            if r["side"] == "A":
-                if r["is_active"]:
-                    active_a = len(roster_a)
-                roster_a.append(battler)
-            else:
-                if r["is_active"]:
-                    active_b = len(roster_b)
-                roster_b.append(battler)
-
-        side_a = be.BattleSide(side_id="A", controller=battle_row["side_a_user_id"], roster=roster_a, active_index=active_a)
-        side_b = be.BattleSide(
-            side_id="B", controller=(battle_row["side_b_user_id"] or "npc"), roster=roster_b, active_index=active_b
-        )
-        forced = battle_row["forced_switch_side"].split(",") if battle_row["forced_switch_side"] else []
-        battle = be.BattleState(
-            battle_id=battle_id, side_a=side_a, side_b=side_b,
-            turn_number=battle_row["current_turn_number"], status=battle_row["status"],
-            winner_side=battle_row["winner_side"], forced_switch_sides=forced,
-        )
-        return battle, battle_row
-
-    def persist_battle_state(self, battle_id: int, battle: "be.BattleState"):
-        now = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(DB_PATH) as conn:
-            for side_label, side in (("A", battle.side_a), ("B", battle.side_b)):
-                for slot, b in enumerate(side.roster):
-                    fields = be.battler_state_to_row_fields(b)
-                    conn.execute(
-                        "UPDATE poke_battle_sides SET current_hp = ?, max_hp = ?, status = ?, status_counter = ?, "
-                        "stat_stages = ?, confusion_counter = ?, moves = ?, is_active = ?, is_fainted = ?, volatile = ? "
-                        "WHERE battle_id = ? AND side = ? AND slot = ?",
-                        (
-                            fields["current_hp"], fields["max_hp"], fields["status"], fields["status_counter"],
-                            json.dumps(fields["stat_stages"]), fields["confusion_counter"], json.dumps(fields["moves"]),
-                            1 if slot == side.active_index else 0, 1 if fields["is_fainted"] else 0,
-                            json.dumps(fields["volatile"]), battle_id, side_label, slot,
-                        ),
-                    )
-            deadline = (
-                (datetime.now(timezone.utc) + timedelta(seconds=BATTLE_TURN_TIMEOUT_SECONDS)).isoformat()
-                if battle.status == "active" else None
-            )
-            conn.execute(
-                "UPDATE poke_battles SET status = ?, current_turn_number = ?, forced_switch_side = ?, "
-                "winner_side = ?, turn_deadline = ?, updated_at = ?, "
-                "finished_at = CASE WHEN ? = 'finished' THEN COALESCE(finished_at, ?) ELSE finished_at END "
-                "WHERE battle_id = ?",
-                (
-                    battle.status, battle.turn_number, ",".join(battle.forced_switch_sides) or None,
-                    battle.winner_side, deadline, now, battle.status, now, battle_id,
-                ),
-            )
-
-    def append_battle_events(self, battle_id: int, turn_number: int, events: list[dict]):
-        if not events:
-            return
-        now = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(DB_PATH) as conn:
-            next_seq = conn.execute(
-                "SELECT COALESCE(MAX(seq), -1) + 1 FROM poke_battle_events WHERE battle_id = ? AND turn_number = ?",
-                (battle_id, turn_number),
-            ).fetchone()[0]
-            for i, event in enumerate(events):
-                conn.execute(
-                    "INSERT INTO poke_battle_events (battle_id, turn_number, seq, event_type, payload, created_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (battle_id, turn_number, next_seq + i, event["type"], json.dumps(event), now),
-                )
-
-    def record_pending_action(self, battle_id: int, side: str, turn_number: int, action: "be.Action"):
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO poke_battle_pending_actions "
-                "(battle_id, side, turn_number, action_kind, move_slot, switch_to_slot, submitted_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    battle_id, side, turn_number, action.kind, action.move_index, action.switch_to_index,
-                    datetime.now(timezone.utc).isoformat(),
-                ),
-            )
-
-    def get_pending_action(self, battle_id: int, side: str, turn_number: int) -> "be.Action | None":
-        with sqlite3.connect(DB_PATH) as conn:
-            row = conn.execute(
-                "SELECT action_kind, move_slot, switch_to_slot FROM poke_battle_pending_actions "
-                "WHERE battle_id = ? AND side = ? AND turn_number = ?",
-                (battle_id, side, turn_number),
-            ).fetchone()
-        if not row:
-            return None
-        return be.Action(kind=row[0], side=side, move_index=row[1], switch_to_index=row[2])
-
-    def clear_pending_actions(self, battle_id: int, turn_number: int):
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.execute(
-                "DELETE FROM poke_battle_pending_actions WHERE battle_id = ? AND turn_number = ?",
-                (battle_id, turn_number),
-            )
-
-    def get_badges(self, user_id: int) -> set[str]:
-        with sqlite3.connect(DB_PATH) as conn:
-            rows = conn.execute("SELECT gym_key FROM poke_badges WHERE user_id = ?", (user_id,)).fetchall()
-        return {r[0] for r in rows}
-
-    def award_badge(self, user_id: int, gym_key: str):
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.execute(
-                "INSERT OR IGNORE INTO poke_badges (user_id, gym_key, earned_at) VALUES (?, ?, ?)",
-                (user_id, gym_key, datetime.now(timezone.utc).isoformat()),
-            )
-
-    def next_gym_key(self, user_id: int) -> str | None:
-        earned = self.get_badges(user_id)
-        for gym_key in self.gym_order:
-            if gym_key not in earned:
-                return gym_key
-        return None
-
-    def display_name_for_side(self, battle_row: sqlite3.Row, side: str) -> str:
-        user_id = battle_row["side_a_user_id"] if side == "A" else battle_row["side_b_user_id"]
-        if user_id:
-            member = self.bot.get_user(user_id)
-            return member.display_name if member else f"Trainer {user_id}"
-        npc_key = battle_row["side_b_npc_key"]
-        if battle_row["battle_type"] == "gym":
-            return self.gyms.get(npc_key, {}).get("leader_name", "Gym Leader")
-        tclass = next((c for c in self.trainer_classes if c["class_key"] == npc_key), None)
-        return tclass["display_name"] if tclass else "Wild Trainer"
-
-    def grant_battle_rewards(self, battle_row: sqlite3.Row, battle: "be.BattleState") -> str | None:
-        """Only a human winner gets rewards — losing to a gym leader or a
-        random trainer costs nothing (no penalty), it just doesn't pay out."""
-        if battle.winner_side not in ("A", "B"):
-            return None
-        winner_user_id = battle_row["side_a_user_id"] if battle.winner_side == "A" else battle_row["side_b_user_id"]
-        if not winner_user_id:
-            return None
-
-        battle_type = battle_row["battle_type"]
-        if battle_type == "pvp":
-            self.add_xp(winner_user_id, PVP_WIN_XP)
-            self.add_item(winner_user_id, "coin", PVP_WIN_COIN)
-            summary = f"+{PVP_WIN_XP} XP, +{PVP_WIN_COIN} {COIN_EMOJI}"
-        elif battle_type == "gym":
-            gym_key = battle_row["side_b_npc_key"]
-            self.add_xp(winner_user_id, GYM_BATTLE_XP)
-            self.add_item(winner_user_id, "coin", GYM_BATTLE_COIN)
-            self.award_badge(winner_user_id, gym_key)
-            badge_name = self.gyms.get(gym_key, {}).get("badge_name", "Badge")
-            summary = f"+{GYM_BATTLE_XP} XP, +{GYM_BATTLE_COIN} {COIN_EMOJI}, and the **{badge_name}**!"
-        else:
-            tclass = next((c for c in self.trainer_classes if c["class_key"] == battle_row["side_b_npc_key"]), None)
-            rewards = TRAINER_BATTLE_REWARDS[tclass["reward_tier"] if tclass else "low"]
-            self.add_xp(winner_user_id, rewards["xp"])
-            self.add_item(winner_user_id, "coin", rewards["coin"])
-            summary = f"+{rewards['xp']} XP, +{rewards['coin']} {COIN_EMOJI}"
-
-        self.check_achievements(winner_user_id)
-        return summary
-
-    async def update_battle_message(self, battle_row: sqlite3.Row, embed: discord.Embed, battle: "be.BattleState"):
-        channel = self.bot.get_channel(battle_row["channel_id"])
-        if not channel or not battle_row["message_id"]:
-            return
-        try:
-            msg = await channel.fetch_message(battle_row["message_id"])
-        except discord.HTTPException:
-            return
-        view = BattleView(self, battle_row["battle_id"]) if battle.status in ("active", "awaiting_forced_switch") else None
-        try:
-            await msg.edit(embed=embed, view=view)
-        except discord.HTTPException as e:
-            log.error(f"Failed to update battle message: {e}")
-
-    async def update_battle_readiness_footer(self, battle_row: sqlite3.Row, ready_side: str):
-        name_a = self.display_name_for_side(battle_row, "A")
-        name_b = self.display_name_for_side(battle_row, "B")
-        ready_name = name_a if ready_side == "A" else name_b
-        waiting_name = name_b if ready_side == "A" else name_a
-        channel = self.bot.get_channel(battle_row["channel_id"])
-        if not channel or not battle_row["message_id"]:
-            return
-        try:
-            msg = await channel.fetch_message(battle_row["message_id"])
-            if msg.embeds:
-                embed = msg.embeds[0]
-                embed.set_footer(text=f"✅ {ready_name} is ready — waiting on {waiting_name}...")
-                await msg.edit(embed=embed)
-        except discord.HTTPException as e:
-            log.error(f"Failed to update battle readiness footer: {e}")
-
-    async def resolve_battle_turn(self, battle_id: int, action_a: "be.Action", action_b: "be.Action"):
-        battle, battle_row = self.load_battle_state(battle_id)
-        if not battle or battle.status != "active":
-            return
-        turn_number = battle.turn_number
-
-        result = be.resolve_turn(battle, action_a, action_b)
-        self.persist_battle_state(battle_id, battle)
-        self.append_battle_events(battle_id, turn_number, result.events)
-        self.clear_pending_actions(battle_id, turn_number)
-        all_events = list(result.events)
-
-        # Auto-resolve any forced switch on an NPC-controlled side immediately
-        # — there's no human to wait on for that side.
-        while battle.status == "awaiting_forced_switch":
-            npc_side = next(
-                (s for s in battle.forced_switch_sides if battle.side(s).controller == "npc"), None
-            )
-            if not npc_side:
-                break
-            idx = be.pick_npc_forced_switch(battle, npc_side)
-            switch_events = be.apply_forced_switch(battle, npc_side, idx)
-            self.persist_battle_state(battle_id, battle)
-            self.append_battle_events(battle_id, turn_number, switch_events)
-            all_events.extend(switch_events)
-
-        battle_row = self.get_battle_row(battle_id)
-        name_a = self.display_name_for_side(battle_row, "A")
-        name_b = self.display_name_for_side(battle_row, "B")
-
-        if battle.status == "finished":
-            footer = self.grant_battle_rewards(battle_row, battle) or "The battle has ended."
-        elif battle.status == "awaiting_forced_switch":
-            waiting_on = [name_a if s == "A" else name_b for s in battle.forced_switch_sides]
-            footer = f"{' and '.join(waiting_on)} must send out a new Pokémon!"
-        else:
-            footer = "Both trainers: use the button below to choose your next move."
-
-        embed = render_battle_embed(battle_row, battle, name_a, name_b, all_events, footer_note=footer)
-        await self.update_battle_message(battle_row, embed, battle)
-
-    async def handle_forced_switch(self, battle_id: int, side: str, team_index: int):
-        battle, battle_row = self.load_battle_state(battle_id)
-        if not battle or battle.status != "awaiting_forced_switch" or side not in battle.forced_switch_sides:
-            return
-        turn_number = battle.turn_number
-
-        events = be.apply_forced_switch(battle, side, team_index)
-        self.persist_battle_state(battle_id, battle)
-        self.append_battle_events(battle_id, turn_number, events)
-        all_events = list(events)
-
-        while battle.status == "awaiting_forced_switch":
-            npc_side = next(
-                (s for s in battle.forced_switch_sides if battle.side(s).controller == "npc"), None
-            )
-            if not npc_side:
-                break
-            idx = be.pick_npc_forced_switch(battle, npc_side)
-            npc_events = be.apply_forced_switch(battle, npc_side, idx)
-            self.persist_battle_state(battle_id, battle)
-            self.append_battle_events(battle_id, turn_number, npc_events)
-            all_events.extend(npc_events)
-
-        battle_row = self.get_battle_row(battle_id)
-        name_a = self.display_name_for_side(battle_row, "A")
-        name_b = self.display_name_for_side(battle_row, "B")
-        if battle.status == "awaiting_forced_switch":
-            waiting_on = [name_a if s == "A" else name_b for s in battle.forced_switch_sides]
-            footer = f"{' and '.join(waiting_on)} must send out a new Pokémon!"
-        else:
-            footer = "Both trainers: use the button below to choose your next move."
-        embed = render_battle_embed(battle_row, battle, name_a, name_b, all_events, footer_note=footer)
-        await self.update_battle_message(battle_row, embed, battle)
-
-    async def submit_battle_action(self, interaction: discord.Interaction, battle_id: int, side: str, action: "be.Action"):
-        battle, battle_row = self.load_battle_state(battle_id)
-        if not battle or battle.status != "active":
-            await interaction.response.edit_message(content="This battle has already ended.", view=None)
-            return
-        turn_number = battle.turn_number
-        self.record_pending_action(battle_id, side, turn_number, action)
-
-        other_side = "B" if side == "A" else "A"
-        other_controller = battle.side(other_side).controller
-
-        if other_controller == "npc":
-            other_action = be.pick_npc_action(battle, other_side)
-            await interaction.response.edit_message(content="Move locked in!", view=None)
-            action_a = action if side == "A" else other_action
-            action_b = other_action if side == "A" else action
-            await self.resolve_battle_turn(battle_id, action_a, action_b)
-            return
-
-        other_action = self.get_pending_action(battle_id, other_side, turn_number)
-        if other_action is None:
-            await interaction.response.edit_message(content="Move locked in! Waiting for your opponent...", view=None)
-            await self.update_battle_readiness_footer(battle_row, ready_side=side)
-            return
-
-        await interaction.response.edit_message(content="Move locked in!", view=None)
-        action_a = action if side == "A" else other_action
-        action_b = other_action if side == "A" else action
-        await self.resolve_battle_turn(battle_id, action_a, action_b)
 
     # ---------- Commands ----------
 
@@ -2716,6 +1856,10 @@ class Pokemon(commands.Cog):
             f"✅ Gave **{quantity}x {item.name}** to **{member.display_name}**.", ephemeral=True
         )
 
+    def _battle_link(self, battle_id: int) -> str:
+        base_url = os.getenv("WEB_BASE_URL", "http://localhost:8080")
+        return f"{base_url}/battles/{battle_id}"
+
     @poke.command(name="challenge", description="Challenge another trainer to a Pokémon battle")
     @app_commands.describe(opponent="The trainer you want to challenge")
     async def poke_challenge(self, interaction: discord.Interaction, opponent: discord.Member):
@@ -2732,35 +1876,34 @@ class Pokemon(commands.Cog):
                 f"{opponent.display_name} hasn't started their Pokémon journey yet.", ephemeral=True
             )
             return
-        if self.has_active_battle(interaction.user.id):
+        if battle_store.has_active_battle(interaction.user.id):
             await interaction.response.send_message("You're already in a battle!", ephemeral=True)
             return
-        if self.has_active_battle(opponent.id):
+        if battle_store.has_active_battle(opponent.id):
             await interaction.response.send_message(f"{opponent.display_name} is already in a battle!", ephemeral=True)
             return
-        if not self.get_team(interaction.user.id):
+        if not battle_store.get_team(interaction.user.id):
             await interaction.response.send_message(
-                "You need to set your team first! Use `/poke team`.", ephemeral=True
+                "You need to set your team first! Use `/poke team` or the Team page on the web app.", ephemeral=True
             )
             return
-        if not self.get_team(opponent.id):
+        if not battle_store.get_team(opponent.id):
             await interaction.response.send_message(f"{opponent.display_name} hasn't set a team yet.", ephemeral=True)
             return
 
-        battle_id = self.create_battle(
+        battle_id = battle_store.create_battle(
             "pvp", interaction.user.id, opponent.id, None, interaction.guild_id, interaction.channel_id
         )
-        view = ChallengeView(self, battle_id, interaction.user.id, opponent.id)
+        link = self._battle_link(battle_id)
         embed = discord.Embed(
             title="Battle Challenge!",
             description=(
-                f"{interaction.user.mention} has challenged {opponent.mention} to a Pokémon battle!\n"
-                f"Both trainers' current `/poke team` will be used."
+                f"{interaction.user.mention} has challenged {opponent.mention} to a Pokémon battle!\n\n"
+                f"**[Open the battle]({link})** to accept or decline, then play it out live on the web."
             ),
             color=discord.Color.orange(),
         )
-        await interaction.response.send_message(content=opponent.mention, embed=embed, view=view)
-        view.message = await interaction.original_response()
+        await interaction.response.send_message(content=opponent.mention, embed=embed)
 
     @poke.command(name="gyms", description="See the 8 Hoenn Gym Leaders and your badge progress")
     async def poke_gyms(self, interaction: discord.Interaction):
@@ -2770,11 +1913,11 @@ class Pokemon(commands.Cog):
             )
             return
 
-        earned = self.get_badges(interaction.user.id)
-        next_key = self.next_gym_key(interaction.user.id)
+        earned = battle_store.get_badges(interaction.user.id)
+        next_key = battle_store.next_gym_key(interaction.user.id)
         lines = []
-        for gym_key in self.gym_order:
-            gym = self.gyms[gym_key]
+        for gym_key in battle_store.GYM_ORDER:
+            gym = battle_store.GYMS[gym_key]
             mark = "🏅" if gym_key in earned else ("⚔️" if gym_key == next_key else "🔒")
             lines.append(
                 f"{mark} **{gym['leader_name']}** ({gym['type_theme'].title()}-type) "
@@ -2793,39 +1936,36 @@ class Pokemon(commands.Cog):
                 "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
             )
             return
-        if self.has_active_battle(interaction.user.id):
+        if battle_store.has_active_battle(interaction.user.id):
             await interaction.response.send_message("You're already in a battle!", ephemeral=True)
             return
-        roster_a = self.build_roster_for_player(interaction.user.id)
+        roster_a = battle_store.build_roster_for_player(interaction.user.id)
         if not roster_a:
             await interaction.response.send_message(
-                "You need to set your team first! Use `/poke team`.", ephemeral=True
+                "You need to set your team first! Use `/poke team` or the Team page on the web app.", ephemeral=True
             )
             return
-        gym_key = self.next_gym_key(interaction.user.id)
+        gym_key = battle_store.next_gym_key(interaction.user.id)
         if not gym_key:
             await interaction.response.send_message("You've already earned all 8 badges! 🏆", ephemeral=True)
             return
 
-        gym = self.gyms[gym_key]
-        roster_b = self.build_roster_for_gym(gym_key)
-        battle_id = self.create_battle(
+        gym = battle_store.GYMS[gym_key]
+        roster_b = battle_store.build_roster_for_gym(gym_key)
+        battle_id = battle_store.create_battle(
             "gym", interaction.user.id, None, gym_key, interaction.guild_id, interaction.channel_id
         )
-        self.start_battle_sides(battle_id, roster_a, roster_b)
-        battle, battle_row = self.load_battle_state(battle_id)
-        name_a, name_b = interaction.user.display_name, gym["leader_name"]
-        embed = render_battle_embed(
-            battle_row, battle, name_a, name_b, [],
-            footer_note=f"{name_a}: use the button below to choose your first move.",
+        battle_store.start_battle_sides(battle_id, roster_a, roster_b)
+        link = self._battle_link(battle_id)
+        embed = discord.Embed(
+            title=f"Gym Battle: {gym['leader_name']}",
+            description=(
+                f"{interaction.user.mention} is challenging Gym Leader **{gym['leader_name']}** "
+                f"({gym['type_theme'].title()}-type)!\n\n**[Open the battle]({link})** to play it out live."
+            ),
+            color=discord.Color.gold(),
         )
-        await interaction.response.send_message(
-            content=f"{interaction.user.mention} is challenging Gym Leader **{gym['leader_name']}** "
-                    f"({gym['type_theme'].title()}-type)!",
-            embed=embed, view=BattleView(self, battle_id),
-        )
-        msg = await interaction.original_response()
-        self.set_battle_message(battle_id, msg.id)
+        await interaction.response.send_message(embed=embed)
 
     @poke.command(name="trainer", description="Battle a random trainer to earn XP and coins")
     async def poke_trainer(self, interaction: discord.Interaction):
@@ -2834,34 +1974,32 @@ class Pokemon(commands.Cog):
                 "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
             )
             return
-        if self.has_active_battle(interaction.user.id):
+        if battle_store.has_active_battle(interaction.user.id):
             await interaction.response.send_message("You're already in a battle!", ephemeral=True)
             return
-        roster_a = self.build_roster_for_player(interaction.user.id)
+        roster_a = battle_store.build_roster_for_player(interaction.user.id)
         if not roster_a:
             await interaction.response.send_message(
-                "You need to set your team first! Use `/poke team`.", ephemeral=True
+                "You need to set your team first! Use `/poke team` or the Team page on the web app.", ephemeral=True
             )
             return
 
-        tclass = random.choice(self.trainer_classes)
-        roster_b = self.build_roster_for_random_trainer(tclass["class_key"])
-        battle_id = self.create_battle(
+        tclass = random.choice(battle_store.TRAINER_CLASSES)
+        roster_b = battle_store.build_roster_for_random_trainer(tclass["class_key"])
+        battle_id = battle_store.create_battle(
             "trainer", interaction.user.id, None, tclass["class_key"], interaction.guild_id, interaction.channel_id
         )
-        self.start_battle_sides(battle_id, roster_a, roster_b)
-        battle, battle_row = self.load_battle_state(battle_id)
-        name_a, name_b = interaction.user.display_name, tclass["display_name"]
-        embed = render_battle_embed(
-            battle_row, battle, name_a, name_b, [],
-            footer_note=f"{name_a}: use the button below to choose your first move.",
+        battle_store.start_battle_sides(battle_id, roster_a, roster_b)
+        link = self._battle_link(battle_id)
+        embed = discord.Embed(
+            title=f"Trainer Battle: {tclass['display_name']}",
+            description=(
+                f"{interaction.user.mention} is battling a **{tclass['display_name']}**!\n\n"
+                f"**[Open the battle]({link})** to play it out live."
+            ),
+            color=discord.Color.blue(),
         )
-        await interaction.response.send_message(
-            content=f"{interaction.user.mention} is battling a **{tclass['display_name']}**!",
-            embed=embed, view=BattleView(self, battle_id),
-        )
-        msg = await interaction.original_response()
-        self.set_battle_message(battle_id, msg.id)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot):

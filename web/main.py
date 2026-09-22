@@ -8,12 +8,14 @@ Run with: uvicorn web.main:app --host 0.0.0.0 --port 8080
 
 CD test marker: deploy-web.yml pipeline
 """
+import asyncio
 import os
 import json
 import logging
 
 import httpx
-from fastapi import FastAPI, Request
+import websockets
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -22,6 +24,7 @@ log = logging.getLogger("web")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+API_WS_BASE_URL = API_BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() == "true"
 SESSION_COOKIE = "session"
 SESSION_MAX_AGE = 7 * 24 * 60 * 60  # 7 days, matches the API's JWT expiry
@@ -427,3 +430,105 @@ async def proxy_get_gym(request: Request, gym_key: str):
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     status, data = await api_get(session, f"/api/gyms/{gym_key}")
     return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/battles/{battle_id}/accept")
+async def proxy_accept_battle(request: Request, battle_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/battles/{battle_id}/accept", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/battles/{battle_id}/decline")
+async def proxy_decline_battle(request: Request, battle_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/battles/{battle_id}/decline", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/battles/{battle_id}/action")
+async def proxy_submit_battle_action(request: Request, battle_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, f"/api/battles/{battle_id}/action", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/battles/{battle_id}/forced-switch")
+async def proxy_submit_forced_switch(request: Request, battle_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, f"/api/battles/{battle_id}/forced-switch", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/battles/{battle_id}/forfeit")
+async def proxy_forfeit_battle(request: Request, battle_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/battles/{battle_id}/forfeit", {})
+    return JSONResponse(data, status_code=status)
+
+
+# ---------- WebSocket relay ----------
+# The browser only ever talks to this same-origin app (auth via its own
+# httponly session cookie, exactly like every HTTP route above) — this proxy
+# is what actually holds the second, server-to-server WebSocket connection to
+# the internal API using that session's token, relaying pushes back down.
+# If the reverse proxy in front of either service doesn't yet pass WebSocket
+# upgrades through, this connection simply fails to open and battle_room.js
+# falls back to polling — nothing breaks, it just isn't instant until that's
+# configured (see deploy/README.md).
+
+@app.websocket("/ws/battles/{battle_id}")
+async def battle_websocket_relay(websocket: WebSocket, battle_id: int):
+    session = websocket.cookies.get(SESSION_COOKIE)
+    if not session:
+        await websocket.close(code=4401)
+        return
+
+    await websocket.accept()
+    upstream_url = f"{API_WS_BASE_URL}/ws/battles/{battle_id}?token={session}"
+
+    try:
+        async with websockets.connect(upstream_url, open_timeout=10) as upstream:
+            async def pump_upstream_to_client():
+                async for message in upstream:
+                    await websocket.send_text(message)
+
+            async def pump_client_to_upstream():
+                # The client never sends real actions over this socket (those
+                # go through the regular POST proxy endpoints above) — this
+                # just keeps the receive loop alive so we notice a disconnect.
+                while True:
+                    await websocket.receive_text()
+
+            pump_task = asyncio.ensure_future(pump_upstream_to_client())
+            recv_task = asyncio.ensure_future(pump_client_to_upstream())
+            try:
+                done, pending = await asyncio.wait(
+                    {pump_task, recv_task}, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in pending:
+                    task.cancel()
+            finally:
+                pump_task.cancel()
+                recv_task.cancel()
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        log.warning(f"Battle WebSocket relay closed early for battle {battle_id}: {e}")
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass

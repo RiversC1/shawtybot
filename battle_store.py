@@ -1,0 +1,678 @@
+"""
+Shared battle DB/orchestration layer — pure Python + sqlite3, zero discord.py
+and zero FastAPI imports, so both the bot (cogs/pokemon.py, which only ever
+*creates* battles now) and the internal API (webapi.py, which is where all
+battle actions are actually submitted and resolved from the web battle UI)
+can import the exact same code instead of maintaining two copies.
+
+Split from battle_engine.py (pure combat math, no I/O at all) — this module
+is the glue: SQLite persistence, roster-building from a trainer's team/web
+loadout or from static gym/trainer data, reward granting, and the turn/
+forced-switch/forfeit orchestration around battle_engine's resolve_turn.
+
+Player-facing display names are resolved purely from poke_trainers.username
+(populated whenever someone visits the web app) rather than a live Discord
+bot object — by the time a human is actually submitting battle actions, they
+are necessarily logged into the web app, so this is always available for
+real participants.
+"""
+import json
+import os
+import random
+import sqlite3
+from datetime import datetime, timedelta, timezone
+
+import battle_engine as be
+
+DB_PATH = "pokemon.db"
+DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "pokemon.json")
+GYMS_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "gyms.json")
+TRAINER_CLASSES_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "trainer_classes.json")
+
+with open(DATA_PATH, encoding="utf-8") as f:
+    POKEDEX: dict[int, dict] = {p["id"]: p for p in json.load(f)}
+
+with open(GYMS_DATA_PATH, encoding="utf-8") as f:
+    GYMS: dict[str, dict] = {g["gym_key"]: g for g in json.load(f)}
+GYM_ORDER: list[str] = sorted(GYMS.keys(), key=lambda k: GYMS[k]["order"])
+
+with open(TRAINER_CLASSES_DATA_PATH, encoding="utf-8") as f:
+    TRAINER_CLASSES: list[dict] = json.load(f)
+TRAINER_CLASS_BY_KEY: dict[str, dict] = {c["class_key"]: c for c in TRAINER_CLASSES}
+
+# Reuses the existing trainer XP/coin systems for rewards — no new
+# per-Pokémon stat-growth mechanic. "Getting stronger" means a stronger
+# account (XP/coins/badges/moveset choices), not stat growth on any mon.
+TRAINER_BATTLE_REWARDS = {
+    "low": {"xp": 15, "coin": 20},
+    "medium": {"xp": 30, "coin": 40},
+    "high": {"xp": 55, "coin": 80},
+}
+GYM_BATTLE_XP = 100
+GYM_BATTLE_COIN = 250
+PVP_WIN_XP = 25
+PVP_WIN_COIN = 30
+
+BATTLE_TURN_TIMEOUT_SECONDS = 90
+BATTLE_PENDING_TIMEOUT_SECONDS = 5 * 60   # unanswered PvP challenge
+BATTLE_ABANDON_SECONDS = 30 * 60          # idle active/awaiting-switch battle
+
+
+def db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+# ---------- Trainer/team helpers ----------
+
+def get_team(user_id: int) -> list[int]:
+    with db() as conn:
+        rows = conn.execute("SELECT dex_id FROM poke_team WHERE user_id = ? ORDER BY slot", (user_id,)).fetchall()
+    return [r["dex_id"] for r in rows]
+
+
+def get_battle_pokemon_config(user_id: int, dex_id: int) -> tuple[list[str], str | None]:
+    """Mirrors webapi.py's resolve_pokemon_config, trimmed to (moves, ability)."""
+    mon = POKEDEX.get(dex_id, {})
+    pool = mon.get("moves", [])
+    abilities = mon.get("abilities", [])
+    default_moves = [m["name"] for m in pool[:4]]
+    default_ability = abilities[0]["name"] if abilities else None
+
+    with db() as conn:
+        row = conn.execute(
+            "SELECT moves, ability FROM poke_pokemon_config WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+        ).fetchone()
+    moves = json.loads(row["moves"]) if row and row["moves"] else default_moves
+    ability = row["ability"] if row and row["ability"] else default_ability
+    return moves, ability
+
+
+def trainer_display_name(conn: sqlite3.Connection, user_id: int | None) -> str:
+    if not user_id:
+        return "Trainer"
+    row = conn.execute("SELECT username FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
+    return row["username"] if row and row["username"] else "Trainer"
+
+
+# ---------- Roster building ----------
+
+def build_roster_for_player(user_id: int) -> list["be.BattlerState"] | None:
+    team = get_team(user_id)
+    if not team:
+        return None
+    roster = []
+    for dex_id in team:
+        mon = POKEDEX.get(dex_id)
+        if not mon:
+            continue
+        moves, ability = get_battle_pokemon_config(user_id, dex_id)
+        roster.append(be.build_battler_state(mon, moves, ability))
+    return roster or None
+
+
+def build_roster_for_gym(gym_key: str) -> list["be.BattlerState"]:
+    gym = GYMS[gym_key]
+    return [
+        be.build_battler_state(POKEDEX[entry["dex_id"]], entry["moves"], entry.get("ability"))
+        for entry in gym["roster"]
+    ]
+
+
+def build_roster_for_random_trainer(class_key: str) -> list["be.BattlerState"]:
+    tclass = TRAINER_CLASS_BY_KEY[class_key]
+    lo, hi = tclass["team_size"]
+    size = random.randint(lo, hi)
+    candidates = [
+        dex_id for dex_id, mon in POKEDEX.items()
+        if not mon.get("is_legendary") and not mon.get("is_mythical")
+        and any(t in tclass["preferred_types"] for t in mon.get("types", []))
+    ]
+    chosen = random.sample(candidates, min(size, len(candidates)))
+    roster = []
+    for dex_id in chosen:
+        mon = POKEDEX[dex_id]
+        pool = mon.get("moves", [])
+        move_names = [m["name"] for m in random.sample(pool, min(4, len(pool)))]
+        abilities = mon.get("abilities", [])
+        ability = random.choice(abilities)["name"] if abilities else None
+        roster.append(be.build_battler_state(mon, move_names, ability))
+    return roster
+
+
+# ---------- Battle session CRUD ----------
+
+def has_active_battle(user_id: int) -> bool:
+    with db() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM poke_battles WHERE status IN ('pending', 'active', 'awaiting_forced_switch') "
+            "AND (side_a_user_id = ? OR side_b_user_id = ?) LIMIT 1",
+            (user_id, user_id),
+        ).fetchone()
+    return row is not None
+
+
+def create_battle(battle_type: str, side_a_user_id: int, side_b_user_id: int | None,
+                   side_b_npc_key: str | None, guild_id: int | None, channel_id: int | None) -> int:
+    now = datetime.now(timezone.utc).isoformat()
+    with db() as conn:
+        cur = conn.execute(
+            "INSERT INTO poke_battles (battle_type, status, side_a_user_id, side_b_user_id, side_b_npc_key, "
+            "guild_id, channel_id, current_turn_number, created_at, updated_at) "
+            "VALUES (?, 'pending', ?, ?, ?, ?, ?, 0, ?, ?)",
+            (battle_type, side_a_user_id, side_b_user_id, side_b_npc_key, guild_id, channel_id, now, now),
+        )
+        return cur.lastrowid
+
+
+def get_battle_row(battle_id: int) -> sqlite3.Row | None:
+    with db() as conn:
+        return conn.execute("SELECT * FROM poke_battles WHERE battle_id = ?", (battle_id,)).fetchone()
+
+
+def touch_battle(battle_id: int):
+    with db() as conn:
+        conn.execute(
+            "UPDATE poke_battles SET updated_at = ? WHERE battle_id = ?",
+            (datetime.now(timezone.utc).isoformat(), battle_id),
+        )
+
+
+def abandon_battle(battle_id: int):
+    with db() as conn:
+        conn.execute(
+            "UPDATE poke_battles SET status = 'abandoned', updated_at = ? "
+            "WHERE battle_id = ? AND status IN ('pending', 'active', 'awaiting_forced_switch')",
+            (datetime.now(timezone.utc).isoformat(), battle_id),
+        )
+
+
+def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster_b: list["be.BattlerState"]):
+    now = datetime.now(timezone.utc).isoformat()
+    deadline = (datetime.now(timezone.utc) + timedelta(seconds=BATTLE_TURN_TIMEOUT_SECONDS)).isoformat()
+    with db() as conn:
+        for side_label, roster in (("A", roster_a), ("B", roster_b)):
+            for slot, b in enumerate(roster):
+                fields = be.battler_state_to_row_fields(b)
+                conn.execute(
+                    "INSERT INTO poke_battle_sides (battle_id, side, slot, dex_id, ability, current_hp, max_hp, "
+                    "status, status_counter, stat_stages, confusion_counter, moves, is_active, is_fainted, volatile) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        battle_id, side_label, slot, fields["dex_id"], b.ability, fields["current_hp"],
+                        fields["max_hp"], fields["status"], fields["status_counter"],
+                        json.dumps(fields["stat_stages"]), fields["confusion_counter"],
+                        json.dumps(fields["moves"]), 1 if slot == 0 else 0,
+                        1 if fields["is_fainted"] else 0, json.dumps(fields["volatile"]),
+                    ),
+                )
+        conn.execute(
+            "UPDATE poke_battles SET status = 'active', current_turn_number = 1, turn_deadline = ?, "
+            "updated_at = ? WHERE battle_id = ?",
+            (deadline, now, battle_id),
+        )
+
+
+def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | tuple[None, None]:
+    battle_row = get_battle_row(battle_id)
+    if not battle_row:
+        return None, None
+    with db() as conn:
+        side_rows = conn.execute(
+            "SELECT * FROM poke_battle_sides WHERE battle_id = ? ORDER BY side, slot", (battle_id,)
+        ).fetchall()
+
+    roster_a, roster_b = [], []
+    active_a, active_b = 0, 0
+    for r in side_rows:
+        mon = POKEDEX.get(r["dex_id"], {})
+        row_dict = {
+            "dex_id": r["dex_id"], "current_hp": r["current_hp"], "max_hp": r["max_hp"],
+            "status": r["status"], "status_counter": r["status_counter"],
+            "stat_stages": json.loads(r["stat_stages"]), "confusion_counter": r["confusion_counter"],
+            "moves": json.loads(r["moves"]), "is_fainted": r["is_fainted"], "volatile": json.loads(r["volatile"]),
+        }
+        battler = be.battler_state_from_row(mon, row_dict, ability=r["ability"])
+        if r["side"] == "A":
+            if r["is_active"]:
+                active_a = len(roster_a)
+            roster_a.append(battler)
+        else:
+            if r["is_active"]:
+                active_b = len(roster_b)
+            roster_b.append(battler)
+
+    side_a = be.BattleSide(side_id="A", controller=battle_row["side_a_user_id"], roster=roster_a, active_index=active_a)
+    side_b = be.BattleSide(
+        side_id="B", controller=(battle_row["side_b_user_id"] or "npc"), roster=roster_b, active_index=active_b
+    )
+    forced = battle_row["forced_switch_side"].split(",") if battle_row["forced_switch_side"] else []
+    battle = be.BattleState(
+        battle_id=battle_id, side_a=side_a, side_b=side_b,
+        turn_number=battle_row["current_turn_number"], status=battle_row["status"],
+        winner_side=battle_row["winner_side"], forced_switch_sides=forced,
+    )
+    return battle, battle_row
+
+
+def persist_battle_state(battle_id: int, battle: "be.BattleState"):
+    now = datetime.now(timezone.utc).isoformat()
+    with db() as conn:
+        for side_label, side in (("A", battle.side_a), ("B", battle.side_b)):
+            for slot, b in enumerate(side.roster):
+                fields = be.battler_state_to_row_fields(b)
+                conn.execute(
+                    "UPDATE poke_battle_sides SET current_hp = ?, max_hp = ?, status = ?, status_counter = ?, "
+                    "stat_stages = ?, confusion_counter = ?, moves = ?, is_active = ?, is_fainted = ?, volatile = ? "
+                    "WHERE battle_id = ? AND side = ? AND slot = ?",
+                    (
+                        fields["current_hp"], fields["max_hp"], fields["status"], fields["status_counter"],
+                        json.dumps(fields["stat_stages"]), fields["confusion_counter"], json.dumps(fields["moves"]),
+                        1 if slot == side.active_index else 0, 1 if fields["is_fainted"] else 0,
+                        json.dumps(fields["volatile"]), battle_id, side_label, slot,
+                    ),
+                )
+        deadline = (
+            (datetime.now(timezone.utc) + timedelta(seconds=BATTLE_TURN_TIMEOUT_SECONDS)).isoformat()
+            if battle.status == "active" else None
+        )
+        conn.execute(
+            "UPDATE poke_battles SET status = ?, current_turn_number = ?, forced_switch_side = ?, "
+            "winner_side = ?, turn_deadline = ?, updated_at = ?, "
+            "finished_at = CASE WHEN ? = 'finished' THEN COALESCE(finished_at, ?) ELSE finished_at END "
+            "WHERE battle_id = ?",
+            (
+                battle.status, battle.turn_number, ",".join(battle.forced_switch_sides) or None,
+                battle.winner_side, deadline, now, battle.status, now, battle_id,
+            ),
+        )
+
+
+def append_battle_events(battle_id: int, turn_number: int, events: list[dict]):
+    if not events:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    with db() as conn:
+        next_seq = conn.execute(
+            "SELECT COALESCE(MAX(seq), -1) + 1 FROM poke_battle_events WHERE battle_id = ? AND turn_number = ?",
+            (battle_id, turn_number),
+        ).fetchone()[0]
+        for i, event in enumerate(events):
+            conn.execute(
+                "INSERT INTO poke_battle_events (battle_id, turn_number, seq, event_type, payload, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (battle_id, turn_number, next_seq + i, event["type"], json.dumps(event), now),
+            )
+
+
+def record_pending_action(battle_id: int, side: str, turn_number: int, action: "be.Action"):
+    with db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO poke_battle_pending_actions "
+            "(battle_id, side, turn_number, action_kind, move_slot, switch_to_slot, submitted_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                battle_id, side, turn_number, action.kind, action.move_index, action.switch_to_index,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+
+
+def get_pending_action(battle_id: int, side: str, turn_number: int) -> "be.Action | None":
+    with db() as conn:
+        row = conn.execute(
+            "SELECT action_kind, move_slot, switch_to_slot FROM poke_battle_pending_actions "
+            "WHERE battle_id = ? AND side = ? AND turn_number = ?",
+            (battle_id, side, turn_number),
+        ).fetchone()
+    if not row:
+        return None
+    return be.Action(kind=row["action_kind"], side=side, move_index=row["move_slot"], switch_to_index=row["switch_to_slot"])
+
+
+def clear_pending_actions(battle_id: int, turn_number: int):
+    with db() as conn:
+        conn.execute(
+            "DELETE FROM poke_battle_pending_actions WHERE battle_id = ? AND turn_number = ?",
+            (battle_id, turn_number),
+        )
+
+
+def get_badges(user_id: int) -> set[str]:
+    with db() as conn:
+        rows = conn.execute("SELECT gym_key FROM poke_badges WHERE user_id = ?", (user_id,)).fetchall()
+    return {r["gym_key"] for r in rows}
+
+
+def award_badge(user_id: int, gym_key: str):
+    with db() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO poke_badges (user_id, gym_key, earned_at) VALUES (?, ?, ?)",
+            (user_id, gym_key, datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def next_gym_key(user_id: int) -> str | None:
+    earned = get_badges(user_id)
+    for gym_key in GYM_ORDER:
+        if gym_key not in earned:
+            return gym_key
+    return None
+
+
+def add_xp_and_coins(user_id: int, xp: int, coin: int):
+    """Mirrors cogs/pokemon.py's add_xp/add_item so a win grants the exact
+    same account progression regardless of which process resolved the
+    winning turn (the bot for creation-time bookkeeping, or the API for the
+    actual turn that ended the battle)."""
+    with db() as conn:
+        for item, delta in (("xp", xp), ("coin", coin)):
+            conn.execute(
+                "INSERT INTO poke_items (user_id, item, qty) VALUES (?, ?, MAX(?, 0)) "
+                "ON CONFLICT(user_id, item) DO UPDATE SET qty = MAX(qty + ?, 0)",
+                (user_id, item, delta, delta),
+            )
+
+
+def display_name_for_side(battle_row: sqlite3.Row, side: str) -> str:
+    user_id = battle_row["side_a_user_id"] if side == "A" else battle_row["side_b_user_id"]
+    if user_id:
+        with db() as conn:
+            return trainer_display_name(conn, user_id)
+    npc_key = battle_row["side_b_npc_key"]
+    if battle_row["battle_type"] == "gym":
+        return GYMS.get(npc_key, {}).get("leader_name", "Gym Leader")
+    tclass = TRAINER_CLASS_BY_KEY.get(npc_key)
+    return tclass["display_name"] if tclass else "Wild Trainer"
+
+
+def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> str | None:
+    """Only a human winner gets rewards; losing costs nothing."""
+    if battle.winner_side not in ("A", "B"):
+        return None
+    winner_user_id = battle_row["side_a_user_id"] if battle.winner_side == "A" else battle_row["side_b_user_id"]
+    if not winner_user_id:
+        return None
+
+    battle_type = battle_row["battle_type"]
+    if battle_type == "pvp":
+        add_xp_and_coins(winner_user_id, PVP_WIN_XP, PVP_WIN_COIN)
+        summary = f"+{PVP_WIN_XP} XP, +{PVP_WIN_COIN} coins"
+    elif battle_type == "gym":
+        gym_key = battle_row["side_b_npc_key"]
+        add_xp_and_coins(winner_user_id, GYM_BATTLE_XP, GYM_BATTLE_COIN)
+        award_badge(winner_user_id, gym_key)
+        badge_name = GYMS.get(gym_key, {}).get("badge_name", "Badge")
+        summary = f"+{GYM_BATTLE_XP} XP, +{GYM_BATTLE_COIN} coins, and the {badge_name}!"
+    else:
+        tclass = TRAINER_CLASS_BY_KEY.get(battle_row["side_b_npc_key"])
+        rewards = TRAINER_BATTLE_REWARDS[tclass["reward_tier"] if tclass else "low"]
+        add_xp_and_coins(winner_user_id, rewards["xp"], rewards["coin"])
+        summary = f"+{rewards['xp']} XP, +{rewards['coin']} coins"
+
+    return summary
+
+
+# ---------- Turn / switch / forfeit orchestration ----------
+
+def resolve_battle_turn(battle_id: int, action_a: "be.Action", action_b: "be.Action"):
+    """Resolves one turn, auto-cascading any NPC-side forced switch. Returns
+    (battle, battle_row, all_events, reward_summary_or_None)."""
+    battle, battle_row = load_battle_state(battle_id)
+    if not battle or battle.status != "active":
+        return battle, battle_row, [], None
+    turn_number = battle.turn_number
+
+    result = be.resolve_turn(battle, action_a, action_b)
+    persist_battle_state(battle_id, battle)
+    append_battle_events(battle_id, turn_number, result.events)
+    clear_pending_actions(battle_id, turn_number)
+    all_events = list(result.events)
+
+    while battle.status == "awaiting_forced_switch":
+        npc_side = next((s for s in battle.forced_switch_sides if battle.side(s).controller == "npc"), None)
+        if not npc_side:
+            break
+        idx = be.pick_npc_forced_switch(battle, npc_side)
+        switch_events = be.apply_forced_switch(battle, npc_side, idx)
+        persist_battle_state(battle_id, battle)
+        append_battle_events(battle_id, turn_number, switch_events)
+        all_events.extend(switch_events)
+
+    battle_row = get_battle_row(battle_id)
+    reward_summary = grant_battle_rewards(battle_row, battle) if battle.status == "finished" else None
+    return battle, battle_row, all_events, reward_summary
+
+
+def handle_forced_switch(battle_id: int, side: str, team_index: int):
+    """Returns (battle, battle_row, all_events)."""
+    battle, battle_row = load_battle_state(battle_id)
+    if not battle or battle.status != "awaiting_forced_switch" or side not in battle.forced_switch_sides:
+        return battle, battle_row, []
+    turn_number = battle.turn_number
+
+    events = be.apply_forced_switch(battle, side, team_index)
+    persist_battle_state(battle_id, battle)
+    append_battle_events(battle_id, turn_number, events)
+    all_events = list(events)
+
+    while battle.status == "awaiting_forced_switch":
+        npc_side = next((s for s in battle.forced_switch_sides if battle.side(s).controller == "npc"), None)
+        if not npc_side:
+            break
+        idx = be.pick_npc_forced_switch(battle, npc_side)
+        npc_events = be.apply_forced_switch(battle, npc_side, idx)
+        persist_battle_state(battle_id, battle)
+        append_battle_events(battle_id, turn_number, npc_events)
+        all_events.extend(npc_events)
+
+    battle_row = get_battle_row(battle_id)
+    return battle, battle_row, all_events
+
+
+def apply_forfeit(battle_id: int, forfeiting_side: str):
+    """Ends the battle immediately; the other side wins and is rewarded
+    normally. Returns (battle, battle_row, reward_summary_or_None)."""
+    battle, battle_row = load_battle_state(battle_id)
+    if not battle or battle.status not in ("active", "awaiting_forced_switch"):
+        return battle, battle_row, None
+    winner_side = "B" if forfeiting_side == "A" else "A"
+    battle.status = "finished"
+    battle.winner_side = winner_side
+    battle.forced_switch_sides = []
+    persist_battle_state(battle_id, battle)
+    append_battle_events(battle_id, battle.turn_number, [
+        {"type": "battle_end", "winner_side": winner_side, "reason": "forfeit"}
+    ])
+    battle_row = get_battle_row(battle_id)
+    reward_summary = grant_battle_rewards(battle_row, battle)
+    return battle, battle_row, reward_summary
+
+
+def accept_challenge(battle_id: int):
+    """Returns (ok, battle, battle_row, error_message)."""
+    battle_row = get_battle_row(battle_id)
+    if not battle_row or battle_row["status"] != "pending":
+        return False, None, battle_row, "This challenge is no longer available."
+    roster_a = build_roster_for_player(battle_row["side_a_user_id"])
+    roster_b = build_roster_for_player(battle_row["side_b_user_id"])
+    if not roster_a or not roster_b:
+        abandon_battle(battle_id)
+        return False, None, battle_row, "One of you doesn't have a team set (use the Team page first)."
+    start_battle_sides(battle_id, roster_a, roster_b)
+    battle, battle_row = load_battle_state(battle_id)
+    return True, battle, battle_row, None
+
+
+def decline_challenge(battle_id: int):
+    abandon_battle(battle_id)
+
+
+# ---------- Viewer-facing legal-action info ----------
+
+def get_viewer_info(battle: "be.BattleState", battle_row: sqlite3.Row, user_id: int | None) -> dict:
+    """What the requesting user is allowed to do right now, if anything —
+    the single source of truth the web battle UI renders its action panel
+    from."""
+    side = None
+    if user_id and battle_row["side_a_user_id"] == user_id:
+        side = "A"
+    elif user_id and battle_row["side_b_user_id"] == user_id:
+        side = "B"
+
+    info = {
+        "side": side,
+        "is_pending_target": side == "B" and battle_row["status"] == "pending",
+        "can_act": False,
+        "usable_move_indices": [],
+        "can_switch": False,
+        "switchable_indices": [],
+        "needs_forced_switch": False,
+        "already_locked_in": False,
+        "waiting_on_opponent": False,
+    }
+    if not side or battle.status not in ("active", "awaiting_forced_switch"):
+        return info
+
+    if battle.status == "awaiting_forced_switch":
+        if side in battle.forced_switch_sides:
+            legal = be.legal_actions(battle, side)
+            info["needs_forced_switch"] = True
+            info["switchable_indices"] = legal["switchable_indices"]
+        return info
+
+    pending = get_pending_action(battle.battle_id, side, battle.turn_number)
+    if pending is not None:
+        info["already_locked_in"] = True
+        other_side = "B" if side == "A" else "A"
+        if battle.side(other_side).controller != "npc":
+            info["waiting_on_opponent"] = get_pending_action(battle.battle_id, other_side, battle.turn_number) is None
+        return info
+
+    legal = be.legal_actions(battle, side)
+    info["can_act"] = True
+    info["usable_move_indices"] = legal["usable_move_indices"]
+    info["can_switch"] = legal["can_switch"]
+    info["switchable_indices"] = legal["switchable_indices"]
+    return info
+
+
+# ---------- Sweep (timeouts / abandonment) ----------
+
+def sweep_battles() -> list[int]:
+    """Auto-resolves any turn whose timer elapsed (auto-picks a random usable
+    move for whichever human side didn't choose — never a forfeit) and
+    abandons battles idle past their threshold. Returns the battle_ids that
+    changed, so the caller can broadcast updates for them."""
+    now = datetime.now(timezone.utc)
+    changed: list[int] = []
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM poke_battles WHERE status IN ('pending', 'active', 'awaiting_forced_switch')"
+        ).fetchall()
+
+    for row in rows:
+        idle_seconds = (now - datetime.fromisoformat(row["updated_at"])).total_seconds()
+        threshold = BATTLE_PENDING_TIMEOUT_SECONDS if row["status"] == "pending" else BATTLE_ABANDON_SECONDS
+        if idle_seconds > threshold:
+            abandon_battle(row["battle_id"])
+            changed.append(row["battle_id"])
+            continue
+
+        if row["status"] != "active" or not row["turn_deadline"]:
+            continue
+        if now < datetime.fromisoformat(row["turn_deadline"]):
+            continue
+
+        battle, _ = load_battle_state(row["battle_id"])
+        if not battle or battle.status != "active":
+            continue
+        turn_number = battle.turn_number
+
+        def resolve_side(side_id: str, controller) -> "be.Action":
+            if controller == "npc":
+                return be.pick_npc_action(battle, side_id)
+            existing = get_pending_action(row["battle_id"], side_id, turn_number)
+            if existing is not None:
+                return existing
+            legal = be.legal_actions(battle, side_id)
+            if legal["usable_move_indices"]:
+                return be.Action(kind="move", side=side_id, move_index=random.choice(legal["usable_move_indices"]))
+            return be.Action(kind="move", side=side_id, move_index=None)
+
+        action_a = resolve_side("A", battle.side_a.controller)
+        action_b = resolve_side("B", battle.side_b.controller)
+        resolve_battle_turn(row["battle_id"], action_a, action_b)
+        changed.append(row["battle_id"])
+
+    return changed
+
+
+# ---------- Serialization (shared by the GET endpoint and WS broadcasts) ----------
+
+def summarize_battle(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+    name_a = trainer_display_name(conn, row["side_a_user_id"])
+    name_b = display_name_for_side(row, "B")
+    winner_name = None
+    if row["winner_side"] in ("A", "B"):
+        winner_name = name_a if row["winner_side"] == "A" else name_b
+    return {
+        "battle_id": row["battle_id"], "battle_type": row["battle_type"], "status": row["status"],
+        "name_a": name_a, "name_b": name_b, "turn_number": row["current_turn_number"],
+        "winner_name": winner_name, "created_at": row["created_at"], "finished_at": row["finished_at"],
+    }
+
+
+def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -> dict | None:
+    battle, battle_row = load_battle_state(battle_id)
+    if not battle_row:
+        return None
+    name_a = display_name_for_side(battle_row, "A")
+    name_b = display_name_for_side(battle_row, "B")
+
+    with db() as conn:
+        side_rows = conn.execute(
+            "SELECT * FROM poke_battle_sides WHERE battle_id = ? ORDER BY side, slot", (battle_id,)
+        ).fetchall()
+        event_rows = conn.execute(
+            "SELECT payload FROM poke_battle_events WHERE battle_id = ? ORDER BY turn_number DESC, seq DESC LIMIT 60",
+            (battle_id,),
+        ).fetchall()
+
+    def mon_summary(r: sqlite3.Row, reveal_moves: bool) -> dict:
+        mon = POKEDEX.get(r["dex_id"], {})
+        out = {
+            "dex_id": r["dex_id"], "name": mon.get("name", f"#{r['dex_id']}"), "artwork": mon.get("artwork"),
+            "types": mon.get("types", []), "current_hp": r["current_hp"], "max_hp": r["max_hp"],
+            "status": r["status"], "is_active": bool(r["is_active"]), "is_fainted": bool(r["is_fainted"]),
+        }
+        if reveal_moves:
+            moves = json.loads(r["moves"])
+            pool_by_name = {m["name"]: m for m in mon.get("moves", [])}
+            out["moves"] = [
+                {"name": m["name"], "pp": m["pp"], "max_pp": pool_by_name.get(m["name"], {}).get("pp", m["pp"]),
+                 "type": pool_by_name.get(m["name"], {}).get("type")}
+                for m in moves
+            ]
+        return out
+
+    reveal_a = viewer_user_id is not None and battle_row["side_a_user_id"] == viewer_user_id
+    reveal_b = viewer_user_id is not None and battle_row["side_b_user_id"] == viewer_user_id
+    roster_a = [mon_summary(r, reveal_a) for r in side_rows if r["side"] == "A"]
+    roster_b = [mon_summary(r, reveal_b) for r in side_rows if r["side"] == "B"]
+    events = [json.loads(r["payload"]) for r in reversed(event_rows)]
+
+    winner_name = None
+    if battle_row["winner_side"] in ("A", "B"):
+        winner_name = name_a if battle_row["winner_side"] == "A" else name_b
+
+    payload = {
+        "battle_id": battle_id, "battle_type": battle_row["battle_type"], "status": battle_row["status"],
+        "name_a": name_a, "name_b": name_b, "roster_a": roster_a, "roster_b": roster_b,
+        "turn_number": battle_row["current_turn_number"], "winner_side": battle_row["winner_side"],
+        "winner_name": winner_name, "events": events,
+    }
+    if viewer_user_id is not None:
+        payload["you"] = get_viewer_info(battle, battle_row, viewer_user_id)
+    return payload

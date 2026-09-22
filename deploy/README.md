@@ -55,15 +55,29 @@ This binds to `127.0.0.1:8000` only. Put nginx in front of it:
 sudo apt install -y nginx certbot python3-certbot-nginx
 ```
 
-Create `/etc/nginx/sites-available/shawtybot-api`:
+Create `/etc/nginx/sites-available/shawtybot-api`. The `map` block and the
+`Upgrade`/`Connection` headers are required for the battle spectate/play
+WebSocket (`/ws/battles/{id}`) to work — without them nginx never passes the
+`Upgrade` handshake through, and the WebSocket connection just fails to open
+(harmlessly — the web battle room automatically falls back to polling every
+2s until this is in place, so nothing is broken in the meantime, it just
+isn't instant):
 
 ```nginx
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
 server {
     listen 80;
     server_name shawtypoke-api.duckdns.org;   # your own DuckDNS name here
 
     location / {
         proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -71,6 +85,11 @@ server {
     }
 }
 ```
+
+(The `map` directive must sit at the `http` context level — either paste it
+above the `server` block in this same file, since nginx includes every file
+under `sites-enabled/` inside its `http` block, or put it once in
+`/etc/nginx/nginx.conf` if you'd rather not repeat it per site.)
 
 ```bash
 sudo ln -sf /etc/nginx/sites-available/shawtybot-api /etc/nginx/sites-enabled/shawtybot-api
@@ -120,7 +139,13 @@ pip install -r web/requirements.txt
 ```
 
 Install nginx + certbot the same way as the VM side, but proxying to
-`127.0.0.1:8080` and using your web app's own DuckDNS name.
+`127.0.0.1:8080` and using your web app's own DuckDNS name — **include the
+same `map $http_upgrade $connection_upgrade` block and
+`proxy_http_version 1.1` / `Upgrade` / `Connection` headers shown above**.
+This box needs it too: the browser's WebSocket connects here first (same
+origin, cookie-authenticated), and this app is what opens the second,
+server-to-server WebSocket to the internal API. Both hops need WebSocket
+upgrades passed through, or the whole chain falls back to polling.
 
 Set the real values in `deploy/shawtybot-web.service` before installing it:
 
@@ -140,8 +165,13 @@ In Discord: `/poke web` → click the link → should land on your profile page.
 ## Notes / current limitations
 
 - The web app is currently **read-only** for team management — editing your team
-  still happens via `/poke team` in Discord. Web-based team editing and the
-  battling feature are the next phases.
+  still happens via `/poke team` in Discord.
+- Battling is fully web-based: `/poke challenge`, `/poke gym`, and `/poke trainer`
+  in Discord only create the battle and post a link — accepting/declining,
+  choosing moves, switching, and forfeiting all happen on `/battles/{id}`.
+  Real-time updates use a WebSocket relayed through both nginx configs (see
+  above); until that's configured on a given deployment, the page falls back
+  to polling every ~2s automatically, so nothing is broken either way.
 - Sessions last 7 days; the one-time `/poke web` link itself expires in 10 minutes
   and can only be used once.
 - Both services must stay reachable over HTTPS for cookies/tokens to work

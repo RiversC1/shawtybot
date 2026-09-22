@@ -1,8 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Battle — ShawtyBot Pokémon{% endblock %}
 {% block content %}
-<h1 id="br-title">{{ battle.name_a }} vs {{ battle.name_b }}</h1>
-<p class="muted" id="br-subtitle">{{ battle.battle_type|capitalize }} battle · Turn {{ battle.turn_number }}</p>
+<div class="battle-room-header">
+    <div>
+        <h1 id="br-title">{{ battle.name_a }} vs {{ battle.name_b }}</h1>
+        <p class="muted" id="br-subtitle">{{ battle.battle_type|capitalize }} battle · Turn {{ battle.turn_number }}</p>
+    </div>
+    <div class="battle-room-header-actions">
+        <span class="muted" id="br-connection-status">Connecting...</span>
+        <button id="br-forfeit-btn" class="btn-secondary" hidden>Forfeit</button>
+    </div>
+</div>
 
 <div id="br-result" class="battle-result-banner" hidden></div>
 
@@ -14,6 +22,8 @@
         <div class="battle-side-name">{{ battle.name_b }}</div>
     </div>
 </div>
+
+<div class="card" id="br-action-panel" hidden></div>
 
 <h2 style="margin-top: 24px;">Battle Log</h2>
 <div class="battle-log" id="br-log"></div>

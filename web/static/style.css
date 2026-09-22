@@ -1548,3 +1548,48 @@ code {
     font-weight: bold;
     margin-top: 4px;
 }
+
+/* ---------- Interactive battle room ---------- */
+
+.battle-room-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.battle-room-header h1 {
+    margin-bottom: 2px;
+}
+
+.battle-room-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.battle-action-section-label {
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.battle-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.battle-move-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+}
+
+.battle-move-grid .br-move-option {
+    text-align: left;
+}

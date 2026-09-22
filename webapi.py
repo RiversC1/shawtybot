@@ -8,16 +8,21 @@ Run with: uvicorn webapi:app --host 0.0.0.0 --port 8000
 
 CD test marker: deploy-bot.yml pipeline
 """
+import asyncio
 import os
 import sqlite3
 import json
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+import battle_engine as be
+import battle_store
 
 log = logging.getLogger("webapi")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -242,16 +247,70 @@ def check_and_unlock_achievements(conn: sqlite3.Connection, target_id: int) -> l
 with open(DATA_PATH, encoding="utf-8") as f:
     POKEDEX: dict[int, dict] = {p["id"]: p for p in json.load(f)}
 
-GYMS_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "gyms.json")
-with open(GYMS_DATA_PATH, encoding="utf-8") as f:
-    GYMS: dict[str, dict] = {g["gym_key"]: g for g in json.load(f)}
-GYM_ORDER: list[str] = sorted(GYMS.keys(), key=lambda k: GYMS[k]["order"])
+# Gym/trainer-class data and every battle DB/orchestration function live in
+# battle_store.py — shared with the bot, which only ever creates a battle and
+# posts a link; all actual play (accepting, choosing moves, forfeiting) is
+# submitted here from the web battle UI, since this is the process with a
+# persistent event loop that can hold WebSocket connections open.
 
-TRAINER_CLASSES_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "trainer_classes.json")
-with open(TRAINER_CLASSES_DATA_PATH, encoding="utf-8") as f:
-    TRAINER_CLASS_BY_KEY: dict[str, dict] = {c["class_key"]: c for c in json.load(f)}
+BATTLE_SWEEP_INTERVAL_SECONDS = 20
 
-app = FastAPI(title="ShawtyBot Pokémon API")
+
+class BattleConnectionManager:
+    """Tracks live WebSocket viewers per battle_id so a state change (a move
+    resolving, a forced switch, a timeout auto-resolve) can be pushed to
+    everyone watching that battle instantly, instead of them polling for it.
+    In-memory only — fine as long as this runs as a single uvicorn process
+    (no multi-worker), which is how it's deployed."""
+
+    def __init__(self):
+        self._connections: dict[int, set[tuple[WebSocket, int | None]]] = {}
+
+    async def connect(self, battle_id: int, websocket: WebSocket, viewer_user_id: int | None):
+        await websocket.accept()
+        self._connections.setdefault(battle_id, set()).add((websocket, viewer_user_id))
+
+    def disconnect(self, battle_id: int, websocket: WebSocket, viewer_user_id: int | None):
+        conns = self._connections.get(battle_id)
+        if conns:
+            conns.discard((websocket, viewer_user_id))
+            if not conns:
+                self._connections.pop(battle_id, None)
+
+    async def broadcast(self, battle_id: int):
+        conns = self._connections.get(battle_id)
+        if not conns:
+            return
+        for websocket, viewer_user_id in list(conns):
+            try:
+                payload = await asyncio.to_thread(battle_store.serialize_battle_detail, battle_id, viewer_user_id)
+                await websocket.send_json(payload)
+            except Exception:
+                self.disconnect(battle_id, websocket, viewer_user_id)
+
+
+battle_connections = BattleConnectionManager()
+
+
+async def _battle_sweep_loop():
+    while True:
+        await asyncio.sleep(BATTLE_SWEEP_INTERVAL_SECONDS)
+        try:
+            changed_ids = await asyncio.to_thread(battle_store.sweep_battles)
+            for battle_id in changed_ids:
+                await battle_connections.broadcast(battle_id)
+        except Exception as e:
+            log.error(f"Battle sweep failed: {e}", exc_info=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_battle_sweep_loop())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="ShawtyBot Pokémon API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1161,156 +1220,200 @@ def set_team(body: TeamRequest, user_id: int = Depends(get_current_user_id)):
 
 
 # ---------- Battles ----------
-# Read-mostly: all actual battling (choosing moves) happens through the
-# Discord bot, which is the only process driving real-time turn resolution.
-# This API just exposes the same poke_battles/poke_battle_sides/
-# poke_battle_events tables (written by cogs/pokemon.py) for the web app's
-# spectate/browse pages, polled every few seconds — no websockets needed for
-# a turn-based game this slow-paced.
+# All actual battling (choosing moves, switching, forfeiting) is submitted
+# here from the web battle UI — the bot only ever creates a battle (and, for
+# gym/trainer battles, its NPC side) then posts a link. Every mutation below
+# broadcasts the fresh state to that battle's connected WebSocket viewers;
+# battle_room.js also polls as a fallback for as long as no socket is open
+# (e.g. before the reverse proxy in front of this API is configured to pass
+# WebSocket upgrades through).
 
-def trainer_display_name(conn: sqlite3.Connection, user_id: int | None) -> str:
-    if not user_id:
-        return "Trainer"
-    row = conn.execute("SELECT username FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
-    return row["username"] if row and row["username"] else "Trainer"
-
-
-def battle_side_names(conn: sqlite3.Connection, row: sqlite3.Row) -> tuple[str, str]:
-    name_a = trainer_display_name(conn, row["side_a_user_id"])
-    if row["side_b_user_id"]:
-        name_b = trainer_display_name(conn, row["side_b_user_id"])
-    elif row["battle_type"] == "gym":
-        name_b = GYMS.get(row["side_b_npc_key"], {}).get("leader_name", "Gym Leader")
-    else:
-        tclass = TRAINER_CLASS_BY_KEY.get(row["side_b_npc_key"])
-        name_b = tclass["display_name"] if tclass else "Wild Trainer"
-    return name_a, name_b
-
-
-def summarize_battle(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
-    name_a, name_b = battle_side_names(conn, row)
-    winner_name = None
-    if row["winner_side"] in ("A", "B"):
-        winner_name = name_a if row["winner_side"] == "A" else name_b
-    return {
-        "battle_id": row["battle_id"],
-        "battle_type": row["battle_type"],
-        "status": row["status"],
-        "name_a": name_a,
-        "name_b": name_b,
-        "turn_number": row["current_turn_number"],
-        "winner_name": winner_name,
-        "created_at": row["created_at"],
-        "finished_at": row["finished_at"],
-    }
+def decode_token_user_id(token: str | None) -> int | None:
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return int(payload["sub"])
+    except jwt.PyJWTError:
+        return None
 
 
 @app.get("/api/battles")
 def list_battles(user_id: int = Depends(get_current_user_id)):
     with db() as conn:
         live_rows = conn.execute(
-            "SELECT * FROM poke_battles WHERE status IN ('active', 'awaiting_forced_switch') ORDER BY updated_at DESC"
+            "SELECT * FROM poke_battles WHERE status IN ('pending', 'active', 'awaiting_forced_switch') "
+            "ORDER BY updated_at DESC"
         ).fetchall()
         recent_rows = conn.execute(
             "SELECT * FROM poke_battles WHERE status = 'finished' ORDER BY finished_at DESC LIMIT 20"
         ).fetchall()
         return {
-            "live": [summarize_battle(conn, r) for r in live_rows],
-            "recent": [summarize_battle(conn, r) for r in recent_rows],
+            "live": [battle_store.summarize_battle(conn, r) for r in live_rows],
+            "recent": [battle_store.summarize_battle(conn, r) for r in recent_rows],
         }
 
 
 @app.get("/api/battles/{battle_id}")
 def get_battle_detail(battle_id: int, user_id: int = Depends(get_current_user_id)):
-    with db() as conn:
-        row = conn.execute("SELECT * FROM poke_battles WHERE battle_id = ?", (battle_id,)).fetchone()
-        if not row:
-            raise HTTPException(404, "Battle not found")
-        name_a, name_b = battle_side_names(conn, row)
+    payload = battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
+    if not payload:
+        raise HTTPException(404, "Battle not found")
+    return payload
 
-        side_rows = conn.execute(
-            "SELECT * FROM poke_battle_sides WHERE battle_id = ? ORDER BY side, slot", (battle_id,)
-        ).fetchall()
 
-        def mon_summary(r: sqlite3.Row) -> dict:
-            mon = POKEDEX.get(r["dex_id"], {})
-            return {
-                "dex_id": r["dex_id"],
-                "name": mon.get("name", f"#{r['dex_id']}"),
-                "artwork": mon.get("artwork"),
-                "types": mon.get("types", []),
-                "current_hp": r["current_hp"],
-                "max_hp": r["max_hp"],
-                "status": r["status"],
-                "is_active": bool(r["is_active"]),
-                "is_fainted": bool(r["is_fainted"]),
-            }
+@app.post("/api/battles/{battle_id}/accept")
+async def accept_battle(battle_id: int, user_id: int = Depends(get_current_user_id)):
+    row = battle_store.get_battle_row(battle_id)
+    if not row:
+        raise HTTPException(404, "Battle not found")
+    if row["side_b_user_id"] != user_id:
+        raise HTTPException(403, "This challenge isn't yours to accept")
+    ok, battle, row, error = await asyncio.to_thread(battle_store.accept_challenge, battle_id)
+    if not ok:
+        raise HTTPException(400, error or "Couldn't accept this challenge")
+    await battle_connections.broadcast(battle_id)
+    return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
 
-        roster_a = [mon_summary(r) for r in side_rows if r["side"] == "A"]
-        roster_b = [mon_summary(r) for r in side_rows if r["side"] == "B"]
 
-        event_rows = conn.execute(
-            "SELECT event_type, payload FROM poke_battle_events WHERE battle_id = ? "
-            "ORDER BY turn_number DESC, seq DESC LIMIT 40",
-            (battle_id,),
-        ).fetchall()
-        events = [json.loads(r["payload"]) for r in reversed(event_rows)]
+@app.post("/api/battles/{battle_id}/decline")
+async def decline_battle(battle_id: int, user_id: int = Depends(get_current_user_id)):
+    row = battle_store.get_battle_row(battle_id)
+    if not row:
+        raise HTTPException(404, "Battle not found")
+    if user_id not in (row["side_a_user_id"], row["side_b_user_id"]):
+        raise HTTPException(403, "This challenge isn't yours to decline")
+    await asyncio.to_thread(battle_store.decline_challenge, battle_id)
+    await battle_connections.broadcast(battle_id)
+    return {"ok": True}
 
-    winner_name = None
-    if row["winner_side"] in ("A", "B"):
-        winner_name = name_a if row["winner_side"] == "A" else name_b
 
-    return {
-        "battle_id": battle_id,
-        "battle_type": row["battle_type"],
-        "status": row["status"],
-        "name_a": name_a,
-        "name_b": name_b,
-        "roster_a": roster_a,
-        "roster_b": roster_b,
-        "turn_number": row["current_turn_number"],
-        "winner_side": row["winner_side"],
-        "winner_name": winner_name,
-        "events": events,
-    }
+class BattleActionRequest(BaseModel):
+    kind: str  # "move" | "switch"
+    move_index: int | None = None
+    switch_to_index: int | None = None
+
+
+@app.post("/api/battles/{battle_id}/action")
+async def submit_battle_action(battle_id: int, body: BattleActionRequest, user_id: int = Depends(get_current_user_id)):
+    row = battle_store.get_battle_row(battle_id)
+    if not row:
+        raise HTTPException(404, "Battle not found")
+    side = "A" if row["side_a_user_id"] == user_id else ("B" if row["side_b_user_id"] == user_id else None)
+    if side is None:
+        raise HTTPException(403, "You're not a participant in this battle")
+
+    def _do():
+        battle, battle_row = battle_store.load_battle_state(battle_id)
+        if not battle or battle.status != "active":
+            return "This battle isn't active right now.", None
+        if battle_store.get_pending_action(battle_id, side, battle.turn_number) is not None:
+            return "You've already locked in your move this turn.", None
+
+        action = be.Action(kind=body.kind, side=side, move_index=body.move_index, switch_to_index=body.switch_to_index)
+        battle_store.record_pending_action(battle_id, side, battle.turn_number, action)
+
+        other_side = "B" if side == "A" else "A"
+        other_controller = battle.side(other_side).controller
+        if other_controller == "npc":
+            other_action = be.pick_npc_action(battle, other_side)
+        else:
+            other_action = battle_store.get_pending_action(battle_id, other_side, battle.turn_number)
+            if other_action is None:
+                return None, None  # recorded, waiting on the opponent
+
+        action_a = action if side == "A" else other_action
+        action_b = other_action if side == "A" else action
+        battle_store.resolve_battle_turn(battle_id, action_a, action_b)
+        return None, None
+
+    error, _ = await asyncio.to_thread(_do)
+    if error:
+        raise HTTPException(400, error)
+    await battle_connections.broadcast(battle_id)
+    return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
+
+
+class ForcedSwitchRequest(BaseModel):
+    team_index: int
+
+
+@app.post("/api/battles/{battle_id}/forced-switch")
+async def submit_forced_switch(battle_id: int, body: ForcedSwitchRequest, user_id: int = Depends(get_current_user_id)):
+    row = battle_store.get_battle_row(battle_id)
+    if not row:
+        raise HTTPException(404, "Battle not found")
+    side = "A" if row["side_a_user_id"] == user_id else ("B" if row["side_b_user_id"] == user_id else None)
+    if side is None:
+        raise HTTPException(403, "You're not a participant in this battle")
+
+    battle, battle_row, events = await asyncio.to_thread(battle_store.handle_forced_switch, battle_id, side, body.team_index)
+    if not events:
+        raise HTTPException(400, "You don't need to switch right now")
+    await battle_connections.broadcast(battle_id)
+    return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
+
+
+@app.post("/api/battles/{battle_id}/forfeit")
+async def forfeit_battle(battle_id: int, user_id: int = Depends(get_current_user_id)):
+    row = battle_store.get_battle_row(battle_id)
+    if not row:
+        raise HTTPException(404, "Battle not found")
+    side = "A" if row["side_a_user_id"] == user_id else ("B" if row["side_b_user_id"] == user_id else None)
+    if side is None:
+        raise HTTPException(403, "You're not a participant in this battle")
+
+    battle, battle_row, _reward = await asyncio.to_thread(battle_store.apply_forfeit, battle_id, side)
+    await battle_connections.broadcast(battle_id)
+    return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
+
+
+@app.websocket("/ws/battles/{battle_id}")
+async def battle_websocket(websocket: WebSocket, battle_id: int):
+    viewer_user_id = decode_token_user_id(websocket.query_params.get("token"))
+    await battle_connections.connect(battle_id, websocket, viewer_user_id)
+    try:
+        payload = await asyncio.to_thread(battle_store.serialize_battle_detail, battle_id, viewer_user_id)
+        if payload is None:
+            await websocket.close(code=4404)
+            return
+        await websocket.send_json(payload)
+        while True:
+            await websocket.receive_text()  # only used to detect disconnect; actions go via POST
+    except WebSocketDisconnect:
+        pass
+    finally:
+        battle_connections.disconnect(battle_id, websocket, viewer_user_id)
 
 
 # ---------- Gyms ----------
 
 @app.get("/api/gyms")
 def list_gyms(user_id: int = Depends(get_current_user_id)):
-    with db() as conn:
-        earned = {
-            r["gym_key"] for r in conn.execute(
-                "SELECT gym_key FROM poke_badges WHERE user_id = ?", (user_id,)
-            ).fetchall()
-        }
-    next_key = next((k for k in GYM_ORDER if k not in earned), None)
+    earned = battle_store.get_badges(user_id)
+    next_key = battle_store.next_gym_key(user_id)
     return [
         {
             "gym_key": k,
-            "order": GYMS[k]["order"],
-            "leader_name": GYMS[k]["leader_name"],
-            "type_theme": GYMS[k]["type_theme"],
-            "location": GYMS[k]["location"],
-            "badge_name": GYMS[k]["badge_name"],
-            "flavor": GYMS[k]["flavor"],
+            "order": battle_store.GYMS[k]["order"],
+            "leader_name": battle_store.GYMS[k]["leader_name"],
+            "type_theme": battle_store.GYMS[k]["type_theme"],
+            "location": battle_store.GYMS[k]["location"],
+            "badge_name": battle_store.GYMS[k]["badge_name"],
+            "flavor": battle_store.GYMS[k]["flavor"],
             "earned": k in earned,
             "is_next": k == next_key,
         }
-        for k in GYM_ORDER
+        for k in battle_store.GYM_ORDER
     ]
 
 
 @app.get("/api/gyms/{gym_key}")
 def get_gym_detail(gym_key: str, user_id: int = Depends(get_current_user_id)):
-    gym = GYMS.get(gym_key)
+    gym = battle_store.GYMS.get(gym_key)
     if not gym:
         raise HTTPException(404, "Unknown gym")
-    with db() as conn:
-        earned = conn.execute(
-            "SELECT 1 FROM poke_badges WHERE user_id = ? AND gym_key = ?", (user_id, gym_key)
-        ).fetchone() is not None
+    earned = gym_key in battle_store.get_badges(user_id)
 
     roster = []
     for entry in gym["roster"]:
