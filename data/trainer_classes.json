@@ -1,0 +1,73 @@
+[
+  {
+    "class_key": "bug_catcher",
+    "display_name": "Bug Catcher",
+    "preferred_types": ["bug", "grass"],
+    "team_size": [2, 3],
+    "reward_tier": "low"
+  },
+  {
+    "class_key": "youngster",
+    "display_name": "Youngster",
+    "preferred_types": ["normal"],
+    "team_size": [2, 3],
+    "reward_tier": "low"
+  },
+  {
+    "class_key": "camper",
+    "display_name": "Camper",
+    "preferred_types": ["fire", "normal"],
+    "team_size": [2, 3],
+    "reward_tier": "low"
+  },
+  {
+    "class_key": "hiker",
+    "display_name": "Hiker",
+    "preferred_types": ["rock", "ground", "steel"],
+    "team_size": [3, 4],
+    "reward_tier": "medium"
+  },
+  {
+    "class_key": "swimmer",
+    "display_name": "Swimmer",
+    "preferred_types": ["water"],
+    "team_size": [3, 4],
+    "reward_tier": "medium"
+  },
+  {
+    "class_key": "bird_keeper",
+    "display_name": "Bird Keeper",
+    "preferred_types": ["flying", "normal"],
+    "team_size": [3, 4],
+    "reward_tier": "medium"
+  },
+  {
+    "class_key": "black_belt",
+    "display_name": "Black Belt",
+    "preferred_types": ["fighting"],
+    "team_size": [3, 4],
+    "reward_tier": "medium"
+  },
+  {
+    "class_key": "psychic",
+    "display_name": "Psychic",
+    "preferred_types": ["psychic", "ghost"],
+    "team_size": [3, 4],
+    "reward_tier": "medium"
+  },
+  {
+    "class_key": "veteran",
+    "display_name": "Veteran",
+    "preferred_types": ["dragon", "dark", "steel"],
+    "team_size": [4, 5],
+    "reward_tier": "high"
+  },
+  {
+    "class_key": "ace_trainer",
+    "display_name": "Ace Trainer",
+    "preferred_types": ["normal", "fire", "water", "electric", "grass", "ice", "fighting", "poison", "ground",
+                          "flying", "psychic", "bug", "rock", "ghost", "dragon", "dark", "steel", "fairy"],
+    "team_size": [5, 6],
+    "reward_tier": "high"
+  }
+]
