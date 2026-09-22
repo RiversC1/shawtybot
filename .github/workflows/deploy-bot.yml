@@ -7,6 +7,8 @@ on:
       - "cogs/**"
       - "bot.py"
       - "webapi.py"
+      - "battle_engine.py"
+      - "battle_store.py"
       - "data/**"
       - "requirements.txt"
       - ".github/workflows/deploy-bot.yml"
