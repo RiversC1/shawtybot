@@ -1102,11 +1102,20 @@ class ChallengeView(discord.ui.View):
         self.challenger_id = challenger_id
         self.target_id = target_id
         self.resolved = False
+        self.message: discord.Message | None = None
 
     async def on_timeout(self):
         if self.resolved:
             return
+        self.resolved = True
         self.cog.abandon_battle(self.battle_id)
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(content="⏱️ This challenge expired.", embed=None, view=self)
+            except discord.HTTPException as e:
+                log.error(f"Failed to mark challenge as expired: {e}")
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.target_id:
@@ -2751,6 +2760,7 @@ class Pokemon(commands.Cog):
             color=discord.Color.orange(),
         )
         await interaction.response.send_message(content=opponent.mention, embed=embed, view=view)
+        view.message = await interaction.original_response()
 
     @poke.command(name="gyms", description="See the 8 Hoenn Gym Leaders and your badge progress")
     async def poke_gyms(self, interaction: discord.Interaction):
