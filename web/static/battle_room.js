@@ -25,6 +25,7 @@
   const actionPanel = document.getElementById("br-action-panel");
   const connectionStatusEl = document.getElementById("br-connection-status");
   const forfeitBtn = document.getElementById("br-forfeit-btn");
+  const muteBtn = document.getElementById("br-mute-btn");
 
   // `truth` is always the latest full state from the server. `visibleA`/
   // `visibleB` are what's actually on screen right now, which can lag behind
@@ -43,10 +44,48 @@
   let ws = null;
   let wsConnectTimer = null;
   let usingWs = false;
+  let resultSoundPlayed = false;
 
   function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+
+  function updateMuteBtn() {
+    const isMuted = BattleAudio.isMuted();
+    muteBtn.textContent = isMuted ? "🔇" : "🔊";
+    muteBtn.title = isMuted ? "Unmute battle sounds" : "Mute battle sounds";
+  }
+
+  // Keeps the background battle theme in sync with the current battle
+  // status, and plays a one-time victory/defeat (or neutral fanfare for a
+  // spectator) jingle the first time a battle is seen as finished.
+  function syncMusicAndResult() {
+    if (truth.status === "active" || truth.status === "awaiting_forced_switch") {
+      BattleAudio.startMusic();
+    } else {
+      BattleAudio.stopMusic();
+    }
+    if (truth.status === "finished" && !resultSoundPlayed) {
+      resultSoundPlayed = true;
+      if (truth.you && truth.you.side) {
+        BattleAudio.playSfx(truth.winner_side === truth.you.side ? "victory" : "defeat");
+      } else if (truth.winner_side) {
+        BattleAudio.playSfx("victory");
+      }
+    }
+  }
+
+  muteBtn.addEventListener("click", () => {
+    BattleAudio.setMuted(!BattleAudio.isMuted());
+    updateMuteBtn();
+    syncMusicAndResult();
+  });
+  updateMuteBtn();
+  // A click anywhere (a move button, accept, etc.) also counts as the user
+  // gesture browsers require before audio can actually play.
+  document.addEventListener("click", () => {
+    if (!BattleAudio.isMuted()) BattleAudio.ensureCtx();
+  });
 
   async function postAction(path, body) {
     const res = await fetch(path, {
@@ -136,6 +175,7 @@
       default:
         break;
     }
+    BattleAudio.handleEvent(event);
     revealed.push(event);
   }
 
@@ -451,6 +491,7 @@
     renderFrame(null, null);
     renderResultBanner();
     renderActionPanel(truth);
+    syncMusicAndResult();
   }
 
   function applyUpdate(battle) {
@@ -467,6 +508,7 @@
       renderFrame(null, null);
       renderResultBanner();
       renderActionPanel(truth);
+      syncMusicAndResult();
       return;
     }
 
@@ -549,6 +591,7 @@
   renderFrame(null, null);
   renderResultBanner();
   renderActionPanel(truth);
+  syncMusicAndResult();
 
   if (truth.status !== "finished" && truth.status !== "abandoned") {
     connectWs();
