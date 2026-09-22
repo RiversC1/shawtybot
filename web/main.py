@@ -36,6 +36,19 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 
+@app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    # Without this, browsers may keep serving an old cached copy of a JS/CSS
+    # file after a deploy (no Cache-Control was ever set) — force revalidation
+    # on every request so a redeploy is picked up immediately. The server's
+    # existing ETag/Last-Modified support still turns an unchanged file into a
+    # cheap 304 instead of a full re-download.
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 async def api_get(session: str, path: str) -> tuple[int, dict | list]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(f"{API_BASE_URL}{path}", headers={"Authorization": f"Bearer {session}"})
