@@ -100,10 +100,17 @@
         overlay.classList.add("page-loading-hidden");
     }
 
-    if (document.readyState === "complete") {
+    // Hide as soon as the HTML itself is parsed, not window "load" — the
+    // page's actual content (server-rendered, or the per-section "Loading..."
+    // placeholders the fully client-rendered pages already show) is ready
+    // well before every hotlinked Pokémon image on the page has finished
+    // downloading. Gating the overlay on "load" meant it stayed on screen,
+    // covering already-rendered content, for however long the slowest image
+    // took — which is exactly what made every page feel slow to load.
+    if (document.readyState === "interactive" || document.readyState === "complete") {
         hideOverlay();
     } else {
-        window.addEventListener("load", hideOverlay);
+        document.addEventListener("DOMContentLoaded", hideOverlay);
     }
 
     document.addEventListener("click", function (e) {

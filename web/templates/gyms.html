@@ -11,7 +11,7 @@
     {% for g in gyms %}
     <div class="card gym-card{{ '' if (g.earned or g.is_next) else ' is-locked' }}" data-gym-key="{{ g.gym_key }}">
         <div class="gym-card-portrait">
-            <img src="{{ g.leader_image }}" alt="{{ g.leader_name }}">
+            <img src="{{ g.leader_image }}" alt="{{ g.leader_name }}" loading="lazy">
             <img class="gym-card-badge-overlay{{ '' if g.earned else ' is-dim' }}" src="{{ g.badge_image }}" alt="{{ g.badge_name }}">
             {% if not g.earned and not g.is_next %}<div class="gym-card-lock">🔒</div>{% endif %}
         </div>

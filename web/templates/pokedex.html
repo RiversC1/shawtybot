@@ -53,7 +53,7 @@
          data-rarity="{{ mon.rarity }}"
          data-gen="{{ mon.generation }}"
          data-owned="{{ 'true' if mon.owned else 'false' }}">
-        <img src="{{ mon.artwork }}" alt="{{ mon.name }}">
+        <img src="{{ mon.artwork }}" alt="{{ mon.name }}" loading="lazy">
         <div class="dex-name">
             #{{ "%03d"|format(mon.dex_id) }} {{ mon.name }}{% if mon.has_shiny %} ✨{% endif %}
         </div>

@@ -10,7 +10,7 @@
     {% for mon in collection %}
     <div class="dex-card collection-card" data-id="{{ mon.id }}"
          data-name="{{ (mon.nickname or mon.name)|lower }} {{ mon.name|lower }}">
-        <img src="{{ mon.artwork }}" alt="{{ mon.name }}">
+        <img src="{{ mon.artwork }}" alt="{{ mon.name }}" loading="lazy">
         <div class="dex-name">
             {{ mon.nickname or mon.name }}{% if mon.is_shiny %} ✨{% endif %}
         </div>

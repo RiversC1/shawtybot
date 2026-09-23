@@ -8,14 +8,14 @@
     {% for t in trainers %}
     <div class="trainer-list-item{{ ' is-you' if t.is_you else '' }}">
         <a href="{{ '/profile' if t.is_you else '/trainer/' + t.user_id|string }}" class="trainer-list-link">
-            <img src="{{ t.character_sprite }}" alt="{{ t.username }}" class="trainer-list-sprite">
+            <img src="{{ t.character_sprite }}" alt="{{ t.username }}" class="trainer-list-sprite" loading="lazy">
             <div class="trainer-list-info">
                 <div class="trainer-list-name">{{ t.username }}{% if t.is_you %} (you){% endif %}</div>
                 <div class="muted">Level {{ t.level }} · {{ t.unique_species }} species</div>
             </div>
         </a>
         {% if t.avatar_url %}
-        <img src="{{ t.avatar_url }}" alt="" class="trainer-list-avatar">
+        <img src="{{ t.avatar_url }}" alt="" class="trainer-list-avatar" loading="lazy">
         {% endif %}
         {% if not t.is_you %}
         <button class="btn-primary trainer-trade-btn" data-target-user-id="{{ t.user_id }}">Trade ⇄</button>
