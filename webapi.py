@@ -1470,7 +1470,7 @@ async def submit_battle_action(battle_id: int, body: BattleActionRequest, user_i
         other_side = "B" if side == "A" else "A"
         other_controller = battle.side(other_side).controller
         if other_controller == "npc":
-            other_action = be.pick_npc_action(battle, other_side)
+            other_action = battle_store.npc_pick_action(battle, other_side, row)
         else:
             other_action = battle_store.get_pending_action(battle_id, other_side, battle.turn_number)
             if other_action is None:

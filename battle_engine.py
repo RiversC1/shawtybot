@@ -419,6 +419,108 @@ def pick_npc_forced_switch(battle: BattleState, side_id: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# "Hard" NPC AI — used for Elite Four / Champion battles instead of the
+# heavily-randomized pick_npc_action above. Every trainer in this game
+# already fields max-IV, level-100 Pokémon (see build_battler_state), so
+# there's no stat-growth lever left to make the League tougher than a gym —
+# the only honest way to raise the difficulty is to make the opponent
+# actually play well: hit the highest-damage move (finishing off a weakened
+# target when possible) instead of a coin flip, and proactively switch out
+# of a bad type matchup instead of only doing so when forced by a faint.
+# ---------------------------------------------------------------------------
+
+def estimate_damage(attacker: BattlerState, defender: BattlerState, move: MoveData) -> float:
+    """Deterministic average-case damage estimate (no RNG consumed) — used
+    only for NPC decision-making, never for real turn resolution, so it
+    never perturbs the battle's own RNG stream."""
+    if move.category == "status" or not move.power:
+        return 0.0
+    a_key, d_key = ("attack", "defense") if move.category == "physical" else ("sp_attack", "sp_defense")
+    A = attacker.stats[a_key] * stat_stage_multiplier(attacker.stat_stages[a_key])
+    D = defender.stats[d_key] * stat_stage_multiplier(defender.stat_stages[d_key])
+    eff = type_effectiveness(move.type, defender.types)
+    if eff == 0:
+        return 0.0
+    base = math.floor(LEVEL_100_STAGE_BASE * move.power * A / D / 50) + 2
+    stab = 1.5 if move.type and move.type in attacker.types else 1.0
+    burn_mult = 0.5 if (attacker.status == "burn" and move.category == "physical") else 1.0
+    return base * stab * eff * 0.925 * burn_mult  # 0.925 ~= average of the real 0.85-1.00 roll
+
+
+def _best_move_damage(attacker: BattlerState, defender: BattlerState) -> float:
+    best = 0.0
+    for slot in attacker.moves:
+        if slot.current_pp <= 0:
+            continue
+        best = max(best, estimate_damage(attacker, defender, slot.move))
+    return best
+
+
+def _matchup_score(candidate: BattlerState, opponent: BattlerState) -> float:
+    """Higher = better for `candidate` to be on the field against
+    `opponent`: the best damage candidate can deal back, minus the best
+    damage opponent can deal to candidate, each as a fraction of the
+    receiving side's current HP."""
+    if candidate.is_fainted:
+        return float("-inf")
+    my_best = _best_move_damage(candidate, opponent)
+    their_best = _best_move_damage(opponent, candidate)
+    return my_best / max(opponent.current_hp, 1) - their_best / max(candidate.current_hp, 1)
+
+
+def pick_npc_action_hard(battle: BattleState, side_id: str) -> Action:
+    la = legal_actions(battle, side_id)
+    side = battle.side(side_id)
+    opp = battle.other(side_id)
+    active = side.active
+    opp_active = opp.active
+
+    if not la["usable_move_indices"]:
+        if la["can_switch"]:
+            best_idx = max(la["switchable_indices"], key=lambda i: _matchup_score(side.roster[i], opp_active))
+            return Action(kind="switch", side=side_id, switch_to_index=best_idx)
+        return Action(kind="move", side=side_id, move_index=None)
+
+    if la["can_switch"]:
+        current_score = _matchup_score(active, opp_active)
+        can_ko_now = any(
+            estimate_damage(active, opp_active, active.moves[i].move) >= opp_active.current_hp
+            for i in la["usable_move_indices"]
+        )
+        if not can_ko_now and current_score < -0.15:
+            best_idx, best_score = None, current_score
+            for i in la["switchable_indices"]:
+                score = _matchup_score(side.roster[i], opp_active)
+                if score > best_score + 0.1:  # meaningful improvement, not a coin flip
+                    best_idx, best_score = i, score
+            if best_idx is not None:
+                return Action(kind="switch", side=side_id, switch_to_index=best_idx)
+
+    scored = [
+        (i, estimate_damage(active, opp_active, active.moves[i].move))
+        for i in la["usable_move_indices"]
+    ]
+    damaging = [(i, dmg) for i, dmg in scored if dmg > 0]
+    if damaging:
+        lethal = [s for s in damaging if s[1] >= opp_active.current_hp]
+        pool = lethal if lethal else damaging
+        best_score = max(s for _, s in pool)
+        top = [i for i, s in pool if s >= best_score - 1e-6]
+        return Action(kind="move", side=side_id, move_index=battle.rng.choice(top))
+
+    return Action(kind="move", side=side_id, move_index=battle.rng.choice(la["usable_move_indices"]))
+
+
+def pick_npc_forced_switch_hard(battle: BattleState, side_id: str) -> int:
+    la = legal_actions(battle, side_id)
+    if not la["switchable_indices"]:
+        raise ValueError("No switchable Pokémon left")
+    side = battle.side(side_id)
+    opp_active = battle.other(side_id).active
+    return max(la["switchable_indices"], key=lambda i: _matchup_score(side.roster[i], opp_active))
+
+
+# ---------------------------------------------------------------------------
 # Damage
 # ---------------------------------------------------------------------------
 

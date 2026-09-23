@@ -596,6 +596,24 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
     return summary
 
 
+# NPC battles the League tier: given every trainer already fields max-IV,
+# level-100 Pokémon, a smarter opponent (battle_engine's "hard" AI) is the
+# only real lever left to make these fights tougher than a gym.
+HARD_AI_BATTLE_TYPES = {"elite_four", "champion"}
+
+
+def npc_pick_action(battle: "be.BattleState", side_id: str, battle_row: sqlite3.Row) -> "be.Action":
+    if battle_row["battle_type"] in HARD_AI_BATTLE_TYPES:
+        return be.pick_npc_action_hard(battle, side_id)
+    return be.pick_npc_action(battle, side_id)
+
+
+def npc_pick_forced_switch(battle: "be.BattleState", side_id: str, battle_row: sqlite3.Row) -> int:
+    if battle_row["battle_type"] in HARD_AI_BATTLE_TYPES:
+        return be.pick_npc_forced_switch_hard(battle, side_id)
+    return be.pick_npc_forced_switch(battle, side_id)
+
+
 # ---------- Turn / switch / forfeit orchestration ----------
 
 def resolve_battle_turn(battle_id: int, action_a: "be.Action", action_b: "be.Action"):
@@ -616,7 +634,7 @@ def resolve_battle_turn(battle_id: int, action_a: "be.Action", action_b: "be.Act
         npc_side = next((s for s in battle.forced_switch_sides if battle.side(s).controller == "npc"), None)
         if not npc_side:
             break
-        idx = be.pick_npc_forced_switch(battle, npc_side)
+        idx = npc_pick_forced_switch(battle, npc_side, battle_row)
         switch_events = be.apply_forced_switch(battle, npc_side, idx)
         persist_battle_state(battle_id, battle)
         append_battle_events(battle_id, turn_number, switch_events)
@@ -643,7 +661,7 @@ def handle_forced_switch(battle_id: int, side: str, team_index: int):
         npc_side = next((s for s in battle.forced_switch_sides if battle.side(s).controller == "npc"), None)
         if not npc_side:
             break
-        idx = be.pick_npc_forced_switch(battle, npc_side)
+        idx = npc_pick_forced_switch(battle, npc_side, battle_row)
         npc_events = be.apply_forced_switch(battle, npc_side, idx)
         persist_battle_state(battle_id, battle)
         append_battle_events(battle_id, turn_number, npc_events)
@@ -774,7 +792,7 @@ def sweep_battles() -> list[int]:
 
         def resolve_side(side_id: str, controller) -> "be.Action":
             if controller == "npc":
-                return be.pick_npc_action(battle, side_id)
+                return npc_pick_action(battle, side_id, row)
             existing = get_pending_action(row["battle_id"], side_id, turn_number)
             if existing is not None:
                 return existing
