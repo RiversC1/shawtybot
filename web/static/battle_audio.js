@@ -1,17 +1,15 @@
 // Battle sound: real Pokémon cries (streamed from PokeAPI's public cries
-// mirror) on switch-in, small synthesized SFX for hits/status/faints, and an
-// original synthesized battle-theme loop — all generated in-browser via the
-// Web Audio API, so there are no audio assets to host for the SFX/music.
+// mirror) on switch-in, small synthesized SFX for hits/status/faints via the
+// Web Audio API, and a looping battle theme played from a locally hosted
+// audio file (web/static/audio/champion_battle.mp3).
 window.BattleAudio = (function () {
   const CRY_BASE_LEGACY = "https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/legacy/";
   const CRY_BASE_LATEST = "https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/";
+  const MUSIC_URL = "/static/audio/champion_battle.mp3";
 
   let ctx = null;
-  let musicGain = null;
   let sfxGain = null;
-  let musicPlaying = false;
-  let musicTimer = null;
-  let musicStep = 0;
+  let musicEl = null;
 
   // Some browsers throw on localStorage access entirely (strict cookie/site-
   // data blocking, private-mode edge cases) rather than just returning null —
@@ -41,9 +39,6 @@ window.BattleAudio = (function () {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return null;
         ctx = new AC();
-        musicGain = ctx.createGain();
-        musicGain.gain.value = 0.16;
-        musicGain.connect(ctx.destination);
         sfxGain = ctx.createGain();
         sfxGain.gain.value = 0.35;
         sfxGain.connect(ctx.destination);
@@ -64,7 +59,7 @@ window.BattleAudio = (function () {
     writeMutedPref(value);
     if (muted) {
       stopMusic();
-    } else if (ensureCtx() && wantMusic) {
+    } else if (wantMusic) {
       startMusic();
     }
   }
@@ -175,36 +170,39 @@ window.BattleAudio = (function () {
     });
   }
 
-  // ---- background battle theme: a short original chiptune loop, not a
-  // copy of any game's actual soundtrack ----
+  // ---- background battle theme ----
 
-  const BASS_RIFF = [82.41, 82.41, 98.0, 82.41, 73.42, 73.42, 65.41, 61.74];
-  const STEP_SEC = 60 / 152 / 2;
-
-  function scheduleStep() {
-    if (!musicPlaying) return;
-    const now = ctx.currentTime + 0.02;
-    const freq = BASS_RIFF[musicStep % BASS_RIFF.length];
-    playTone(musicGain, freq, now, STEP_SEC * 0.85, "sawtooth", 0.22);
-    if (musicStep % 2 === 0) playNoiseBurst(musicGain, now, 0.03, 0.12, 6000);
-    musicStep++;
-    musicTimer = setTimeout(scheduleStep, STEP_SEC * 1000);
+  function ensureMusicEl() {
+    if (!musicEl) {
+      musicEl = new Audio(MUSIC_URL);
+      musicEl.loop = true;
+      musicEl.volume = 0.35;
+      musicEl.preload = "auto";
+    }
+    return musicEl;
   }
 
   function startMusic() {
     wantMusic = true;
-    if (muted || musicPlaying || !ensureCtx()) return;
-    musicPlaying = true;
-    musicStep = 0;
-    scheduleStep();
+    retryMusic();
+  }
+
+  // Attempts to actually play the theme if it's supposed to be playing but
+  // isn't (blocked pending a user gesture) — safe to call from any click,
+  // since it never changes whether music is wanted, only whether it's
+  // audibly caught up to that.
+  function retryMusic() {
+    if (muted || !wantMusic) return;
+    const el = ensureMusicEl();
+    if (!el.paused) return;
+    el.play().catch(() => {});
   }
 
   function stopMusic() {
     wantMusic = false;
-    musicPlaying = false;
-    if (musicTimer) {
-      clearTimeout(musicTimer);
-      musicTimer = null;
+    if (musicEl) {
+      musicEl.pause();
+      musicEl.currentTime = 0;
     }
   }
 
@@ -240,5 +238,5 @@ window.BattleAudio = (function () {
     }
   }
 
-  return { ensureCtx, isMuted, setMuted, startMusic, stopMusic, playSfx, playCry, handleEvent };
+  return { ensureCtx, isMuted, setMuted, startMusic, stopMusic, retryMusic, playSfx, playCry, handleEvent };
 })();

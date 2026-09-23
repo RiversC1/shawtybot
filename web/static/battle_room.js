@@ -90,9 +90,13 @@
   });
   updateMuteBtn();
   // A click anywhere (a move button, accept, etc.) also counts as the user
-  // gesture browsers require before audio can actually play.
+  // gesture browsers require before audio can actually play — retry starting
+  // the music here too in case the very first play() attempt was blocked.
   document.addEventListener("click", () => {
-    if (!BattleAudio.isMuted()) BattleAudio.ensureCtx();
+    if (!BattleAudio.isMuted()) {
+      BattleAudio.ensureCtx();
+      BattleAudio.retryMusic();
+    }
   });
 
   async function postAction(path, body) {
