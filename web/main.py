@@ -277,6 +277,19 @@ async def gyms(request: Request):
     return templates.TemplateResponse(request, "gyms.html", {"gyms": data})
 
 
+@app.get("/league")
+async def league(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/league")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "league.html", {"league": data})
+
+
 @app.get("/trades")
 async def trades(request: Request):
     session = request.cookies.get(SESSION_COOKIE)
@@ -492,6 +505,42 @@ async def proxy_start_gym_battle(request: Request, gym_key: str):
     if not session:
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     status, data = await api_post(session, f"/api/battles/gym/{gym_key}", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/league")
+async def proxy_get_league(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/league")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/league/{generation}/{member_key}")
+async def proxy_get_league_member(request: Request, generation: str, member_key: str):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/league/{generation}/{member_key}")
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/battles/elite4/{generation}/{member_key}")
+async def proxy_start_elite_four_battle(request: Request, generation: str, member_key: str):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/battles/elite4/{generation}/{member_key}", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/battles/champion/{generation}")
+async def proxy_start_champion_battle(request: Request, generation: str):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/battles/champion/{generation}", {})
     return JSONResponse(data, status_code=status)
 
 

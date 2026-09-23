@@ -51,6 +51,7 @@ DB_PATH = "pokemon.db"
 DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "pokemon.json")
 GYMS_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "gyms.json")
 TRAINER_CLASSES_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "trainer_classes.json")
+ELITE_FOUR_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "elite_four.json")
 
 with open(DATA_PATH, encoding="utf-8") as f:
     POKEDEX: dict[int, dict] = {p["id"]: p for p in json.load(f)}
@@ -62,6 +63,25 @@ GYM_ORDER: list[str] = sorted(GYMS.keys(), key=lambda k: GYMS[k]["order"])
 with open(TRAINER_CLASSES_DATA_PATH, encoding="utf-8") as f:
     TRAINER_CLASSES: list[dict] = json.load(f)
 TRAINER_CLASS_BY_KEY: dict[str, dict] = {c["class_key"]: c for c in TRAINER_CLASSES}
+
+# Poké League: the Elite Four + Champion tier, unlocked once all 8 gym
+# badges are earned. Keyed by "{generation}:{member_key}" (e.g.
+# "kanto:lorelei") — that composite is what's stored in poke_battles'
+# side_b_npc_key and in poke_league_progress' league_key, exactly the same
+# role gym_key plays for gym battles.
+with open(ELITE_FOUR_DATA_PATH, encoding="utf-8") as f:
+    LEAGUE: dict[str, dict] = {f"{e['generation']}:{e['member_key']}": e for e in json.load(f)}
+LEAGUE_GENERATIONS: list[str] = ["kanto", "johto", "hoenn", "sinnoh"]
+
+
+def league_order(generation: str, role: str) -> list[str]:
+    """The ordered list of league_keys for one generation's Elite Four
+    (role='elite_four', 4 members) or Champion (role='champion', 1 member),
+    sorted by each entry's own `order` field."""
+    return [
+        key for key, entry in sorted(LEAGUE.items(), key=lambda kv: kv[1]["order"])
+        if entry["generation"] == generation and entry["role"] == role
+    ]
 
 # Reuses the existing trainer XP/coin systems for rewards — no new
 # per-Pokémon stat-growth mechanic. "Getting stronger" means a stronger
@@ -75,6 +95,10 @@ GYM_BATTLE_XP = 100
 GYM_BATTLE_COIN = 250
 PVP_WIN_XP = 25
 PVP_WIN_COIN = 30
+LEAGUE_BATTLE_XP = 200
+LEAGUE_BATTLE_COIN = 400
+CHAMPION_BATTLE_XP = 400
+CHAMPION_BATTLE_COIN = 800
 
 BATTLE_TURN_TIMEOUT_SECONDS = 90
 BATTLE_PENDING_TIMEOUT_SECONDS = 5 * 60   # unanswered PvP challenge
@@ -172,6 +196,14 @@ def build_roster_for_gym(gym_key: str) -> list["be.BattlerState"]:
     return [
         be.build_battler_state(POKEDEX[entry["dex_id"]], entry["moves"], entry.get("ability"))
         for entry in gym["roster"]
+    ]
+
+
+def build_roster_for_league(league_key: str) -> list["be.BattlerState"]:
+    entry = LEAGUE[league_key]
+    return [
+        be.build_battler_state(POKEDEX[m["dex_id"]], m["moves"], m.get("ability"))
+        for m in entry["roster"]
     ]
 
 
@@ -427,6 +459,48 @@ def next_gym_key(user_id: int) -> str | None:
     return None
 
 
+def league_unlocked(user_id: int) -> bool:
+    """The Poké League opens once all 8 gym badges are earned."""
+    return next_gym_key(user_id) is None
+
+
+def get_league_progress(user_id: int) -> set[str]:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT league_key FROM poke_league_progress WHERE user_id = ?", (user_id,)
+        ).fetchall()
+    return {r["league_key"] for r in rows}
+
+
+def award_league_progress(user_id: int, league_key: str):
+    with db() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO poke_league_progress (user_id, league_key, earned_at) VALUES (?, ?, ?)",
+            (user_id, league_key, datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def next_elite_four_key(user_id: int, generation: str) -> str | None:
+    """The next unbeaten Elite Four member in this generation's fixed order,
+    or None once all 4 are defeated."""
+    earned = get_league_progress(user_id)
+    for key in league_order(generation, "elite_four"):
+        if key not in earned:
+            return key
+    return None
+
+
+def champion_key(generation: str) -> str | None:
+    keys = league_order(generation, "champion")
+    return keys[0] if keys else None
+
+
+def champion_unlocked(user_id: int, generation: str) -> bool:
+    """The Champion fight opens once that generation's 4 Elite Four members
+    are all defeated."""
+    return next_elite_four_key(user_id, generation) is None
+
+
 def add_xp_and_coins(user_id: int, xp: int, coin: int):
     """Mirrors cogs/pokemon.py's add_xp/add_item so a win grants the exact
     same account progression regardless of which process resolved the
@@ -463,6 +537,8 @@ def avatar_for_side(battle_row: sqlite3.Row, side: str) -> str | None:
     npc_key = battle_row["side_b_npc_key"]
     if battle_row["battle_type"] == "gym":
         return GYMS.get(npc_key, {}).get("leader_image")
+    if battle_row["battle_type"] in ("elite_four", "champion"):
+        return LEAGUE.get(npc_key, {}).get("portrait")
     tclass = TRAINER_CLASS_BY_KEY.get(npc_key)
     return tclass.get("sprite") if tclass else None
 
@@ -475,6 +551,8 @@ def display_name_for_side(battle_row: sqlite3.Row, side: str) -> str:
     npc_key = battle_row["side_b_npc_key"]
     if battle_row["battle_type"] == "gym":
         return GYMS.get(npc_key, {}).get("leader_name", "Gym Leader")
+    if battle_row["battle_type"] in ("elite_four", "champion"):
+        return LEAGUE.get(npc_key, {}).get("name", "League Trainer")
     tclass = TRAINER_CLASS_BY_KEY.get(npc_key)
     return tclass["display_name"] if tclass else "Wild Trainer"
 
@@ -497,6 +575,18 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         award_badge(winner_user_id, gym_key)
         badge_name = GYMS.get(gym_key, {}).get("badge_name", "Badge")
         summary = f"+{GYM_BATTLE_XP} XP, +{GYM_BATTLE_COIN} coins, and the {badge_name}!"
+    elif battle_type == "elite_four":
+        league_key = battle_row["side_b_npc_key"]
+        add_xp_and_coins(winner_user_id, LEAGUE_BATTLE_XP, LEAGUE_BATTLE_COIN)
+        award_league_progress(winner_user_id, league_key)
+        member_name = LEAGUE.get(league_key, {}).get("name", "the Elite Four member")
+        summary = f"+{LEAGUE_BATTLE_XP} XP, +{LEAGUE_BATTLE_COIN} coins! {member_name} has been defeated."
+    elif battle_type == "champion":
+        league_key = battle_row["side_b_npc_key"]
+        add_xp_and_coins(winner_user_id, CHAMPION_BATTLE_XP, CHAMPION_BATTLE_COIN)
+        award_league_progress(winner_user_id, league_key)
+        champ_name = LEAGUE.get(league_key, {}).get("name", "the Champion")
+        summary = f"+{CHAMPION_BATTLE_XP} XP, +{CHAMPION_BATTLE_COIN} coins! {champ_name} has fallen — Champion crowned!"
     else:
         tclass = TRAINER_CLASS_BY_KEY.get(battle_row["side_b_npc_key"])
         rewards = TRAINER_BATTLE_REWARDS[tclass["reward_tier"] if tclass else "low"]

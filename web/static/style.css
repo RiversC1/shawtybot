@@ -1963,6 +1963,30 @@ code {
     margin-top: 4px;
 }
 
+/* ---------- Poké League ---------- */
+
+.league-locked-banner {
+    text-align: center;
+    padding: 32px 20px;
+}
+
+.league-generation {
+    margin-top: 28px;
+}
+
+.league-generation-title {
+    margin-bottom: 12px;
+}
+
+.champion-card {
+    border-color: #ffd76a;
+    box-shadow: 0 0 0 1px rgba(255, 215, 106, 0.35);
+}
+
+.champion-card:hover {
+    border-color: #ffd76a;
+}
+
 /* ---------- Interactive battle room ---------- */
 
 .battle-room-header {

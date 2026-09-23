@@ -1,0 +1,1442 @@
+[
+  {
+    "member_key": "lorelei",
+    "generation": "kanto",
+    "order": 1,
+    "role": "elite_four",
+    "name": "Lorelei",
+    "type_theme": "ice",
+    "flavor": "A cool, calculating Ice-type master of the Kanto Elite Four.",
+    "roster": [
+      {
+        "dex_id": 87,
+        "ability": "thick-fat",
+        "moves": [
+          "Ice Beam",
+          "Aqua Tail",
+          "Double Edge",
+          "Hail"
+        ]
+      },
+      {
+        "dex_id": 91,
+        "ability": "shell-armor",
+        "moves": [
+          "Icicle Crash",
+          "Razor Shell",
+          "Tackle",
+          "Spikes"
+        ]
+      },
+      {
+        "dex_id": 80,
+        "ability": "oblivious",
+        "moves": [
+          "Psychic",
+          "Surf",
+          "Heal Pulse",
+          "Psych Up"
+        ]
+      },
+      {
+        "dex_id": 124,
+        "ability": "oblivious",
+        "moves": [
+          "Blizzard",
+          "Psychic",
+          "Thrash",
+          "Perish Song"
+        ]
+      },
+      {
+        "dex_id": 131,
+        "ability": "water-absorb",
+        "moves": [
+          "Hydro Pump",
+          "Blizzard",
+          "Dragon Pulse",
+          "Perish Song"
+        ]
+      },
+      {
+        "dex_id": 362,
+        "ability": "inner-focus",
+        "moves": [
+          "Blizzard",
+          "Freeze Dry",
+          "Crunch",
+          "Hail"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/87.png"
+  },
+  {
+    "member_key": "bruno",
+    "generation": "kanto",
+    "order": 2,
+    "role": "elite_four",
+    "name": "Bruno",
+    "type_theme": "fighting",
+    "flavor": "A stone-hard Fighting-type specialist who trains through brute strength.",
+    "roster": [
+      {
+        "dex_id": 95,
+        "ability": "rock-head",
+        "moves": [
+          "Stone Edge",
+          "Dig",
+          "Double Edge",
+          "Sandstorm"
+        ]
+      },
+      {
+        "dex_id": 208,
+        "ability": "rock-head",
+        "moves": [
+          "Iron Tail",
+          "Dig",
+          "Double Edge",
+          "Magnet Rise"
+        ]
+      },
+      {
+        "dex_id": 106,
+        "ability": "limber",
+        "moves": [
+          "High Jump Kick",
+          "Close Combat",
+          "Mega Kick",
+          "Endure"
+        ]
+      },
+      {
+        "dex_id": 107,
+        "ability": "keen-eye",
+        "moves": [
+          "Focus Punch",
+          "Close Combat",
+          "Mega Punch",
+          "Detect"
+        ]
+      },
+      {
+        "dex_id": 237,
+        "ability": "intimidate",
+        "moves": [
+          "Close Combat",
+          "Triple Kick",
+          "Endeavor",
+          "Detect"
+        ]
+      },
+      {
+        "dex_id": 68,
+        "ability": "guts",
+        "moves": [
+          "Superpower",
+          "Cross Chop",
+          "Double Edge",
+          "Scary Face"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/95.png"
+  },
+  {
+    "member_key": "agatha",
+    "generation": "kanto",
+    "order": 3,
+    "role": "elite_four",
+    "name": "Agatha",
+    "type_theme": "ghost",
+    "flavor": "A cackling old master of Ghost- and Poison-type trickery.",
+    "roster": [
+      {
+        "dex_id": 94,
+        "ability": "cursed-body",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Dream Eater",
+          "Mean Look"
+        ]
+      },
+      {
+        "dex_id": 24,
+        "ability": "intimidate",
+        "moves": [
+          "Gunk Shot",
+          "Belch",
+          "Spit Up",
+          "Haze"
+        ]
+      },
+      {
+        "dex_id": 93,
+        "ability": "levitate",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Dream Eater",
+          "Mean Look"
+        ]
+      },
+      {
+        "dex_id": 110,
+        "ability": "levitate",
+        "moves": [
+          "Belch",
+          "Sludge Bomb",
+          "Explosion",
+          "Memento"
+        ]
+      },
+      {
+        "dex_id": 169,
+        "ability": "inner-focus",
+        "moves": [
+          "Air Slash",
+          "Venoshock",
+          "Leech Life",
+          "Haze"
+        ]
+      },
+      {
+        "dex_id": 477,
+        "ability": "pressure",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Future Sight",
+          "Destiny Bond"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png"
+  },
+  {
+    "member_key": "lance",
+    "generation": "kanto",
+    "order": 4,
+    "role": "elite_four",
+    "name": "Lance",
+    "type_theme": "dragon",
+    "flavor": "An elite Dragon-type tamer with a Champion's pedigree.",
+    "roster": [
+      {
+        "dex_id": 130,
+        "ability": "intimidate",
+        "moves": [
+          "Hurricane",
+          "Hydro Pump",
+          "Hyper Beam",
+          "Rain Dance"
+        ]
+      },
+      {
+        "dex_id": 148,
+        "ability": "shed-skin",
+        "moves": [
+          "Outrage",
+          "Dragon Rush",
+          "Hyper Beam",
+          "Dragon Dance"
+        ]
+      },
+      {
+        "dex_id": 142,
+        "ability": "rock-head",
+        "moves": [
+          "Fly",
+          "Rock Slide",
+          "Giga Impact",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 149,
+        "ability": "inner-focus",
+        "moves": [
+          "Outrage",
+          "Hurricane",
+          "Hyper Beam",
+          "Roost"
+        ]
+      },
+      {
+        "dex_id": 373,
+        "ability": "intimidate",
+        "moves": [
+          "Outrage",
+          "Fly",
+          "Double Edge",
+          "Scary Face"
+        ]
+      },
+      {
+        "dex_id": 230,
+        "ability": "swift-swim",
+        "moves": [
+          "Wave Crash",
+          "Hydro Pump",
+          "Rain Dance",
+          "Dragon Pulse"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/130.png"
+  },
+  {
+    "member_key": "blue",
+    "generation": "kanto",
+    "order": 5,
+    "role": "champion",
+    "name": "Blue",
+    "type_theme": null,
+    "flavor": "Kanto's reigning Champion, fielding a relentlessly versatile team.",
+    "roster": [
+      {
+        "dex_id": 18,
+        "ability": "keen-eye",
+        "moves": [
+          "Hurricane",
+          "Razor Wind",
+          "Mirror Move",
+          "Air Slash"
+        ]
+      },
+      {
+        "dex_id": 65,
+        "ability": "synchronize",
+        "moves": [
+          "Future Sight",
+          "Psychic",
+          "Trick",
+          "Psycho Cut"
+        ]
+      },
+      {
+        "dex_id": 112,
+        "ability": "lightning-rod",
+        "moves": [
+          "Earthquake",
+          "Stone Edge",
+          "Giga Impact",
+          "Leer"
+        ]
+      },
+      {
+        "dex_id": 103,
+        "ability": "chlorophyll",
+        "moves": [
+          "Leaf Storm",
+          "Wood Hammer",
+          "Egg Bomb",
+          "Leech Seed"
+        ]
+      },
+      {
+        "dex_id": 59,
+        "ability": "intimidate",
+        "moves": [
+          "Flamethrower",
+          "Ember",
+          "Double Edge",
+          "Leer"
+        ]
+      },
+      {
+        "dex_id": 6,
+        "ability": "blaze",
+        "moves": [
+          "Flare Blitz",
+          "Inferno",
+          "Slash",
+          "Heat Wave"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png"
+  },
+  {
+    "member_key": "will",
+    "generation": "johto",
+    "order": 1,
+    "role": "elite_four",
+    "name": "Will",
+    "type_theme": "psychic",
+    "flavor": "A self-assured Psychic-type user of the Johto Elite Four.",
+    "roster": [
+      {
+        "dex_id": 178,
+        "ability": "synchronize",
+        "moves": [
+          "Future Sight",
+          "Psychic",
+          "Ominous Wind",
+          "Guard Swap"
+        ]
+      },
+      {
+        "dex_id": 124,
+        "ability": "oblivious",
+        "moves": [
+          "Blizzard",
+          "Psychic",
+          "Thrash",
+          "Perish Song"
+        ]
+      },
+      {
+        "dex_id": 103,
+        "ability": "chlorophyll",
+        "moves": [
+          "Leaf Storm",
+          "Wood Hammer",
+          "Egg Bomb",
+          "Leech Seed"
+        ]
+      },
+      {
+        "dex_id": 199,
+        "ability": "oblivious",
+        "moves": [
+          "Psychic",
+          "Headbutt",
+          "Heal Pulse",
+          "Trump Card"
+        ]
+      },
+      {
+        "dex_id": 196,
+        "ability": "synchronize",
+        "moves": [
+          "Future Sight",
+          "Psychic",
+          "Last Resort",
+          "Power Swap"
+        ]
+      },
+      {
+        "dex_id": 202,
+        "ability": "shadow-tag",
+        "moves": [
+          "Mirror Coat",
+          "Counter",
+          "Amnesia",
+          "Splash"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/178.png"
+  },
+  {
+    "member_key": "koga",
+    "generation": "johto",
+    "order": 2,
+    "role": "elite_four",
+    "name": "Koga",
+    "type_theme": "poison",
+    "flavor": "A former Gym Leader turned Poison-type ninja master.",
+    "roster": [
+      {
+        "dex_id": 168,
+        "ability": "swarm",
+        "moves": [
+          "Poison Jab",
+          "Cross Poison",
+          "Psychic",
+          "Toxic Thread"
+        ]
+      },
+      {
+        "dex_id": 49,
+        "ability": "shield-dust",
+        "moves": [
+          "Bug Buzz",
+          "Leech Life",
+          "Psychic",
+          "Quiver Dance"
+        ]
+      },
+      {
+        "dex_id": 205,
+        "ability": "sturdy",
+        "moves": [
+          "Heavy Slam",
+          "Gyro Ball",
+          "Explosion",
+          "Magnet Rise"
+        ]
+      },
+      {
+        "dex_id": 89,
+        "ability": "stench",
+        "moves": [
+          "Gunk Shot",
+          "Belch",
+          "Memento",
+          "Sludge Wave"
+        ]
+      },
+      {
+        "dex_id": 169,
+        "ability": "inner-focus",
+        "moves": [
+          "Air Slash",
+          "Venoshock",
+          "Leech Life",
+          "Haze"
+        ]
+      },
+      {
+        "dex_id": 110,
+        "ability": "levitate",
+        "moves": [
+          "Belch",
+          "Sludge Bomb",
+          "Explosion",
+          "Memento"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/168.png"
+  },
+  {
+    "member_key": "bruno",
+    "generation": "johto",
+    "order": 3,
+    "role": "elite_four",
+    "name": "Bruno",
+    "type_theme": "fighting",
+    "flavor": "A stone-hard Fighting-type specialist who trains through brute strength.",
+    "roster": [
+      {
+        "dex_id": 106,
+        "ability": "limber",
+        "moves": [
+          "High Jump Kick",
+          "Close Combat",
+          "Mega Kick",
+          "Endure"
+        ]
+      },
+      {
+        "dex_id": 107,
+        "ability": "keen-eye",
+        "moves": [
+          "Focus Punch",
+          "Close Combat",
+          "Mega Punch",
+          "Detect"
+        ]
+      },
+      {
+        "dex_id": 237,
+        "ability": "intimidate",
+        "moves": [
+          "Close Combat",
+          "Triple Kick",
+          "Endeavor",
+          "Detect"
+        ]
+      },
+      {
+        "dex_id": 214,
+        "ability": "swarm",
+        "moves": [
+          "Close Combat",
+          "Megahorn",
+          "Thrash",
+          "Swords Dance"
+        ]
+      },
+      {
+        "dex_id": 62,
+        "ability": "water-absorb",
+        "moves": [
+          "Superpower",
+          "Dynamic Punch",
+          "Pound",
+          "Mind Reader"
+        ]
+      },
+      {
+        "dex_id": 68,
+        "ability": "guts",
+        "moves": [
+          "Superpower",
+          "Cross Chop",
+          "Double Edge",
+          "Scary Face"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/106.png"
+  },
+  {
+    "member_key": "karen",
+    "generation": "johto",
+    "order": 4,
+    "role": "elite_four",
+    "name": "Karen",
+    "type_theme": "dark",
+    "flavor": "A laid-back but ruthless Dark-type specialist.",
+    "roster": [
+      {
+        "dex_id": 197,
+        "ability": "synchronize",
+        "moves": [
+          "Dark Pulse",
+          "Assurance",
+          "Last Resort",
+          "Guard Swap"
+        ]
+      },
+      {
+        "dex_id": 229,
+        "ability": "early-bird",
+        "moves": [
+          "Inferno",
+          "Foul Play",
+          "Nasty Plot",
+          "Flamethrower"
+        ]
+      },
+      {
+        "dex_id": 198,
+        "ability": "insomnia",
+        "moves": [
+          "Foul Play",
+          "Dark Pulse",
+          "Quash",
+          "Sucker Punch"
+        ]
+      },
+      {
+        "dex_id": 94,
+        "ability": "cursed-body",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Dream Eater",
+          "Mean Look"
+        ]
+      },
+      {
+        "dex_id": 45,
+        "ability": "chlorophyll",
+        "moves": [
+          "Solar Beam",
+          "Petal Dance",
+          "Sleep Powder",
+          "Petal Blizzard"
+        ]
+      },
+      {
+        "dex_id": 359,
+        "ability": "pressure",
+        "moves": [
+          "Sucker Punch",
+          "Night Slash",
+          "Future Sight",
+          "Perish Song"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/197.png"
+  },
+  {
+    "member_key": "lance",
+    "generation": "johto",
+    "order": 5,
+    "role": "champion",
+    "name": "Lance",
+    "type_theme": null,
+    "flavor": "An elite Dragon-type tamer with a Champion's pedigree.",
+    "roster": [
+      {
+        "dex_id": 130,
+        "ability": "intimidate",
+        "moves": [
+          "Hurricane",
+          "Hydro Pump",
+          "Hyper Beam",
+          "Rain Dance"
+        ]
+      },
+      {
+        "dex_id": 6,
+        "ability": "blaze",
+        "moves": [
+          "Flare Blitz",
+          "Inferno",
+          "Slash",
+          "Heat Wave"
+        ]
+      },
+      {
+        "dex_id": 142,
+        "ability": "rock-head",
+        "moves": [
+          "Fly",
+          "Rock Slide",
+          "Giga Impact",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 230,
+        "ability": "swift-swim",
+        "moves": [
+          "Wave Crash",
+          "Hydro Pump",
+          "Rain Dance",
+          "Dragon Pulse"
+        ]
+      },
+      {
+        "dex_id": 373,
+        "ability": "intimidate",
+        "moves": [
+          "Outrage",
+          "Fly",
+          "Double Edge",
+          "Scary Face"
+        ]
+      },
+      {
+        "dex_id": 149,
+        "ability": "inner-focus",
+        "moves": [
+          "Outrage",
+          "Hurricane",
+          "Hyper Beam",
+          "Roost"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/149.png"
+  },
+  {
+    "member_key": "sidney",
+    "generation": "hoenn",
+    "order": 1,
+    "role": "elite_four",
+    "name": "Sidney",
+    "type_theme": "dark",
+    "flavor": "A grinning Dark-type Elite Four member who battles for the thrill of it.",
+    "roster": [
+      {
+        "dex_id": 262,
+        "ability": "intimidate",
+        "moves": [
+          "Crunch",
+          "Sucker Punch",
+          "Play Rough",
+          "Embargo"
+        ]
+      },
+      {
+        "dex_id": 275,
+        "ability": "chlorophyll",
+        "moves": [
+          "Leaf Storm",
+          "Leaf Tornado",
+          "Hurricane",
+          "Whirlwind"
+        ]
+      },
+      {
+        "dex_id": 332,
+        "ability": "sand-veil",
+        "moves": [
+          "Energy Ball",
+          "Sucker Punch",
+          "Pin Missile",
+          "Destiny Bond"
+        ]
+      },
+      {
+        "dex_id": 342,
+        "ability": "hyper-cutter",
+        "moves": [
+          "Crabhammer",
+          "Crunch",
+          "Guillotine",
+          "Swords Dance"
+        ]
+      },
+      {
+        "dex_id": 359,
+        "ability": "pressure",
+        "moves": [
+          "Sucker Punch",
+          "Night Slash",
+          "Future Sight",
+          "Perish Song"
+        ]
+      },
+      {
+        "dex_id": 319,
+        "ability": "rough-skin",
+        "moves": [
+          "Liquidation",
+          "Crunch",
+          "Skull Bash",
+          "Taunt"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/262.png"
+  },
+  {
+    "member_key": "phoebe",
+    "generation": "hoenn",
+    "order": 2,
+    "role": "elite_four",
+    "name": "Phoebe",
+    "type_theme": "ghost",
+    "flavor": "A Ghost-type master who trained at Mt. Pyre.",
+    "roster": [
+      {
+        "dex_id": 356,
+        "ability": "pressure",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Future Sight",
+          "Mean Look"
+        ]
+      },
+      {
+        "dex_id": 354,
+        "ability": "insomnia",
+        "moves": [
+          "Phantom Force",
+          "Shadow Ball",
+          "Sucker Punch",
+          "Trick"
+        ]
+      },
+      {
+        "dex_id": 302,
+        "ability": "keen-eye",
+        "moves": [
+          "Foul Play",
+          "Shadow Ball",
+          "Zen Headbutt",
+          "Mean Look"
+        ]
+      },
+      {
+        "dex_id": 292,
+        "ability": "wonder-guard",
+        "moves": [
+          "Phantom Force",
+          "Shadow Ball",
+          "Fury Swipes",
+          "Spite"
+        ]
+      },
+      {
+        "dex_id": 429,
+        "ability": "levitate",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Power Gem",
+          "Hypnosis"
+        ]
+      },
+      {
+        "dex_id": 426,
+        "ability": "aftermath",
+        "moves": [
+          "Phantom Force",
+          "Shadow Ball",
+          "Explosion",
+          "Baton Pass"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/356.png"
+  },
+  {
+    "member_key": "glacia",
+    "generation": "hoenn",
+    "order": 3,
+    "role": "elite_four",
+    "name": "Glacia",
+    "type_theme": "ice",
+    "flavor": "A serene Ice-type specialist from a frozen homeland.",
+    "roster": [
+      {
+        "dex_id": 362,
+        "ability": "inner-focus",
+        "moves": [
+          "Blizzard",
+          "Freeze Dry",
+          "Crunch",
+          "Hail"
+        ]
+      },
+      {
+        "dex_id": 365,
+        "ability": "thick-fat",
+        "moves": [
+          "Blizzard",
+          "Surf",
+          "Body Slam",
+          "Hail"
+        ]
+      },
+      {
+        "dex_id": 364,
+        "ability": "thick-fat",
+        "moves": [
+          "Blizzard",
+          "Surf",
+          "Body Slam",
+          "Hail"
+        ]
+      },
+      {
+        "dex_id": 460,
+        "ability": "snow-warning",
+        "moves": [
+          "Wood Hammer",
+          "Blizzard",
+          "Ingrain",
+          "Energy Ball"
+        ]
+      },
+      {
+        "dex_id": 478,
+        "ability": "snow-cloak",
+        "moves": [
+          "Blizzard",
+          "Shadow Ball",
+          "Destiny Bond",
+          "Hail"
+        ]
+      },
+      {
+        "dex_id": 461,
+        "ability": "pressure",
+        "moves": [
+          "Blizzard",
+          "Dark Pulse",
+          "Metal Claw",
+          "Screech"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/362.png"
+  },
+  {
+    "member_key": "drake",
+    "generation": "hoenn",
+    "order": 4,
+    "role": "elite_four",
+    "name": "Drake",
+    "type_theme": "dragon",
+    "flavor": "A veteran Dragon-type tamer and airline pilot.",
+    "roster": [
+      {
+        "dex_id": 334,
+        "ability": "natural-cure",
+        "moves": [
+          "Sky Attack",
+          "Dragon Pulse",
+          "Moonblast",
+          "Perish Song"
+        ]
+      },
+      {
+        "dex_id": 330,
+        "ability": "levitate",
+        "moves": [
+          "Dragon Rush",
+          "Earthquake",
+          "Hyper Beam",
+          "Sandstorm"
+        ]
+      },
+      {
+        "dex_id": 230,
+        "ability": "swift-swim",
+        "moves": [
+          "Wave Crash",
+          "Hydro Pump",
+          "Rain Dance",
+          "Dragon Pulse"
+        ]
+      },
+      {
+        "dex_id": 373,
+        "ability": "intimidate",
+        "moves": [
+          "Outrage",
+          "Fly",
+          "Double Edge",
+          "Scary Face"
+        ]
+      },
+      {
+        "dex_id": 149,
+        "ability": "inner-focus",
+        "moves": [
+          "Outrage",
+          "Hurricane",
+          "Hyper Beam",
+          "Roost"
+        ]
+      },
+      {
+        "dex_id": 445,
+        "ability": "sand-veil",
+        "moves": [
+          "Outrage",
+          "Dragon Rush",
+          "Double Edge",
+          "Sandstorm"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/334.png"
+  },
+  {
+    "member_key": "wallace",
+    "generation": "hoenn",
+    "order": 5,
+    "role": "champion",
+    "name": "Wallace",
+    "type_theme": null,
+    "flavor": "Hoenn's elegant Champion and a master of Water-type artistry.",
+    "roster": [
+      {
+        "dex_id": 350,
+        "ability": "marvel-scale",
+        "moves": [
+          "Hydro Pump",
+          "Surf",
+          "Rain Dance",
+          "Aqua Tail"
+        ]
+      },
+      {
+        "dex_id": 130,
+        "ability": "intimidate",
+        "moves": [
+          "Hurricane",
+          "Hydro Pump",
+          "Hyper Beam",
+          "Rain Dance"
+        ]
+      },
+      {
+        "dex_id": 272,
+        "ability": "swift-swim",
+        "moves": [
+          "Hydro Pump",
+          "Bubble Beam",
+          "Fury Swipes",
+          "Growl"
+        ]
+      },
+      {
+        "dex_id": 340,
+        "ability": "oblivious",
+        "moves": [
+          "Earthquake",
+          "Earth Power",
+          "Future Sight",
+          "Rest"
+        ]
+      },
+      {
+        "dex_id": 230,
+        "ability": "swift-swim",
+        "moves": [
+          "Wave Crash",
+          "Hydro Pump",
+          "Rain Dance",
+          "Dragon Pulse"
+        ]
+      },
+      {
+        "dex_id": 365,
+        "ability": "thick-fat",
+        "moves": [
+          "Blizzard",
+          "Surf",
+          "Body Slam",
+          "Hail"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/365.png"
+  },
+  {
+    "member_key": "aaron",
+    "generation": "sinnoh",
+    "order": 1,
+    "role": "elite_four",
+    "name": "Aaron",
+    "type_theme": "bug",
+    "flavor": "A swift Bug-type specialist of the Sinnoh Elite Four.",
+    "roster": [
+      {
+        "dex_id": 267,
+        "ability": "swarm",
+        "moves": [
+          "Bug Buzz",
+          "Air Slash",
+          "Giga Drain",
+          "Quiver Dance"
+        ]
+      },
+      {
+        "dex_id": 269,
+        "ability": "shield-dust",
+        "moves": [
+          "Bug Buzz",
+          "Silver Wind",
+          "Extrasensory",
+          "Quiver Dance"
+        ]
+      },
+      {
+        "dex_id": 416,
+        "ability": "pressure",
+        "moves": [
+          "Attack Order",
+          "Bug Buzz",
+          "Destiny Bond",
+          "Fell Stinger"
+        ]
+      },
+      {
+        "dex_id": 214,
+        "ability": "swarm",
+        "moves": [
+          "Close Combat",
+          "Megahorn",
+          "Thrash",
+          "Swords Dance"
+        ]
+      },
+      {
+        "dex_id": 469,
+        "ability": "speed-boost",
+        "moves": [
+          "Bug Buzz",
+          "Air Slash",
+          "Crunch",
+          "Screech"
+        ]
+      },
+      {
+        "dex_id": 212,
+        "ability": "swarm",
+        "moves": [
+          "Iron Head",
+          "Fury Cutter",
+          "Night Slash",
+          "Swords Dance"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/267.png"
+  },
+  {
+    "member_key": "bertha",
+    "generation": "sinnoh",
+    "order": 2,
+    "role": "elite_four",
+    "name": "Bertha",
+    "type_theme": "ground",
+    "flavor": "A grandmotherly but formidable Ground-type veteran.",
+    "roster": [
+      {
+        "dex_id": 450,
+        "ability": "sand-stream",
+        "moves": [
+          "Earthquake",
+          "High Horsepower",
+          "Double Edge",
+          "Slack Off"
+        ]
+      },
+      {
+        "dex_id": 76,
+        "ability": "rock-head",
+        "moves": [
+          "Stone Edge",
+          "Earthquake",
+          "Explosion",
+          "Stealth Rock"
+        ]
+      },
+      {
+        "dex_id": 195,
+        "ability": "damp",
+        "moves": [
+          "Earthquake",
+          "Muddy Water",
+          "Mist",
+          "Haze"
+        ]
+      },
+      {
+        "dex_id": 340,
+        "ability": "oblivious",
+        "moves": [
+          "Earthquake",
+          "Earth Power",
+          "Future Sight",
+          "Rest"
+        ]
+      },
+      {
+        "dex_id": 472,
+        "ability": "hyper-cutter",
+        "moves": [
+          "Earthquake",
+          "Earth Power",
+          "Crabhammer",
+          "Swords Dance"
+        ]
+      },
+      {
+        "dex_id": 464,
+        "ability": "lightning-rod",
+        "moves": [
+          "Rock Wrecker",
+          "Earthquake",
+          "Giga Impact",
+          "Megahorn"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/450.png"
+  },
+  {
+    "member_key": "flint",
+    "generation": "sinnoh",
+    "order": 3,
+    "role": "elite_four",
+    "name": "Flint",
+    "type_theme": "fire",
+    "flavor": "A fiery-spirited Fire-type specialist and Volkner's best friend.",
+    "roster": [
+      {
+        "dex_id": 78,
+        "ability": "run-away",
+        "moves": [
+          "Flare Blitz",
+          "Fire Blast",
+          "Take Down",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 208,
+        "ability": "rock-head",
+        "moves": [
+          "Iron Tail",
+          "Dig",
+          "Double Edge",
+          "Magnet Rise"
+        ]
+      },
+      {
+        "dex_id": 426,
+        "ability": "aftermath",
+        "moves": [
+          "Phantom Force",
+          "Shadow Ball",
+          "Explosion",
+          "Baton Pass"
+        ]
+      },
+      {
+        "dex_id": 467,
+        "ability": "flame-body",
+        "moves": [
+          "Fire Blast",
+          "Flamethrower",
+          "Hyper Beam",
+          "Sunny Day"
+        ]
+      },
+      {
+        "dex_id": 229,
+        "ability": "early-bird",
+        "moves": [
+          "Inferno",
+          "Foul Play",
+          "Nasty Plot",
+          "Flamethrower"
+        ]
+      },
+      {
+        "dex_id": 392,
+        "ability": "blaze",
+        "moves": [
+          "Flare Blitz",
+          "Raging Fury",
+          "Double Edge",
+          "Calm Mind"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/78.png"
+  },
+  {
+    "member_key": "lucian",
+    "generation": "sinnoh",
+    "order": 4,
+    "role": "elite_four",
+    "name": "Lucian",
+    "type_theme": "psychic",
+    "flavor": "A bookish, calculating Psychic-type master.",
+    "roster": [
+      {
+        "dex_id": 122,
+        "ability": "soundproof",
+        "moves": [
+          "Psychic",
+          "Dazzling Gleam",
+          "Safeguard",
+          "Teeter Dance"
+        ]
+      },
+      {
+        "dex_id": 203,
+        "ability": "inner-focus",
+        "moves": [
+          "Psychic",
+          "Zen Headbutt",
+          "Crunch",
+          "Nasty Plot"
+        ]
+      },
+      {
+        "dex_id": 308,
+        "ability": "pure-power",
+        "moves": [
+          "High Jump Kick",
+          "Axe Kick",
+          "Recover",
+          "Reversal"
+        ]
+      },
+      {
+        "dex_id": 437,
+        "ability": "levitate",
+        "moves": [
+          "Future Sight",
+          "Extrasensory",
+          "Feint Attack",
+          "Heal Block"
+        ]
+      },
+      {
+        "dex_id": 65,
+        "ability": "synchronize",
+        "moves": [
+          "Future Sight",
+          "Psychic",
+          "Trick",
+          "Psycho Cut"
+        ]
+      },
+      {
+        "dex_id": 475,
+        "ability": "steadfast",
+        "moves": [
+          "Close Combat",
+          "Stored Power",
+          "False Swipe",
+          "Wide Guard"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/122.png"
+  },
+  {
+    "member_key": "cynthia",
+    "generation": "sinnoh",
+    "order": 5,
+    "role": "champion",
+    "name": "Cynthia",
+    "type_theme": null,
+    "flavor": "Sinnoh's reigning Champion, famed for her unpredictable, powerhouse team.",
+    "roster": [
+      {
+        "dex_id": 442,
+        "ability": "pressure",
+        "moves": [
+          "Dark Pulse",
+          "Shadow Ball",
+          "Dream Eater",
+          "Hypnosis"
+        ]
+      },
+      {
+        "dex_id": 407,
+        "ability": "natural-cure",
+        "moves": [
+          "Petal Dance",
+          "Energy Ball",
+          "Stun Spore",
+          "Poison Jab"
+        ]
+      },
+      {
+        "dex_id": 350,
+        "ability": "marvel-scale",
+        "moves": [
+          "Hydro Pump",
+          "Surf",
+          "Rain Dance",
+          "Aqua Tail"
+        ]
+      },
+      {
+        "dex_id": 448,
+        "ability": "steadfast",
+        "moves": [
+          "Close Combat",
+          "Meteor Mash",
+          "Dragon Pulse",
+          "Heal Pulse"
+        ]
+      },
+      {
+        "dex_id": 468,
+        "ability": "hustle",
+        "moves": [
+          "Moonblast",
+          "Air Slash",
+          "Extrasensory",
+          "Baby Doll Eyes"
+        ]
+      },
+      {
+        "dex_id": 445,
+        "ability": "sand-veil",
+        "moves": [
+          "Outrage",
+          "Dragon Rush",
+          "Double Edge",
+          "Sandstorm"
+        ]
+      }
+    ],
+    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/445.png"
+  }
+]

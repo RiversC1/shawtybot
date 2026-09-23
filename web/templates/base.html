@@ -54,6 +54,11 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/></svg>
                     </span> Challenges &amp; Gyms
                 </a>
+                <a href="/league" class="sidebar-link{{ ' active' if request.url.path.startswith('/league') else '' }}">
+                    <span class="sidebar-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6l4 5 6-8 6 8 4-5-2 13H4z"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+                    </span> Poké League
+                </a>
                 <a href="/trades" class="sidebar-link{{ ' active' if request.url.path.startswith('/trades') else '' }}">
                     <span class="sidebar-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3 3 7l4 4"/><path d="M3 7h13a4 4 0 0 1 4 4v1"/><path d="M17 21l4-4-4-4"/><path d="M21 17H8a4 4 0 0 1-4-4v-1"/></svg>

@@ -1090,6 +1090,14 @@ class Pokemon(commands.Cog):
                     PRIMARY KEY (user_id, gym_key)
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_league_progress (
+                    user_id INTEGER NOT NULL,
+                    league_key TEXT NOT NULL,
+                    earned_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, league_key)
+                )
+            """)
 
             # ---------- Trading ----------
             # side_a is always the initiator. side_a/b_catch_id name a specific
@@ -2161,6 +2169,152 @@ class Pokemon(commands.Cog):
                 f"**[Open the battle]({link})** to play it out live."
             ),
             color=discord.Color.blue(),
+        )
+        await interaction.response.send_message(embed=embed)
+
+    GENERATION_CHOICES = [
+        app_commands.Choice(name=gen.title(), value=gen) for gen in battle_store.LEAGUE_GENERATIONS
+    ]
+
+    @poke.command(name="league", description="See the Poké League: Elite Four + Champion progress")
+    async def poke_league(self, interaction: discord.Interaction):
+        if not self.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+
+        if not battle_store.league_unlocked(interaction.user.id):
+            await interaction.response.send_message(
+                "🔒 The Poké League is locked. Earn all 8 Gym Badges (`/poke gym`) to enter.", ephemeral=True
+            )
+            return
+
+        earned = battle_store.get_league_progress(interaction.user.id)
+        lines = []
+        for generation in battle_store.LEAGUE_GENERATIONS:
+            lines.append(f"**{generation.title()} League**")
+            next_e4_key = battle_store.next_elite_four_key(interaction.user.id, generation)
+            for league_key in battle_store.league_order(generation, "elite_four"):
+                member = battle_store.LEAGUE[league_key]
+                mark = "🏅" if league_key in earned else ("⚔️" if league_key == next_e4_key else "🔒")
+                lines.append(f"{mark} {member['name']}")
+            champ_key = battle_store.champion_key(generation)
+            if champ_key:
+                champ = battle_store.LEAGUE[champ_key]
+                champ_unlocked = battle_store.champion_unlocked(interaction.user.id, generation)
+                mark = "🏆" if champ_key in earned else ("⚔️" if champ_unlocked else "🔒")
+                lines.append(f"{mark} Champion {champ['name']}")
+            lines.append("")
+
+        embed = discord.Embed(
+            title="Poké League", description="\n".join(lines).strip(), color=discord.Color.purple()
+        )
+        embed.set_footer(text="Use /poke elite4 <region> and /poke champion <region> to challenge your next fight.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @poke.command(name="elite4", description="Challenge the next Elite Four member of a region, in order")
+    @app_commands.describe(region="Which region's Elite Four to challenge")
+    @app_commands.choices(region=GENERATION_CHOICES)
+    async def poke_elite4(self, interaction: discord.Interaction, region: app_commands.Choice[str]):
+        if not self.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+        if battle_store.has_active_battle(interaction.user.id):
+            await interaction.response.send_message("You're already in a battle!", ephemeral=True)
+            return
+        if not battle_store.league_unlocked(interaction.user.id):
+            await interaction.response.send_message(
+                "🔒 The Poké League is locked. Earn all 8 Gym Badges (`/poke gym`) to enter.", ephemeral=True
+            )
+            return
+        roster_a = battle_store.build_roster_for_player(interaction.user.id)
+        if not roster_a:
+            await interaction.response.send_message(
+                "You need to set your team first! Use `/poke team` or the Team page on the web app.", ephemeral=True
+            )
+            return
+
+        generation = region.value
+        league_key = battle_store.next_elite_four_key(interaction.user.id, generation)
+        if not league_key:
+            await interaction.response.send_message(
+                f"You've already defeated {generation.title()}'s entire Elite Four! Try `/poke champion`.",
+                ephemeral=True,
+            )
+            return
+
+        member = battle_store.LEAGUE[league_key]
+        roster_b = battle_store.build_roster_for_league(league_key)
+        battle_id = battle_store.create_battle(
+            "elite_four", interaction.user.id, None, league_key, interaction.guild_id, interaction.channel_id
+        )
+        battle_store.start_battle_sides(battle_id, roster_a, roster_b)
+        link = self._battle_link(battle_id)
+        embed = discord.Embed(
+            title=f"Elite Four: {member['name']}",
+            description=(
+                f"{interaction.user.mention} is challenging Elite Four member **{member['name']}** "
+                f"of the {generation.title()} region!\n\n**[Open the battle]({link})** to play it out live."
+            ),
+            color=discord.Color.purple(),
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @poke.command(name="champion", description="Challenge a region's Champion (after clearing its Elite Four)")
+    @app_commands.describe(region="Which region's Champion to challenge")
+    @app_commands.choices(region=GENERATION_CHOICES)
+    async def poke_champion(self, interaction: discord.Interaction, region: app_commands.Choice[str]):
+        if not self.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+        if battle_store.has_active_battle(interaction.user.id):
+            await interaction.response.send_message("You're already in a battle!", ephemeral=True)
+            return
+        if not battle_store.league_unlocked(interaction.user.id):
+            await interaction.response.send_message(
+                "🔒 The Poké League is locked. Earn all 8 Gym Badges (`/poke gym`) to enter.", ephemeral=True
+            )
+            return
+        roster_a = battle_store.build_roster_for_player(interaction.user.id)
+        if not roster_a:
+            await interaction.response.send_message(
+                "You need to set your team first! Use `/poke team` or the Team page on the web app.", ephemeral=True
+            )
+            return
+
+        generation = region.value
+        if not battle_store.champion_unlocked(interaction.user.id, generation):
+            await interaction.response.send_message(
+                f"🔒 Defeat all 4 of {generation.title()}'s Elite Four first (`/poke elite4`).", ephemeral=True
+            )
+            return
+        earned = battle_store.get_league_progress(interaction.user.id)
+        league_key = battle_store.champion_key(generation)
+        if not league_key or league_key in earned:
+            await interaction.response.send_message(
+                f"You've already defeated {generation.title()}'s Champion! 🏆", ephemeral=True
+            )
+            return
+
+        champ = battle_store.LEAGUE[league_key]
+        roster_b = battle_store.build_roster_for_league(league_key)
+        battle_id = battle_store.create_battle(
+            "champion", interaction.user.id, None, league_key, interaction.guild_id, interaction.channel_id
+        )
+        battle_store.start_battle_sides(battle_id, roster_a, roster_b)
+        link = self._battle_link(battle_id)
+        embed = discord.Embed(
+            title=f"Champion Battle: {champ['name']}",
+            description=(
+                f"{interaction.user.mention} is challenging **{champ['name']}**, "
+                f"Champion of the {generation.title()} region!\n\n**[Open the battle]({link})** to play it out live."
+            ),
+            color=discord.Color.purple(),
         )
         await interaction.response.send_message(embed=embed)
 

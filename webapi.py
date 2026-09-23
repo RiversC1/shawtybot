@@ -1793,3 +1793,141 @@ async def start_gym_battle(gym_key: str, user_id: int = Depends(get_current_user
 
     battle_id = await asyncio.to_thread(_do)
     return {"battle_id": battle_id}
+
+
+# ---------- Poké League (Elite Four + Champions) ----------
+
+@app.get("/api/league")
+def get_league(user_id: int = Depends(get_current_user_id)):
+    unlocked = battle_store.league_unlocked(user_id)
+    earned = battle_store.get_league_progress(user_id)
+    generations = []
+    for generation in battle_store.LEAGUE_GENERATIONS:
+        next_e4_key = battle_store.next_elite_four_key(user_id, generation)
+        elite_four = []
+        for league_key in battle_store.league_order(generation, "elite_four"):
+            member = battle_store.LEAGUE[league_key]
+            elite_four.append({
+                "league_key": league_key,
+                "member_key": member["member_key"],
+                "order": member["order"],
+                "name": member["name"],
+                "type_theme": member["type_theme"],
+                "flavor": member["flavor"],
+                "portrait": member.get("portrait"),
+                "earned": league_key in earned,
+                "is_next": league_key == next_e4_key,
+            })
+        champ_key = battle_store.champion_key(generation)
+        champion = None
+        if champ_key:
+            champ = battle_store.LEAGUE[champ_key]
+            champion = {
+                "league_key": champ_key,
+                "member_key": champ["member_key"],
+                "name": champ["name"],
+                "flavor": champ["flavor"],
+                "portrait": champ.get("portrait"),
+                "earned": champ_key in earned,
+                "unlocked": battle_store.champion_unlocked(user_id, generation),
+            }
+        generations.append({"generation": generation, "elite_four": elite_four, "champion": champion})
+
+    return {"unlocked": unlocked, "generations": generations}
+
+
+@app.get("/api/league/{generation}/{member_key}")
+def get_league_member_detail(generation: str, member_key: str, user_id: int = Depends(get_current_user_id)):
+    league_key = f"{generation}:{member_key}"
+    member = battle_store.LEAGUE.get(league_key)
+    if not member:
+        raise HTTPException(404, "Unknown League member")
+
+    earned = battle_store.get_league_progress(user_id)
+    if member["role"] == "champion":
+        is_next = battle_store.champion_unlocked(user_id, generation) and league_key not in earned
+    else:
+        is_next = league_key == battle_store.next_elite_four_key(user_id, generation)
+
+    roster = []
+    for entry in member["roster"]:
+        mon = POKEDEX.get(entry["dex_id"], {})
+        roster.append({
+            "dex_id": entry["dex_id"],
+            "name": mon.get("name", f"#{entry['dex_id']}"),
+            "artwork": mon.get("artwork"),
+            "types": mon.get("types", []),
+            "moves": entry["moves"],
+            "ability": format_ability_name(entry["ability"]) if entry.get("ability") else None,
+        })
+
+    return {
+        "league_key": league_key,
+        "generation": generation,
+        "member_key": member["member_key"],
+        "role": member["role"],
+        "order": member["order"],
+        "name": member["name"],
+        "type_theme": member["type_theme"],
+        "flavor": member["flavor"],
+        "portrait": member.get("portrait"),
+        "earned": league_key in earned,
+        "is_next": is_next,
+        "roster": roster,
+    }
+
+
+@app.post("/api/battles/elite4/{generation}/{member_key}")
+async def start_elite_four_battle(generation: str, member_key: str, user_id: int = Depends(get_current_user_id)):
+    league_key = f"{generation}:{member_key}"
+    member = battle_store.LEAGUE.get(league_key)
+    if not member or member["role"] != "elite_four":
+        raise HTTPException(404, "Unknown Elite Four member")
+    if battle_store.has_active_battle(user_id):
+        raise HTTPException(400, "You're already in a battle!")
+    if not battle_store.league_unlocked(user_id):
+        raise HTTPException(400, "Earn all 8 Gym Badges first to unlock the Poké League.")
+    roster_a = battle_store.build_roster_for_player(user_id)
+    if not roster_a:
+        raise HTTPException(400, "You need to set your team first — use the Team page.")
+    next_key = battle_store.next_elite_four_key(user_id, generation)
+    if next_key is None:
+        raise HTTPException(400, f"You've already defeated {generation.title()}'s entire Elite Four!")
+    if league_key != next_key:
+        raise HTTPException(400, "You need to beat the earlier Elite Four members first, in order.")
+
+    def _do():
+        roster_b = battle_store.build_roster_for_league(league_key)
+        battle_id = battle_store.create_battle("elite_four", user_id, None, league_key, 0, 0)
+        battle_store.start_battle_sides(battle_id, roster_a, roster_b)
+        return battle_id
+
+    battle_id = await asyncio.to_thread(_do)
+    return {"battle_id": battle_id}
+
+
+@app.post("/api/battles/champion/{generation}")
+async def start_champion_battle(generation: str, user_id: int = Depends(get_current_user_id)):
+    league_key = battle_store.champion_key(generation)
+    member = battle_store.LEAGUE.get(league_key) if league_key else None
+    if not member:
+        raise HTTPException(404, "Unknown region")
+    if battle_store.has_active_battle(user_id):
+        raise HTTPException(400, "You're already in a battle!")
+    roster_a = battle_store.build_roster_for_player(user_id)
+    if not roster_a:
+        raise HTTPException(400, "You need to set your team first — use the Team page.")
+    if not battle_store.champion_unlocked(user_id, generation):
+        raise HTTPException(400, f"Defeat all 4 of {generation.title()}'s Elite Four first.")
+    earned = battle_store.get_league_progress(user_id)
+    if league_key in earned:
+        raise HTTPException(400, f"You've already defeated {generation.title()}'s Champion!")
+
+    def _do():
+        roster_b = battle_store.build_roster_for_league(league_key)
+        battle_id = battle_store.create_battle("champion", user_id, None, league_key, 0, 0)
+        battle_store.start_battle_sides(battle_id, roster_a, roster_b)
+        return battle_id
+
+    battle_id = await asyncio.to_thread(_do)
+    return {"battle_id": battle_id}

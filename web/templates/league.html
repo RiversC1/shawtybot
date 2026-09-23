@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Poké League — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Poké League</h1>
+
+{% if not league.unlocked %}
+<div class="card league-locked-banner">
+    <p class="muted">🔒 Defeat all 8 Gym Leaders to enter the Poké League.</p>
+    <p class="muted">Check your gym progress any time with <code>/poke gyms</code> in Discord.</p>
+</div>
+{% else %}
+<p class="muted">
+    Challenge each region's Elite Four in order, then their Champion — right here on the web, or with
+    <code>/poke elite4</code> / <code>/poke champion</code> in Discord.
+</p>
+
+{% for gen in league.generations %}
+<section class="league-generation">
+    <h2 class="league-generation-title">{{ gen.generation|capitalize }} League</h2>
+    <div class="grid">
+        {% for m in gen.elite_four %}
+        <div class="card gym-card{{ '' if (m.earned or m.is_next) else ' is-locked' }}"
+             data-generation="{{ gen.generation }}" data-member-key="{{ m.member_key }}">
+            <div class="gym-card-portrait">
+                <img src="{{ m.portrait }}" alt="{{ m.name }}" loading="lazy">
+                {% if not m.earned and not m.is_next %}<div class="gym-card-lock">🔒</div>{% endif %}
+            </div>
+            <div class="gym-card-name">{{ m.name }}</div>
+            <div class="muted">{{ m.type_theme|capitalize }}-type</div>
+        </div>
+        {% endfor %}
+        {% if gen.champion %}
+        <div class="card gym-card champion-card{{ '' if (gen.champion.earned or gen.champion.unlocked) else ' is-locked' }}"
+             data-generation="{{ gen.generation }}" data-member-key="{{ gen.champion.member_key }}">
+            <div class="gym-card-portrait">
+                <img src="{{ gen.champion.portrait }}" alt="{{ gen.champion.name }}" loading="lazy">
+                {% if not gen.champion.earned and not gen.champion.unlocked %}<div class="gym-card-lock">🔒</div>{% endif %}
+            </div>
+            <div class="gym-card-name">👑 {{ gen.champion.name }}</div>
+            <div class="muted">Champion</div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endfor %}
+{% endif %}
+
+<div id="league-modal" class="modal-overlay" hidden>
+    <div class="modal collection-modal">
+        <div class="modal-header">
+            <h2 id="lm-title">League</h2>
+            <button id="lm-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="lm-body">
+            <p class="muted">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script src="/static/move-tooltip.js"></script>
+<script src="/static/league.js"></script>
+{% endblock %}
