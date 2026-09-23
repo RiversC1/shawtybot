@@ -1672,6 +1672,15 @@ class Pokemon(commands.Cog):
             choices.append(app_commands.Choice(name=f"{mon['name']} (x{count})", value=mon["name"]))
         return choices[:25]
 
+    async def spawn_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        current = (current or "").lower()
+        choices = []
+        for mon in self.pokedex.values():
+            if current and current not in mon["name"].lower():
+                continue
+            choices.append(app_commands.Choice(name=mon["name"], value=mon["name"]))
+        return choices[:25]
+
     # ---------- Commands ----------
 
     poke = app_commands.Group(name="poke", description="Pokémon commands")
@@ -1942,6 +1951,32 @@ class Pokemon(commands.Cog):
         await interaction.response.send_message(
             f"✅ Gave **{quantity}x {item.name}** to **{member.display_name}**.", ephemeral=True
         )
+
+    @poke.command(name="spawn", description="[Bot owner only] Manually spawn a specific Pokémon in this channel")
+    @app_commands.describe(pokemon="The Pokémon species to spawn")
+    @app_commands.autocomplete(pokemon=spawn_autocomplete)
+    async def poke_spawn(self, interaction: discord.Interaction, pokemon: str):
+        if not await self.bot.is_owner(interaction.user):
+            await interaction.response.send_message(
+                "You don't have permission to use this command.", ephemeral=True
+            )
+            return
+
+        base = find_by_name(self.pokedex, pokemon)
+        if not base:
+            await interaction.response.send_message("Couldn't find that Pokémon.", ephemeral=True)
+            return
+
+        mon = dict(base)
+        mon["is_shiny"] = random.random() < SHINY_CHANCE
+        # spawner_id=None: an admin-triggered spawn shouldn't give anyone the
+        # summoner catch-rate bonus — it behaves like a natural spawn for
+        # catching purposes, just labeled as manually spawned in the embed.
+        view = SpawnView(self, mon, spawner_id=None)
+        embed = self.build_spawn_embed(mon, spawned_by=f"{interaction.user.mention} (admin)", expires_at=view.expires_at)
+        await interaction.response.send_message(embed=embed, view=view)
+        view.message = await interaction.original_response()
+        self.track_spawn(view.message.id, view.message.channel.id, mon["id"], mon["is_shiny"], view.expires_at)
 
     def _battle_link(self, battle_id: int) -> str:
         base_url = os.getenv("WEB_BASE_URL", "http://localhost:8080")
