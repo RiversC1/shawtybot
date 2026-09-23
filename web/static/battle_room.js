@@ -85,6 +85,23 @@
   }
 
   muteBtn.addEventListener("click", () => {
+    // If the saved preference is already "unmuted" but the music never
+    // actually started (the automatic attempt at page load had no user
+    // gesture behind it, so the browser silently blocked it), this click IS
+    // that gesture — just retry playback. Without this, the click toggles
+    // straight to muted instead (since as far as the button knows, sound was
+    // already "on"), and it takes a confusing second click to undo that and
+    // actually hear anything.
+    if (!BattleAudio.isMuted() && !BattleAudio.isMusicPlaying()) {
+      try {
+        BattleAudio.ensureCtx();
+        BattleAudio.retryMusic();
+      } catch (e) {
+        console.error("BattleAudio.retryMusic failed:", e);
+      }
+      updateMuteBtn();
+      return;
+    }
     try {
       BattleAudio.setMuted(!BattleAudio.isMuted());
     } catch (e) {

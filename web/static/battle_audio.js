@@ -206,6 +206,10 @@ window.BattleAudio = (function () {
     }
   }
 
+  function isMusicPlaying() {
+    return !!musicEl && !musicEl.paused;
+  }
+
   function handleEvent(event) {
     if (muted) return;
     switch (event.type) {
@@ -238,5 +242,7 @@ window.BattleAudio = (function () {
     }
   }
 
-  return { ensureCtx, isMuted, setMuted, startMusic, stopMusic, retryMusic, playSfx, playCry, handleEvent };
+  return {
+    ensureCtx, isMuted, setMuted, startMusic, stopMusic, retryMusic, isMusicPlaying, playSfx, playCry, handleEvent,
+  };
 })();
