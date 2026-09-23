@@ -18,20 +18,25 @@
 <div class="battle-scene" id="br-scene">
     <div class="battle-turn-badge" id="br-turn-badge">Turn {{ battle.turn_number }}</div>
 
-    <div class="battle-scene-row battle-scene-row-top">
-        <div class="battle-hud" id="br-hud-b"></div>
-        <div class="battle-sprite-slot">
+    <div class="battle-trainer-panel battle-trainer-panel-b" id="br-trainer-b"></div>
+    <div class="battle-trainer-panel battle-trainer-panel-a" id="br-trainer-a"></div>
+
+    <div class="battle-mon-column battle-mon-column-top">
+        <div class="battle-hp-label" id="br-hp-b"></div>
+        <div class="battle-sprite-slot" id="br-slot-b">
             <div class="battle-platform"></div>
             <img class="battle-sprite" id="br-sprite-b" alt="">
+            <img class="battle-throw-ball" id="br-ball-b" src="/static/favicon.png" alt="">
         </div>
     </div>
 
-    <div class="battle-scene-row battle-scene-row-bottom">
-        <div class="battle-sprite-slot">
+    <div class="battle-mon-column battle-mon-column-bottom">
+        <div class="battle-hp-label" id="br-hp-a"></div>
+        <div class="battle-sprite-slot" id="br-slot-a">
             <div class="battle-platform"></div>
             <img class="battle-sprite" id="br-sprite-a" alt="">
+            <img class="battle-throw-ball" id="br-ball-a" src="/static/favicon.png" alt="">
         </div>
-        <div class="battle-hud" id="br-hud-a"></div>
     </div>
 </div>
 

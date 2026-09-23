@@ -1467,9 +1467,10 @@ code {
         radial-gradient(ellipse at 70% 0%, rgba(126, 200, 255, 0.10), transparent 55%),
         linear-gradient(180deg, #1c1c2c 0%, #14141f 55%, #101018 100%);
     border: 1px solid var(--border);
-    min-height: 340px;
+    min-height: 400px;
     display: flex;
     flex-direction: column;
+    align-items: center;
     justify-content: space-between;
     gap: 20px;
 }
@@ -1487,20 +1488,72 @@ code {
     z-index: 2;
 }
 
-.battle-scene-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
+/* The trainer/gym-leader/elite-four portrait + their team roster — pinned to
+   a corner like a scoreboard, independent of whichever Pokémon is currently
+   out (that's the HP label below, not this). */
+.battle-trainer-panel {
+    position: absolute;
+    width: 108px;
+    text-align: center;
+    z-index: 2;
+    background: rgba(10, 10, 16, 0.5);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px;
+    backdrop-filter: blur(2px);
 }
 
-/* Each side's HUD sits right next to its own sprite instead of the two
-   being pushed to opposite ends of the row — with two real trainer names
-   instead of "you vs a gym leader", that gap read as the HUD and the
-   Pokémon belonging to different sides. */
-.battle-scene-row-top { padding-top: 10px; justify-content: flex-end; }
-.battle-scene-row-bottom { padding-bottom: 4px; justify-content: flex-start; }
+.battle-trainer-panel-b { top: 12px; right: 12px; }
+.battle-trainer-panel-a { bottom: 12px; left: 12px; }
+
+.battle-trainer-panel.is-winner {
+    border-color: var(--yellow);
+    box-shadow: 0 0 0 1px var(--yellow);
+}
+
+.battle-trainer-portrait {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    object-position: center top;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.battle-trainer-name {
+    font-weight: bold;
+    font-size: 0.78em;
+    margin: 6px 0 4px;
+    overflow-wrap: break-word;
+}
+
+.battle-mon-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.battle-mon-column-top { padding-top: 6px; }
+
+.battle-hp-label {
+    background: rgba(10, 10, 16, 0.55);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 14px;
+    min-width: 170px;
+    text-align: left;
+    backdrop-filter: blur(2px);
+}
+
+.battle-hp-label.is-winner {
+    border-color: var(--yellow);
+    box-shadow: 0 0 0 1px var(--yellow);
+}
+
+.battle-hp-name {
+    font-weight: bold;
+}
 
 .battle-sprite-slot {
     position: relative;
@@ -1530,39 +1583,16 @@ code {
     z-index: 1;
 }
 
-.battle-hud {
-    background: rgba(10, 10, 16, 0.55);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 10px 14px;
-    min-width: 200px;
-    backdrop-filter: blur(2px);
-}
-
-.battle-hud.is-winner {
-    border-color: var(--yellow);
-    box-shadow: 0 0 0 1px var(--yellow);
-}
-
-.battle-hud-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-
-.battle-hud-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-    object-position: top;
-    background: rgba(255, 255, 255, 0.08);
-    flex-shrink: 0;
-}
-
-.battle-hud-name {
-    font-weight: bold;
+/* The Poké Ball thrown during a send-out — arcs in from the trainer's side,
+   spins, and fades out right as the Pokémon's sprite pops in underneath it. */
+.battle-throw-ball {
+    position: absolute;
+    bottom: 46px;
+    width: 22px;
+    height: 22px;
+    z-index: 3;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .status-badge {
@@ -1583,13 +1613,9 @@ code {
 .status-badge.status-frz { background: #7ad6e0; }
 
 @media (max-width: 640px) {
-    .battle-scene-row {
-        justify-content: center;
-        text-align: center;
-    }
-    .battle-hud {
-        min-width: 160px;
-    }
+    .battle-trainer-panel { width: 84px; padding: 6px; }
+    .battle-trainer-portrait { width: 40px; height: 40px; }
+    .battle-hp-label { min-width: 130px; padding: 6px 10px; }
 }
 
 /* Attack lunge: toward the opponent (row-bottom sprites lunge up-right,
@@ -1604,6 +1630,24 @@ code {
 }
 .battle-sprite.anim-attack-a { animation: battle-lunge-up 0.4s ease; }
 .battle-sprite.anim-attack-b { animation: battle-lunge-down 0.4s ease; }
+
+/* Ball arcs in from the thrower's side (down toward the sprite for the
+   opponent's throw from above, up toward it for the player's throw from
+   below), spinning, then pops/fades right as the Pokémon appears. */
+@keyframes pokeball-arc-a {
+    0%   { transform: translate(-70px, 30px) scale(0.6) rotate(0deg); opacity: 1; }
+    55%  { transform: translate(-15px, -35px) scale(1) rotate(200deg); opacity: 1; }
+    80%  { transform: translate(0, 0) scale(1.05) rotate(320deg); opacity: 1; }
+    100% { transform: translate(0, 0) scale(1.6) rotate(360deg); opacity: 0; }
+}
+@keyframes pokeball-arc-b {
+    0%   { transform: translate(70px, -30px) scale(0.6) rotate(0deg); opacity: 1; }
+    55%  { transform: translate(15px, 10px) scale(1) rotate(-200deg); opacity: 1; }
+    80%  { transform: translate(0, 0) scale(1.05) rotate(-320deg); opacity: 1; }
+    100% { transform: translate(0, 0) scale(1.6) rotate(-360deg); opacity: 0; }
+}
+.battle-throw-ball.anim-throw-ball-a { animation: pokeball-arc-a 0.65s ease-out forwards; }
+.battle-throw-ball.anim-throw-ball-b { animation: pokeball-arc-b 0.65s ease-out forwards; }
 
 @keyframes battle-hit-flash {
     0%, 100% { filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.4)) brightness(1); }

@@ -8,19 +8,28 @@
   // of both sides' whole turn snapping to its final state at once.
   const EVENT_DELAYS = {
     move_used: 500, damage: 600, confusion_self_hit: 600, status_damage: 600, recoil: 600,
-    drain: 500, heal: 500, faint: 750, switch_in: 600, status_applied: 550, stat_changed: 500,
+    drain: 500, heal: 500, faint: 750, status_applied: 550, stat_changed: 500,
     cannot_act: 550, move_missed: 550, move_failed: 500, charge_start: 500, multi_hit_summary: 450,
   };
   const DEFAULT_EVENT_DELAY = 250; // structural events with no on-screen effect (turn_start, switch_out, battle_end)
+
+  // switch_in plays as its own two-phase mini-sequence (see playSwitchIn)
+  // rather than through the generic per-event delay table above.
+  const SEND_OUT_THROW_MS = 650;
+  const SEND_OUT_SETTLE_MS = 500;
 
   const titleEl = document.getElementById("br-title");
   const subtitleEl = document.getElementById("br-subtitle");
   const resultEl = document.getElementById("br-result");
   const turnBadgeEl = document.getElementById("br-turn-badge");
-  const hudA = document.getElementById("br-hud-a");
-  const hudB = document.getElementById("br-hud-b");
+  const trainerPanelA = document.getElementById("br-trainer-a");
+  const trainerPanelB = document.getElementById("br-trainer-b");
+  const hpLabelA = document.getElementById("br-hp-a");
+  const hpLabelB = document.getElementById("br-hp-b");
   const spriteA = document.getElementById("br-sprite-a");
   const spriteB = document.getElementById("br-sprite-b");
+  const ballA = document.getElementById("br-ball-a");
+  const ballB = document.getElementById("br-ball-b");
   const logEl = document.getElementById("br-log");
   const actionPanel = document.getElementById("br-action-panel");
   const connectionStatusEl = document.getElementById("br-connection-status");
@@ -137,7 +146,6 @@
 
   function animationForEvent(event) {
     switch (event.type) {
-      case "switch_in": return "anim-switch-in";
       case "faint": return "anim-faint";
       case "damage": case "confusion_self_hit": case "status_damage": case "recoil":
         return "anim-hit";
@@ -156,13 +164,6 @@
     const current = isA ? visibleA : visibleB;
 
     switch (event.type) {
-      case "switch_in": {
-        const roster = isA ? truth.roster_a : truth.roster_b;
-        const match = roster.find((m) => m.dex_id === event.dex_id && !m.is_fainted) || roster.find((m) => m.dex_id === event.dex_id);
-        if (isA) visibleA = match ? { ...match } : current;
-        else visibleB = match ? { ...match } : current;
-        break;
-      }
       case "damage": case "confusion_self_hit": case "status_damage": case "recoil": case "drain": case "heal": {
         if (current && event.new_hp !== undefined) {
           const updated = { ...current, current_hp: event.new_hp };
@@ -191,29 +192,36 @@
     revealed.push(event);
   }
 
-  function renderHud(hudEl, name, avatar, activeMon, rosterForStrip, isWinner) {
-    const avatarHtml = avatar ? `<img class="battle-hud-avatar" src="${avatar}" alt="${name}">` : "";
-    if (!activeMon) {
-      hudEl.innerHTML = `
-        <div class="battle-hud-header">${avatarHtml}<div class="battle-hud-name">${name}</div></div>
-        <p class="muted">No Pokémon</p>`;
-      return;
-    }
-    const pct = activeMon.max_hp > 0 ? Math.max(0, Math.min(100, (activeMon.current_hp / activeMon.max_hp) * 100)) : 0;
-    const rosterStrip = rosterForStrip
+  // The trainer/gym-leader/elite-four panel: portrait + name + team roster.
+  // This is per-side identity, independent of whichever Pokémon is currently
+  // out — that's renderHpLabel below.
+  function renderTrainerPanel(panelEl, name, avatar, roster, isWinner) {
+    const avatarHtml = avatar ? `<img class="battle-trainer-portrait" src="${avatar}" alt="${name}">` : "";
+    const rosterStrip = (roster || [])
       .map(
         (m) =>
           `<img class="battle-roster-mon${m.is_fainted ? " is-fainted" : ""}${m.is_active ? " is-active" : ""}" src="${m.artwork}" alt="${m.name}" title="${m.name}">`
       )
       .join("");
+    panelEl.classList.toggle("is-winner", !!isWinner);
+    panelEl.innerHTML = `
+        ${avatarHtml}
+        <div class="battle-trainer-name">${name}</div>
+        <div class="battle-roster-strip">${rosterStrip}</div>
+    `;
+  }
 
-    hudEl.classList.toggle("is-winner", !!isWinner);
-    hudEl.innerHTML = `
-        <div class="battle-hud-header">${avatarHtml}<div class="battle-hud-name">${name}</div></div>
-        <div>${activeMon.name}${statusBadgeHtml(activeMon.status)}${activeMon.is_fainted ? " (fainted)" : ""}</div>
+  function renderHpLabel(labelEl, activeMon, isWinner) {
+    labelEl.classList.toggle("is-winner", !!isWinner);
+    if (!activeMon) {
+      labelEl.innerHTML = `<p class="muted">No Pokémon</p>`;
+      return;
+    }
+    const pct = activeMon.max_hp > 0 ? Math.max(0, Math.min(100, (activeMon.current_hp / activeMon.max_hp) * 100)) : 0;
+    labelEl.innerHTML = `
+        <div class="battle-hp-name">${activeMon.name}${statusBadgeHtml(activeMon.status)}${activeMon.is_fainted ? " (fainted)" : ""}</div>
         <div class="hp-bar-track"><div class="hp-bar-fill ${hpClass(activeMon.current_hp, activeMon.max_hp)}" style="width:${pct}%"></div></div>
         <div class="muted">${Math.max(0, activeMon.current_hp)}/${activeMon.max_hp} HP</div>
-        <div class="battle-roster-strip">${rosterStrip}</div>
     `;
   }
 
@@ -240,6 +248,27 @@
       spriteEl.classList.remove("anim-attack-a", "anim-attack-b", "anim-hit", "anim-faint", "anim-switch-in");
       void spriteEl.offsetWidth; // force reflow so the animation restarts even if the same class was just used
       spriteEl.classList.add(animClass);
+    }
+  }
+
+  // Phase 1 of a send-out: show the trainer standing where their Pokémon
+  // will appear, and throw a ball at them. dataset.mon is cleared so the
+  // next renderSprite() call (phase 2, showing the actual Pokémon) always
+  // re-assigns .src even if it happens to be the same species as before.
+  function showTrainerStanding(spriteEl, ballEl, avatarUrl, name, isA) {
+    spriteEl.style.visibility = "visible";
+    spriteEl.style.opacity = "1";
+    spriteEl.src = avatarUrl || "";
+    spriteEl.alt = name;
+    spriteEl.dataset.mon = "";
+    spriteEl.classList.remove("anim-attack-a", "anim-attack-b", "anim-hit", "anim-faint", "anim-switch-in");
+    void spriteEl.offsetWidth;
+    spriteEl.classList.add("anim-switch-in");
+
+    if (ballEl) {
+      ballEl.classList.remove("anim-throw-ball-a", "anim-throw-ball-b");
+      void ballEl.offsetWidth;
+      ballEl.classList.add(isA ? "anim-throw-ball-a" : "anim-throw-ball-b");
     }
   }
 
@@ -474,12 +503,39 @@
   }
 
   function renderFrame(animA, animB) {
-    renderHud(hudA, truth.name_a, truth.avatar_a, visibleA, truth.roster_a, truth.winner_side === "A");
-    renderHud(hudB, truth.name_b, truth.avatar_b, visibleB, truth.roster_b, truth.winner_side === "B");
+    renderTrainerPanel(trainerPanelA, truth.name_a, truth.avatar_a, truth.roster_a, truth.winner_side === "A");
+    renderTrainerPanel(trainerPanelB, truth.name_b, truth.avatar_b, truth.roster_b, truth.winner_side === "B");
+    renderHpLabel(hpLabelA, visibleA, truth.winner_side === "A");
+    renderHpLabel(hpLabelB, visibleB, truth.winner_side === "B");
     renderSprite(spriteA, visibleA, animA);
     renderSprite(spriteB, visibleB, animB);
     renderLog();
     renderMeta();
+  }
+
+  // A switch-in plays as its own two-phase beat instead of the generic
+  // per-event loop: first the trainer appears and throws a ball (with the
+  // "X sends out Y!" log line showing immediately), then after a beat the
+  // ball vanishes and the actual Pokémon is revealed.
+  async function playSwitchIn(event) {
+    const isA = event.side === "A";
+    revealed.push(event);
+    renderLog();
+    renderMeta();
+
+    const avatarUrl = isA ? truth.avatar_a : truth.avatar_b;
+    const trainerName = isA ? truth.name_a : truth.name_b;
+    showTrainerStanding(isA ? spriteA : spriteB, isA ? ballA : ballB, avatarUrl, trainerName, isA);
+    await wait(SEND_OUT_THROW_MS);
+
+    const roster = isA ? truth.roster_a : truth.roster_b;
+    const match = roster.find((m) => m.dex_id === event.dex_id && !m.is_fainted) || roster.find((m) => m.dex_id === event.dex_id);
+    if (isA) visibleA = match ? { ...match } : visibleA;
+    else visibleB = match ? { ...match } : visibleB;
+
+    BattleAudio.handleEvent(event); // the cry plays as the Pokémon itself appears
+    renderFrame(isA ? "anim-switch-in" : null, !isA ? "anim-switch-in" : null);
+    await wait(SEND_OUT_SETTLE_MS);
   }
 
   // Plays every queued event one at a time — HP bars drain to each event's
@@ -489,6 +545,10 @@
   async function playQueue() {
     while (pendingEvents.length) {
       const event = pendingEvents.shift();
+      if (event.type === "switch_in") {
+        await playSwitchIn(event);
+        continue;
+      }
       applyEventEffect(event);
       const animA = event.side === "A" ? animationForEvent(event) : null;
       const animB = event.side === "B" ? animationForEvent(event) : null;
