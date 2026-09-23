@@ -1495,8 +1495,12 @@ code {
     flex-wrap: wrap;
 }
 
-.battle-scene-row-top { padding-top: 10px; }
-.battle-scene-row-bottom { padding-bottom: 4px; }
+/* Each side's HUD sits right next to its own sprite instead of the two
+   being pushed to opposite ends of the row — with two real trainer names
+   instead of "you vs a gym leader", that gap read as the HUD and the
+   Pokémon belonging to different sides. */
+.battle-scene-row-top { padding-top: 10px; justify-content: flex-end; }
+.battle-scene-row-bottom { padding-bottom: 4px; justify-content: flex-start; }
 
 .battle-sprite-slot {
     position: relative;
