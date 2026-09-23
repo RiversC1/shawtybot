@@ -653,17 +653,41 @@
     });
   }
 
-  // Initial render: show the full existing history immediately, with no
-  // playback delay — only events that arrive AFTER this point get the
-  // one-at-a-time treatment.
-  visibleA = truth.roster_a.find((m) => m.is_active) || truth.roster_a[0] || null;
-  visibleB = truth.roster_b.find((m) => m.is_active) || truth.roster_b[0] || null;
-  revealed = truth.events.slice();
-  animatedEventCount = truth.events.length;
-  renderFrame(null, null);
-  renderResultBanner();
-  renderActionPanel(truth);
-  syncMusicAndResult();
+  // Initial render: normally shows the full existing history immediately,
+  // with no playback delay, so reopening a battle already many turns in
+  // doesn't replay all of it — only events that arrive AFTER this point get
+  // the one-at-a-time treatment. The one exception is a battle nobody has
+  // acted in yet (just the opening send-outs): that gets the same animated
+  // beat a live switch-in gets, so the very first "X sends out Y!" throw
+  // isn't the one send-out in the whole battle that never plays.
+  const onlyOpeningSendOuts =
+    truth.events.length > 0 && truth.events.every((e) => e.type === "turn_start" || e.type === "switch_in");
+
+  if (onlyOpeningSendOuts) {
+    visibleA = null;
+    visibleB = null;
+    revealed = [];
+    // Mark these as already claimed for animation *before* playQueue starts
+    // (not after) — connectWs()'s first message can otherwise land mid- or
+    // right-after-animation and, seeing animatedEventCount still at 0,
+    // re-queue the exact same send-outs a second time.
+    animatedEventCount = truth.events.length;
+    pendingEvents = truth.events.slice();
+    renderFrame(null, null);
+    playing = true;
+    playQueue().finally(() => {
+      playing = false;
+    });
+  } else {
+    visibleA = truth.roster_a.find((m) => m.is_active) || truth.roster_a[0] || null;
+    visibleB = truth.roster_b.find((m) => m.is_active) || truth.roster_b[0] || null;
+    revealed = truth.events.slice();
+    animatedEventCount = truth.events.length;
+    renderFrame(null, null);
+    renderResultBanner();
+    renderActionPanel(truth);
+    syncMusicAndResult();
+  }
 
   if (truth.status !== "finished" && truth.status !== "abandoned") {
     connectWs();

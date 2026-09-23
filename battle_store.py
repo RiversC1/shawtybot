@@ -269,6 +269,15 @@ def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster
             (deadline, now, battle_id),
         )
 
+    # The opening send-outs never went through resolve_turn (which is what
+    # normally emits switch_in), so without this the battle log — and the
+    # web room's send-out animation — would have nothing to show for how
+    # the first two Pokémon got there.
+    append_battle_events(battle_id, 1, [
+        {"type": "switch_in", "side": "A", "dex_id": roster_a[0].dex_id, "name": roster_a[0].species_name},
+        {"type": "switch_in", "side": "B", "dex_id": roster_b[0].dex_id, "name": roster_b[0].species_name},
+    ])
+
 
 def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | tuple[None, None]:
     battle_row = get_battle_row(battle_id)
