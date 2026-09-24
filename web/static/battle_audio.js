@@ -66,10 +66,11 @@ window.BattleAudio = (function () {
     muted = value;
     writeMutedPref(value);
     if (muted) {
-      stopMusic();
+      if (musicEl) musicEl.pause();
     } else if (wantMusic) {
       startMusic();
     }
+    notifyState();
   }
 
   // ---- low-level synths ----
@@ -180,19 +181,36 @@ window.BattleAudio = (function () {
 
   // ---- background battle theme ----
 
+  // Listeners told whenever what's audible may have changed (music started,
+  // paused, or the mute preference flipped) — lets the page's sound button
+  // reflect what the user actually hears, not just the saved preference.
+  const stateListeners = [];
+  function notifyState() {
+    for (const cb of stateListeners) {
+      try { cb(); } catch (e) { console.error(e); }
+    }
+  }
+  function onStateChange(cb) {
+    stateListeners.push(cb);
+  }
+
   function ensureMusicEl() {
     if (!musicEl) {
       musicEl = new Audio(MUSIC_URL);
       musicEl.loop = true;
       musicEl.volume = 0.35;
       musicEl.preload = "auto";
+      musicEl.addEventListener("playing", notifyState);
+      musicEl.addEventListener("pause", notifyState);
     }
     return musicEl;
   }
 
+
   function startMusic() {
     wantMusic = true;
     retryMusic();
+    notifyState();
   }
 
   // Attempts to actually play the theme if it's supposed to be playing but
@@ -203,7 +221,7 @@ window.BattleAudio = (function () {
     if (muted || !wantMusic) return;
     const el = ensureMusicEl();
     if (!el.paused) return;
-    el.play().catch(() => {});
+    el.play().catch(notifyState);
   }
 
   function stopMusic() {
@@ -212,6 +230,7 @@ window.BattleAudio = (function () {
       musicEl.pause();
       musicEl.currentTime = 0;
     }
+    notifyState();
   }
 
   function isMusicPlaying() {
@@ -251,6 +270,7 @@ window.BattleAudio = (function () {
   }
 
   return {
-    ensureCtx, isMuted, setMuted, startMusic, stopMusic, retryMusic, isMusicPlaying, playSfx, playCry, handleEvent,
+    ensureCtx, isMuted, setMuted, startMusic, stopMusic, retryMusic, isMusicPlaying, onStateChange,
+    playSfx, playCry, handleEvent,
   };
 })();

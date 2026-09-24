@@ -59,16 +59,36 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  // "Audible" means the user can actually hear the battle right now: sound
+  // isn't muted AND, if a theme should be playing, it really is. Browsers
+  // block audio until the first click, so a saved "sound on" preference alone
+  // isn't enough — until playback starts the button offers to turn it on.
+  function battleHasMusic() {
+    return truth.status === "active" || truth.status === "awaiting_forced_switch";
+  }
+
+  function isAudible() {
+    return !BattleAudio.isMuted() && (BattleAudio.isMusicPlaying() || !battleHasMusic());
+  }
+
   function updateMuteBtn() {
-    const isMuted = BattleAudio.isMuted();
-    muteBtn.textContent = isMuted ? "🔇" : "🔊";
-    muteBtn.title = isMuted ? "Unmute battle sounds" : "Mute battle sounds";
+    const audible = isAudible();
+    const onLabel = battleHasMusic() ? "Turn on music" : "Turn on sound";
+    muteBtn.innerHTML = audible
+      ? `<span aria-hidden="true">🔇</span> Mute`
+      : `<span aria-hidden="true">🔊</span> ${onLabel}`;
+    muteBtn.title = audible ? "Mute battle music and sounds" : "Play battle music and sounds";
+    muteBtn.setAttribute("aria-pressed", audible ? "true" : "false");
+    muteBtn.classList.toggle("btn-primary", !audible);
+    muteBtn.classList.toggle("btn-secondary", audible);
+    muteBtn.classList.toggle("is-off", !audible);
   }
 
   // Keeps the background battle theme in sync with the current battle
   // status, and plays a one-time victory/defeat (or neutral fanfare for a
   // spectator) jingle the first time a battle is seen as finished.
   function syncMusicAndResult() {
+    updateMuteBtn();
     if (truth.status === "active" || truth.status === "awaiting_forced_switch") {
       BattleAudio.startMusic();
     } else {
@@ -85,35 +105,22 @@
   }
 
   muteBtn.addEventListener("click", () => {
-    // If the saved preference is already "unmuted" but the music never
-    // actually started (the automatic attempt at page load had no user
-    // gesture behind it, so the browser silently blocked it), this click IS
-    // that gesture — just retry playback. Without this, the click toggles
-    // straight to muted instead (since as far as the button knows, sound was
-    // already "on"), and it takes a confusing second click to undo that and
-    // actually hear anything.
-    if (!BattleAudio.isMuted() && !BattleAudio.isMusicPlaying()) {
-      try {
-        BattleAudio.ensureCtx();
-        BattleAudio.retryMusic();
-      } catch (e) {
-        console.error("BattleAudio.retryMusic failed:", e);
-      }
-      updateMuteBtn();
-      return;
-    }
     try {
-      BattleAudio.setMuted(!BattleAudio.isMuted());
+      if (isAudible()) {
+        BattleAudio.setMuted(true);
+      } else {
+        // This click is the user gesture browsers require before audio can
+        // play, so start everything from inside it.
+        BattleAudio.ensureCtx();
+        if (BattleAudio.isMuted()) BattleAudio.setMuted(false);
+        if (battleHasMusic()) BattleAudio.startMusic();
+      }
     } catch (e) {
-      console.error("BattleAudio.setMuted failed:", e);
+      console.error("Battle sound toggle failed:", e);
     }
     updateMuteBtn();
-    try {
-      syncMusicAndResult();
-    } catch (e) {
-      console.error("syncMusicAndResult failed:", e);
-    }
   });
+  BattleAudio.onStateChange(updateMuteBtn);
   updateMuteBtn();
   // A click anywhere (a move button, accept, etc.) also counts as the user
   // gesture browsers require before audio can actually play — retry starting

@@ -2841,9 +2841,28 @@ code {
 }
 
 .battle-mute-btn {
-    padding: 8px 12px;
-    font-size: 1.1em;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    font-size: 0.9em;
     line-height: 1;
+    white-space: nowrap;
+}
+
+.battle-mute-btn.is-off {
+    animation: sound-btn-pulse 2s ease-in-out infinite;
+}
+
+@keyframes sound-btn-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 51, 64, 0.45); }
+    50% { box-shadow: 0 0 0 6px rgba(239, 51, 64, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .battle-mute-btn.is-off {
+        animation: none;
+    }
 }
 
 .battle-action-section-label {

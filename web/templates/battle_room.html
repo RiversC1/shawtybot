@@ -7,7 +7,7 @@
         <p class="muted" id="br-subtitle">{{ {"pvp": "PvP", "elite_four": "Elite Four"}.get(battle.battle_type, battle.battle_type|capitalize) }} battle · Turn {{ battle.turn_number }}</p>
     </div>
     <div class="battle-room-header-actions">
-        <button id="br-mute-btn" class="btn-secondary battle-mute-btn" type="button" title="Unmute battle sounds">🔇</button>
+        <button id="br-mute-btn" class="btn-primary battle-mute-btn is-off" type="button" title="Play battle music and sounds"><span aria-hidden="true">🔊</span> Turn on music</button>
         <span class="muted" id="br-connection-status">Connecting...</span>
         <button id="br-forfeit-btn" class="btn-secondary" hidden>Forfeit</button>
     </div>
