@@ -417,9 +417,10 @@ class CatchPanelView(discord.ui.View):
         self.catcher_id = catcher_id
         self._build_buttons()
 
-    def _build_buttons(self):
+    def _build_buttons(self, items: dict[str, int] | None = None):
         self.clear_items()
-        items = self.cog.get_items(self.catcher_id)
+        if items is None:
+            items = self.cog.get_items(self.catcher_id)
         locked = self.spawn_view.caught or self.spawn_view.fled
         for key in BALLS:
             qty = items.get(key, 0)
@@ -443,13 +444,45 @@ class CatchPanelView(discord.ui.View):
         return callback
 
     async def _refresh(self, interaction: discord.Interaction):
-        items = self.cog.get_items(self.catcher_id)
-        self._build_buttons()
+        items = await asyncio.to_thread(self.cog.get_items, self.catcher_id)
+        self._build_buttons(items)
         embed = build_catch_panel_embed(
             self.cog, self.spawn_view.mon, items, self.catcher_id,
             self.spawn_view.spawner_id, self.spawn_view.expires_at,
         )
         await interaction.response.edit_message(embed=embed, view=self)
+
+    def _resolve_catch_attempt(self, ball_key: str, mon: dict) -> dict:
+        """All the blocking sqlite work for one ball throw (roughly a dozen
+        separate connections between the ball spend, the collection insert,
+        the candy/XP grants, and check_achievements' several read queries) —
+        run off the event loop via asyncio.to_thread so a burst of catch
+        attempts (or any other bot activity happening at the same time)
+        doesn't queue up behind several sequential DB round-trips."""
+        self.cog.add_item(self.catcher_id, ball_key, -1)
+        is_summoner = self.spawn_view.spawner_id == self.catcher_id
+        rate = self.cog.compute_catch_rate(ball_key, mon, is_summoner)
+        success = random.random() < rate
+
+        result = {"success": success, "candy_qty": 0, "family_name": None, "xp_gain": 0}
+        if success:
+            self.cog.add_to_collection(self.catcher_id, mon["id"], is_shiny=mon.get("is_shiny", False))
+            family_id = mon.get("family_id", mon["id"])
+            result["family_name"] = self.cog.pokedex.get(family_id, mon)["name"]
+            result["candy_qty"] = random.randint(2, 5)
+            self.cog.add_item(self.catcher_id, f"famcandy_{family_id}", result["candy_qty"])
+
+            xp_gain = XP_PER_CATCH
+            if mon.get("is_shiny"):
+                xp_gain += XP_SHINY_BONUS
+            if is_rare(mon):
+                xp_gain += XP_LEGENDARY_BONUS
+            result["xp_gain"] = xp_gain
+            self.cog.add_xp(self.catcher_id, xp_gain)
+            self.cog.check_achievements(self.catcher_id)
+
+        result["items"] = self.cog.get_items(self.catcher_id)
+        return result
 
     async def _throw(self, interaction: discord.Interaction, ball_key: str):
         if self.spawn_view.caught:
@@ -466,44 +499,43 @@ class CatchPanelView(discord.ui.View):
             return
 
         mon = self.spawn_view.mon
-        self.cog.add_item(self.catcher_id, ball_key, -1)
-        is_summoner = self.spawn_view.spawner_id == self.catcher_id
-        rate = self.cog.compute_catch_rate(ball_key, mon, is_summoner)
-        success = random.random() < rate
+        # The lock only serializes catch attempts on THIS spawn (contention
+        # is rare and brief) — it does not block any other interaction, so
+        # unrelated commands/catches keep running freely on the event loop
+        # while this one's DB work happens in a thread.
+        async with self.spawn_view.catch_lock:
+            if self.spawn_view.caught or self.spawn_view.fled:
+                await interaction.response.edit_message(
+                    embed=discord.Embed(
+                        description="Someone already caught this Pokémon!" if self.spawn_view.caught
+                        else "This Pokémon already fled!",
+                        color=discord.Color.dark_grey(),
+                    ),
+                    view=None,
+                )
+                return
 
-        if success:
-            self.spawn_view.caught = True
-            self.cog.add_to_collection(self.catcher_id, mon["id"], is_shiny=mon.get("is_shiny", False))
-            family_id = mon.get("family_id", mon["id"])
-            family_name = self.cog.pokedex.get(family_id, mon)["name"]
-            candy_qty = random.randint(2, 5)
-            self.cog.add_item(self.catcher_id, f"famcandy_{family_id}", candy_qty)
+            outcome = await asyncio.to_thread(self._resolve_catch_attempt, ball_key, mon)
 
-            xp_gain = XP_PER_CATCH
-            if mon.get("is_shiny"):
-                xp_gain += XP_SHINY_BONUS
-            if is_rare(mon):
-                xp_gain += XP_LEGENDARY_BONUS
-            self.cog.add_xp(self.catcher_id, xp_gain)
-            self.cog.check_achievements(self.catcher_id)
+            if outcome["success"]:
+                self.spawn_view.caught = True
+                await self.spawn_view.mark_caught(
+                    interaction.user.display_name, interaction.user.mention, BALLS[ball_key]["label"]
+                )
+                result = (
+                    f"🎉 Gotcha! **{mon['name']}** was caught with a {BALLS[ball_key]['label']}!\n"
+                    f"You also got **{outcome['candy_qty']}x {outcome['family_name']} Candy** "
+                    f"and **{outcome['xp_gain']} XP**."
+                )
+            else:
+                result = f"The {mon['name']} broke free from the {BALLS[ball_key]['label']}!"
 
-            await self.spawn_view.mark_caught(
-                interaction.user.display_name, interaction.user.mention, BALLS[ball_key]["label"]
+            self._build_buttons(outcome["items"])
+            embed = build_catch_panel_embed(
+                self.cog, mon, outcome["items"], self.catcher_id, self.spawn_view.spawner_id,
+                self.spawn_view.expires_at, result_line=result,
             )
-            result = (
-                f"🎉 Gotcha! **{mon['name']}** was caught with a {BALLS[ball_key]['label']}!\n"
-                f"You also got **{candy_qty}x {family_name} Candy** and **{xp_gain} XP**."
-            )
-        else:
-            result = f"The {mon['name']} broke free from the {BALLS[ball_key]['label']}!"
-
-        items = self.cog.get_items(self.catcher_id)
-        self._build_buttons()
-        embed = build_catch_panel_embed(
-            self.cog, mon, items, self.catcher_id, self.spawn_view.spawner_id,
-            self.spawn_view.expires_at, result_line=result,
-        )
-        await interaction.response.edit_message(embed=embed, view=None if success else self)
+            await interaction.response.edit_message(embed=embed, view=None if outcome["success"] else self)
 
 
 class SpawnView(discord.ui.View):
@@ -516,6 +548,12 @@ class SpawnView(discord.ui.View):
         self.fled = False
         self.message: discord.Message | None = None
         self.expires_at = datetime.now(timezone.utc) + SPAWN_FLEE_AFTER
+        # Every catcher gets their own ephemeral CatchPanelView, but they all
+        # share this one SpawnView — this lock serializes the actual "commit
+        # a catch" critical section across all of them so moving the DB work
+        # off the event loop (asyncio.to_thread, see CatchPanelView._throw)
+        # can't let two people both win the same spawn.
+        self.catch_lock = asyncio.Lock()
 
     async def on_timeout(self):
         if self.caught:
@@ -560,13 +598,15 @@ class SpawnView(discord.ui.View):
             await interaction.response.send_message("This Pokémon already fled!", ephemeral=True)
             return
 
-        if not self.cog.get_trainer(interaction.user.id):
+        trainer, items = await asyncio.to_thread(
+            lambda: (self.cog.get_trainer(interaction.user.id), self.cog.get_items(interaction.user.id))
+        )
+        if not trainer:
             await interaction.response.send_message(
                 "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
             )
             return
 
-        items = self.cog.get_items(interaction.user.id)
         if not any(qty > 0 for qty in items.values()):
             await interaction.response.send_message(
                 "You're out of balls! Catch more Pokémon to keep going.", ephemeral=True
@@ -612,12 +652,22 @@ class CofferView(discord.ui.View):
             )
             return
 
+        # Claimed the instant the check above passes — get_trainer stays a
+        # plain synchronous call (no `await` before this line) precisely so
+        # nothing can interleave here, meaning a double-click from the same
+        # user can't double-claim even though the actual reward grants below
+        # now run off the event loop.
         self.claimed_by.add(interaction.user.id)
-        rewards = roll_coffer_rewards(self.coffer_key)
-        for item, qty in rewards.items():
-            self.cog.add_item(interaction.user.id, item, qty)
-        self.cog.add_xp(interaction.user.id, XP_PER_COFFER[self.coffer_key])
-        self.cog.check_achievements(interaction.user.id)
+
+        def _grant_rewards():
+            rewards = roll_coffer_rewards(self.coffer_key)
+            for item, qty in rewards.items():
+                self.cog.add_item(interaction.user.id, item, qty)
+            self.cog.add_xp(interaction.user.id, XP_PER_COFFER[self.coffer_key])
+            self.cog.check_achievements(interaction.user.id)
+            return rewards
+
+        rewards = await asyncio.to_thread(_grant_rewards)
 
         if self.message:
             embed = self.message.embeds[0]
