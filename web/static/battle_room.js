@@ -416,10 +416,9 @@
     actionPanel.hidden = true;
   }
 
-  // Two different "subjects" show up in the log: the trainer commanding an
-  // action (move_used, charge_start, switch_in — nameBySide) and the
-  // Pokémon something is actually happening TO (damage, recoil, status,
-  // stat changes, etc. — monBySide, tracked below from switch_in events as
+  // Two different "subjects" show up in the log: the trainer (switch_in —
+  // nameBySide) and the Pokémon acting or being acted on (moves, charging,
+  // damage, recoil, status, stat changes, etc. — monBySide, tracked below from switch_in events as
   // the log is built, since the active Pokémon per side changes over the
   // battle). Mixing these up is exactly the bug where a damage line showed
   // the trainer's name instead of the Pokémon actually taking the hit.
@@ -435,7 +434,7 @@
       case "switch_in":
         return `🔁 ${side} sends out <strong>${event.name}</strong>!`;
       case "move_used":
-        return `<strong>${side}</strong> used <strong>${event.move_name}</strong>!`;
+        return `<strong>${mon}</strong> used <strong>${event.move_name}</strong>!`;
       case "move_missed":
         if (event.reason === "invulnerable") {
           return `${mon}'s attack missed! <strong>${event.target_name}</strong> was out of reach!`;
@@ -490,7 +489,7 @@
         const flavor = {
           Fly: "flew up high!", Bounce: "sprang up!", Dig: "burrowed underground!", Dive: "hid underwater!",
         };
-        return `${side} ${flavor[event.move_name] || "is charging its attack!"}`;
+        return `${mon} ${flavor[event.move_name] || "is charging its attack!"}`;
       }
       case "faint":
         return `💀 <strong>${event.name}</strong> fainted!`;
