@@ -964,12 +964,9 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             viewer_side = "B"
     back_side = viewer_side or "A"
 
-    # The opposing active Pokémon's types, so revealed moves can say how
-    # effective they'd be right now (the move tooltip on the battle page).
-    active_types = {
-        r["side"]: POKEDEX.get(r["dex_id"], {}).get("types", [])
-        for r in side_rows if r["is_active"] and not r["is_fainted"]
-    }
+    # Move details for the viewer's own moves (the battle page's move
+    # tooltips). Deliberately no type-effectiveness vs the opponent: working
+    # that out is part of playing, as in the games.
     move_detail_keys = (
         "category", "power", "accuracy", "priority", "description", "ailment", "ailment_chance",
         "stat_changes", "stat_chance", "crit_rate", "drain_percent", "recoil_percent", "healing_percent",
@@ -991,15 +988,12 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
         if reveal_moves:
             moves = json.loads(r["moves"])
             pool_by_name = {m["name"]: m for m in mon.get("moves", [])}
-            foe_types = active_types.get("B" if side == "A" else "A")
             out["moves"] = []
             for m in moves:
                 info = pool_by_name.get(m["name"], {})
                 move = {"name": m["name"], "pp": m["pp"], "max_pp": info.get("pp", m["pp"]), "type": info.get("type")}
                 move.update({k: info.get(k) for k in move_detail_keys})
                 move["stat_self"] = be.stat_changes_affect_user(info)
-                if foe_types and info.get("category") != "status" and info.get("target") != "self":
-                    move["effectiveness"] = be.effectiveness_label(be.type_effectiveness(info.get("type"), foe_types))
                 out["moves"].append(move)
         return out
 

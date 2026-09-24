@@ -492,13 +492,10 @@
       const moveButtons = (active.moves || [])
         .map((m, i) => {
           const disabled = !you.usable_move_indices.includes(i);
-          const effLabel = { super_effective: "Super effective", not_very_effective: "Not very effective", no_effect: "No effect" }[m.effectiveness];
-          const eff = effLabel ? `<span class="br-move-eff eff-${m.effectiveness}">${effLabel}</span>` : "";
           return `<button class="br-move-option type-${m.type || "normal"}" data-index="${i}" ${disabled ? "disabled" : ""}>
               <span class="br-move-name">${m.name}</span>
               <span class="br-move-meta">${typeBadge(m.type)}<span class="br-move-cat">${m.category || ""}</span></span>
               <span class="br-move-pp">${m.pp}/${m.max_pp} PP</span>
-              ${eff}
           </button>`;
         })
         .join("");
@@ -518,10 +515,9 @@
               : ""
           }
       `;
-      const foe = (truth.you.side === "A" ? truth.roster_b : truth.roster_a).find((m) => m.is_active && !m.is_fainted);
       actionPanel.querySelectorAll(".br-move-option").forEach((btn) => {
         const move = (active.moves || [])[parseInt(btn.dataset.index, 10)];
-        if (move && window.MoveTooltip) window.MoveTooltip.attach(btn, move, { targetName: foe && foe.name });
+        if (move && window.MoveTooltip) window.MoveTooltip.attach(btn, move);
       });
       actionPanel.querySelectorAll(".br-move-option").forEach((btn) =>
         btn.addEventListener("click", async () => {
@@ -786,7 +782,7 @@
           const known = roster.flatMap((m) => m.moves || []).find((m) => m.name === e.move_name);
           e = { ...e, move_type: known && known.type, category: (known && known.category) || "physical", target: known && known.target };
         }
-        return BattleFX.playMove(e, slot, otherSlot, sprite);
+        return BattleFX.playMove(e, slot, otherSlot, sprite, isA ? spriteB : spriteA);
       }
       case "charge_start":
         BattleFX.glowSprite(sprite, BattleFX.colorForType(event.move_type) || "#ffffff", 700);

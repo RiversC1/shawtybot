@@ -84,7 +84,7 @@ window.BattleFX = (function () {
   function particle(shape, x, y, size, fx) {
     size *= PARTICLE_SCALE;
     const p = document.createElement("div");
-    p.className = `fx-p fx-${shape}`;
+    p.className = `fx-p fx-${shape || "orb"}`;
     p.style.left = `${x}px`;
     p.style.top = `${y}px`;
     p.style.width = `${size}px`;
@@ -258,8 +258,16 @@ window.BattleFX = (function () {
    * target, possibly missing on old events), the slots are the sprite
    * containers. Resolves when the animation has visually finished.
    */
-  function playMove(event, attackerSlot, targetSlot, attackerSprite) {
+  function playMove(event, attackerSlot, targetSlot, attackerSprite, targetSprite) {
     if (!layer) return Promise.resolve();
+    // Game-accurate per-move animations (battle_moves.js) take priority; the
+    // generic type/category animation below is the fallback.
+    if (window.BattleMoves) {
+      const custom = window.BattleMoves.play(event, {
+        atk: attackerSlot, tgt: targetSlot, atkSprite: attackerSprite, tgtSprite: targetSprite,
+      });
+      if (custom) return custom;
+    }
     const fx = fxFor(event.move_type);
     const from = centerOf(attackerSlot);
     const to = centerOf(targetSlot);
@@ -418,8 +426,15 @@ window.BattleFX = (function () {
     return TYPE_FX[type] ? TYPE_FX[type].color : null;
   }
 
+  // Building blocks for battle_moves.js.
+  const kit = {
+    scene: () => scene, layer: () => layer, reduceMotion, TYPE_FX, fxFor, wait, centerOf, rand, particle, run,
+    flash, burst, splash, strike, rise, fall, rings, impact, lunge, projectile, chargeGlow, aura, glowSprite,
+    healSparkles, floatText,
+  };
+
   return {
     init, playMove, floatText, statusEffect, statArrows, healSparkles, glowSprite,
-    caption, fadeCaption, colorForType, STATUS_FX,
+    caption, fadeCaption, colorForType, STATUS_FX, kit,
   };
 })();

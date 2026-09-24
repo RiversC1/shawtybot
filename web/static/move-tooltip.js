@@ -82,18 +82,10 @@ window.MoveTooltip = (function () {
     return lines;
   }
 
-  const EFFECTIVENESS = {
-    super_effective: { label: "Super effective", cls: "is-super" },
-    not_very_effective: { label: "Not very effective", cls: "is-weak" },
-    no_effect: { label: "No effect", cls: "is-none" },
-    neutral: { label: "Normal effectiveness", cls: "is-neutral" },
-  };
 
   function show(move, anchorEl, opts) {
     const tip = ensure();
     const lines = effectLines(move);
-    const eff = move.effectiveness && EFFECTIVENESS[move.effectiveness];
-    const target = opts && opts.targetName;
     tip.innerHTML = `
       <div class="move-tooltip-header">${move.name}</div>
       <div class="move-tooltip-badges">
@@ -108,7 +100,6 @@ window.MoveTooltip = (function () {
       </div>
       ${move.description ? `<hr><div class="move-tooltip-label">Effect</div><div class="move-tooltip-desc">${move.description.replace(/\s+/g, " ")}</div>` : ""}
       ${lines.length ? `<ul class="move-tooltip-effects">${lines.map((l) => `<li>${l}</li>`).join("")}</ul>` : ""}
-      ${eff ? `<div class="move-tooltip-eff ${eff.cls}">${eff.label}${target ? ` vs ${target}` : ""}</div>` : ""}
     `;
     tip.hidden = false;
     position(anchorEl);

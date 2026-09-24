@@ -3880,7 +3880,7 @@ body.lineup-dragging * {
     position: relative;
     display: grid;
     grid-template-columns: 1fr auto;
-    grid-template-areas: "name pp" "meta meta" "eff eff";
+    grid-template-areas: "name pp" "meta meta";
     gap: 4px 8px;
     min-width: 170px;
     padding: 10px 12px;
@@ -3908,10 +3908,6 @@ body.lineup-dragging * {
 .br-move-pp { grid-area: pp; font-size: 0.78em; color: var(--text-muted); align-self: center; }
 .br-move-meta { grid-area: meta; display: flex; align-items: center; gap: 6px; }
 .br-move-cat { font-size: 0.72em; color: var(--text-muted); text-transform: capitalize; }
-.br-move-eff { grid-area: eff; font-size: 0.7em; font-weight: bold; }
-.br-move-eff.eff-super_effective { color: #ffb347; }
-.br-move-eff.eff-not_very_effective { color: #9aa4b8; }
-.br-move-eff.eff-no_effect { color: #ff6b6b; }
 
 .br-move-option.type-normal { --t: #A8A878; }
 .br-move-option.type-fire { --t: #F08030; }
@@ -3941,18 +3937,6 @@ body.lineup-dragging * {
     line-height: 1.5;
 }
 
-.move-tooltip-eff {
-    margin-top: 10px;
-    padding: 5px 10px;
-    border-radius: 6px;
-    font-size: 0.85em;
-    font-weight: bold;
-}
-.move-tooltip-eff.is-super { background: rgba(255, 140, 40, 0.18); color: #ffb347; }
-.move-tooltip-eff.is-weak { background: rgba(150, 160, 180, 0.15); color: #b4bccb; }
-.move-tooltip-eff.is-none { background: rgba(239, 51, 64, 0.15); color: #ff8088; }
-.move-tooltip-eff.is-neutral { background: rgba(255, 255, 255, 0.06); color: var(--text-muted); }
-
 @media (max-width: 640px) {
     /* No free corner on a narrow scene: the caption gets its own strip at
        the bottom, reserved even while empty so the layout never jumps. */
@@ -3979,4 +3963,150 @@ body.lineup-dragging * {
 
 @media (prefers-reduced-motion: reduce) {
     .battle-caption-line { animation: none; }
+}
+
+/* ---------- Per-move animation pieces (battle_moves.js) ---------- */
+
+.fx-screen {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.fx-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.fx-beam {
+    position: absolute;
+    transform-origin: 0 50%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, transparent 0%, var(--c) 22%, var(--g) 42%, #fff 50%, var(--g) 58%, var(--c) 78%, transparent 100%);
+    box-shadow: 0 0 14px var(--c), 0 0 30px color-mix(in srgb, var(--c) 60%, transparent);
+}
+
+.fx-beam-rings {
+    background:
+        repeating-linear-gradient(90deg, transparent 0 10px, color-mix(in srgb, var(--g) 80%, transparent) 10px 14px, transparent 14px 22px),
+        linear-gradient(180deg, transparent 0%, var(--c) 25%, var(--g) 50%, var(--c) 75%, transparent 100%);
+}
+
+.fx-beam-rainbow {
+    background:
+        repeating-linear-gradient(90deg, #ff6b9d 0 12px, #ffd36b 12px 24px, #7dff9a 24px 36px, #6bc8ff 36px 48px, #b58cff 48px 60px);
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 25%, #000 75%, transparent);
+    mask-image: linear-gradient(180deg, transparent, #000 25%, #000 75%, transparent);
+}
+
+.fx-big-orb {
+    box-shadow: 0 0 16px var(--c), 0 0 34px var(--g), inset 0 0 10px rgba(255, 255, 255, 0.6);
+}
+
+.fx-drop {
+    border-radius: 50% 50% 50% 50% / 70% 70% 30% 30%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), var(--g) 35%, var(--c));
+    width: 5px !important;
+}
+
+.fx-wave {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border-radius: 45% 55% 0 0 / 60% 70% 0 0;
+    background:
+        radial-gradient(ellipse 30% 22% at 78% 8%, rgba(255, 255, 255, 0.85), transparent 70%),
+        radial-gradient(ellipse 60% 40% at 70% 18%, var(--g), transparent 70%),
+        linear-gradient(180deg, color-mix(in srgb, var(--g) 70%, var(--c)) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 70%, #000) 100%);
+    box-shadow: 0 -6px 30px color-mix(in srgb, var(--c) 60%, transparent);
+    opacity: 0.9;
+}
+
+.fx-spike {
+    position: absolute;
+    transform-origin: 50% 100%;
+    background: linear-gradient(180deg, #fff, var(--g) 25%, var(--c) 70%, color-mix(in srgb, var(--c) 60%, #000));
+    clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+    filter: drop-shadow(0 0 6px var(--c));
+}
+
+.fx-slash-mark {
+    position: absolute;
+    height: 6px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, transparent, var(--g) 20%, #fff 50%, var(--g) 80%, transparent);
+    box-shadow: 0 0 10px var(--c), 0 0 18px var(--c);
+}
+
+.fx-jaw {
+    position: absolute;
+    width: 84px;
+    height: 26px;
+    background: linear-gradient(180deg, #fff, var(--g));
+    filter: drop-shadow(0 0 6px var(--c));
+}
+
+.fx-jaw-top {
+    clip-path: polygon(0 0, 100% 0, 100% 20%, 92% 100%, 84% 20%, 68% 20%, 60% 100%, 52% 20%, 48% 20%, 40% 100%, 32% 20%, 16% 20%, 8% 100%, 0 20%);
+}
+
+.fx-jaw-bottom {
+    clip-path: polygon(0 100%, 100% 100%, 100% 80%, 92% 0, 84% 80%, 68% 80%, 60% 0, 52% 80%, 48% 80%, 40% 0, 32% 80%, 16% 80%, 8% 0, 0 80%);
+}
+
+.fx-afterimage {
+    position: absolute;
+    object-fit: contain;
+    image-rendering: pixelated;
+    filter: brightness(1.8) saturate(0.3);
+    pointer-events: none;
+}
+
+.fx-speed-line {
+    position: absolute;
+    width: 80px;
+    height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, transparent, var(--g), transparent);
+}
+
+.fx-sound-arc {
+    position: absolute;
+    width: 26px;
+    height: 54px;
+    border-radius: 50%;
+    border: 4px solid var(--c);
+    border-left-color: transparent;
+    border-top-color: transparent;
+    border-bottom-color: transparent;
+    filter: drop-shadow(0 0 5px var(--c));
+}
+
+.fx-shield {
+    position: absolute;
+    border-radius: 50%;
+    border: 3px solid var(--c);
+    background: radial-gradient(circle, transparent 55%, color-mix(in srgb, var(--c) 35%, transparent) 75%, color-mix(in srgb, var(--g) 50%, transparent) 100%);
+    box-shadow: 0 0 20px var(--c), inset 0 0 20px var(--g);
+}
+
+.fx-sword {
+    position: absolute;
+    width: 10px;
+    height: 44px;
+    background: linear-gradient(180deg, #ffffff 0%, #d8e0ea 60%, #8a6a3a 62%, #8a6a3a 100%);
+    clip-path: polygon(50% 0%, 100% 18%, 100% 60%, 90% 60%, 90% 100%, 10% 100%, 10% 60%, 0% 60%, 0% 18%);
+    filter: drop-shadow(0 0 6px #ffd27a);
+}
+
+.fx-note {
+    position: absolute;
+    font-size: 24px;
+    font-weight: bold;
+    color: #ffe3f3;
+    text-shadow: 0 0 8px #ff7ac0;
 }
