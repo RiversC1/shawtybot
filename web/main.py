@@ -28,6 +28,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 API_WS_BASE_URL = API_BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() == "true"
+# Battle music is hosted in S3 rather than the repo (see battle_audio.js).
+AUDIO_BASE_URL = os.getenv("AUDIO_BASE_URL", "https://poke-music.s3.us-east-1.amazonaws.com").rstrip("/")
 SESSION_COOKIE = "session"
 SESSION_MAX_AGE = 7 * 24 * 60 * 60  # 7 days, matches the API's JWT expiry
 
@@ -55,6 +57,7 @@ app = FastAPI(title="ShawtyBot Pokémon Web", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+templates.env.globals["AUDIO_BASE_URL"] = AUDIO_BASE_URL
 
 
 @app.middleware("http")

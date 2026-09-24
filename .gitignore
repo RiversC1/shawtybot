@@ -20,3 +20,6 @@ tmp_*/
 
 # Stray logs from local testing
 *.log
+
+# Battle music lives in the poke-music S3 bucket, not the repo
+web/static/audio/

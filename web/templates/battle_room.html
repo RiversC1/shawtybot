@@ -46,7 +46,7 @@
 <div class="battle-log" id="br-log"></div>
 
 <script type="application/json" id="battle-data">{{ battle_json|safe }}</script>
-<script>window.BATTLE_ID = {{ battle_id }}; window.BATTLE_TYPE = {{ battle.battle_type|tojson }};</script>
+<script>window.BATTLE_ID = {{ battle_id }}; window.BATTLE_TYPE = {{ battle.battle_type|tojson }}; window.AUDIO_BASE_URL = {{ AUDIO_BASE_URL|tojson }};</script>
 <script src="/static/battle_audio.js"></script>
 <script src="/static/battle_room.js"></script>
 {% endblock %}
