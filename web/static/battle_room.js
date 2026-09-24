@@ -416,9 +416,17 @@
     actionPanel.hidden = true;
   }
 
-  function formatEvent(event, nameBySide) {
+  // Two different "subjects" show up in the log: the trainer commanding an
+  // action (move_used, charge_start, switch_in — nameBySide) and the
+  // Pokémon something is actually happening TO (damage, recoil, status,
+  // stat changes, etc. — monBySide, tracked below from switch_in events as
+  // the log is built, since the active Pokémon per side changes over the
+  // battle). Mixing these up is exactly the bug where a damage line showed
+  // the trainer's name instead of the Pokémon actually taking the hit.
+  function formatEvent(event, nameBySide, monBySide) {
     const t = event.type;
     const side = nameBySide[event.side] || "";
+    const mon = monBySide[event.side] || side;
     switch (t) {
       case "turn_start":
       case "switch_out":
@@ -430,20 +438,20 @@
         return `<strong>${side}</strong> used <strong>${event.move_name}</strong>!`;
       case "move_missed":
         if (event.reason === "invulnerable") {
-          return `${side}'s attack missed! <strong>${event.target_name}</strong> was out of reach!`;
+          return `${mon}'s attack missed! <strong>${event.target_name}</strong> was out of reach!`;
         }
-        return `${side}'s attack missed!`;
+        return `${mon}'s attack missed!`;
       case "move_failed":
-        return `${side}'s move failed!`;
+        return `${mon}'s move failed!`;
       case "cannot_act": {
         const reasons = {
           recharge: "must recharge!", asleep: "is fast asleep.", frozen: "is frozen solid!",
           flinched: "flinched and couldn't move!", paralyzed: "is paralyzed and can't move!",
         };
-        return `${side} ${reasons[event.reason] || "could not act."}`;
+        return `${mon} ${reasons[event.reason] || "could not act."}`;
       }
       case "confusion_self_hit":
-        return `${side} is confused and hurt itself for <strong>${event.amount}</strong> damage!`;
+        return `${mon} is confused and hurt itself for <strong>${event.amount}</strong> damage!`;
       case "damage": {
         const suffix = {
           super_effective: " It's super effective!",
@@ -451,33 +459,33 @@
           no_effect: " It had no effect!",
         }[event.effectiveness] || "";
         const crit = event.is_crit ? " A critical hit!" : "";
-        return `${side} took <strong>${event.amount}</strong> damage.${crit}${suffix}`;
+        return `${mon} took <strong>${event.amount}</strong> damage.${crit}${suffix}`;
       }
       case "multi_hit_summary":
         return `Hit <strong>${event.hits}</strong> time(s) for <strong>${event.total_damage}</strong> total damage!`;
       case "status_applied": {
         if (!event.status || event.status === "none") {
           const texts = { woke_up: "woke up!", thawed: "thawed out!", confusion_ended: "snapped out of confusion!" };
-          return `${side} ${texts[event.reason] || "recovered!"}`;
+          return `${mon} ${texts[event.reason] || "recovered!"}`;
         }
         const labels = {
           burn: "was burned!", paralysis: "was paralyzed!", poison: "was poisoned!",
           toxic: "was badly poisoned!", sleep: "fell asleep!", freeze: "was frozen solid!", confusion: "became confused!",
         };
-        return `${side} ${labels[event.status] || `was afflicted with ${event.status}!`}`;
+        return `${mon} ${labels[event.status] || `was afflicted with ${event.status}!`}`;
       }
       case "stat_changed": {
         const dir = event.change > 0 ? "rose" : "fell";
         const sharply = Math.abs(event.change) >= 2 ? "sharply " : "";
         const statName = event.stat.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-        return `${side}'s ${statName} ${sharply}${dir}!`;
+        return `${mon}'s ${statName} ${sharply}${dir}!`;
       }
       case "status_damage":
       case "recoil":
-        return `${side} was hurt${event.status ? ` by its ${event.status}` : ""}! (-${event.amount})`;
+        return `${mon} was hurt${event.status ? ` by its ${event.status}` : ""}! (-${event.amount})`;
       case "drain":
       case "heal":
-        return `${side} restored <strong>${event.amount}</strong> HP!`;
+        return `${mon} restored <strong>${event.amount}</strong> HP!`;
       case "charge_start": {
         const flavor = {
           Fly: "flew up high!", Bounce: "sprang up!", Dig: "burrowed underground!", Dive: "hid underwater!",
@@ -493,7 +501,17 @@
 
   function renderLog() {
     const nameBySide = { A: truth.name_a, B: truth.name_b };
-    const lines = revealed.map((e) => formatEvent(e, nameBySide)).filter(Boolean);
+    // Walk the log in chronological order tracking which Pokémon is active
+    // per side as of each event (switch_in is the only event that changes
+    // it), so every line resolves against whoever was actually on the
+    // field at that point rather than always using the current one.
+    const monBySide = { A: null, B: null };
+    const lines = [];
+    for (const e of revealed) {
+      if (e.type === "switch_in") monBySide[e.side] = e.name;
+      const line = formatEvent(e, nameBySide, monBySide);
+      if (line) lines.push(line);
+    }
     logEl.innerHTML = lines.length
       ? lines.map((l) => `<div class="battle-log-line">${l}</div>`).reverse().join("")
       : "<p class='muted'>The battle begins!</p>";
