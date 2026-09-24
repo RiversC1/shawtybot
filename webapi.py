@@ -470,16 +470,24 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
     dex_total = len(POKEDEX)
 
     earned_badges = battle_store.get_badges(target_id)
-    badges = [
+    badges_by_region = [
         {
-            "gym_key": k,
-            "leader_name": battle_store.GYMS[k]["leader_name"],
-            "badge_name": battle_store.GYMS[k]["badge_name"],
-            "badge_image": battle_store.GYMS[k].get("badge_image"),
-            "earned": k in earned_badges,
+            "region": region,
+            "badges": [
+                {
+                    "gym_key": k,
+                    "leader_name": battle_store.GYMS[k]["leader_name"],
+                    "badge_name": battle_store.GYMS[k]["badge_name"],
+                    "badge_image": battle_store.GYMS[k].get("badge_image"),
+                    "earned": k in earned_badges,
+                }
+                for k in battle_store.gym_order(region)
+            ],
         }
-        for k in battle_store.GYM_ORDER
+        for region in battle_store.GYM_REGIONS
     ]
+    badges_total_earned = len(earned_badges & set(battle_store.GYMS.keys()))
+    badges_total = len(battle_store.GYMS)
 
     return {
         "user_id": str(target_id),  # Discord snowflake — see the note in list_trainers()
@@ -507,7 +515,9 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
                 (target_id, target_id),
             ).fetchone()[0],
         },
-        "badges": badges,
+        "badges_by_region": badges_by_region,
+        "badges_total_earned": badges_total_earned,
+        "badges_total": badges_total,
         "achievements": {"unlocked": unlocked_count, "total": TOTAL_ACHIEVEMENT_TIERS},
     }
 
@@ -1714,23 +1724,27 @@ async def trade_websocket(websocket: WebSocket, trade_id: int):
 @app.get("/api/gyms")
 def list_gyms(user_id: int = Depends(get_current_user_id)):
     earned = battle_store.get_badges(user_id)
-    next_key = battle_store.next_gym_key(user_id)
-    return [
-        {
-            "gym_key": k,
-            "order": battle_store.GYMS[k]["order"],
-            "leader_name": battle_store.GYMS[k]["leader_name"],
-            "type_theme": battle_store.GYMS[k]["type_theme"],
-            "location": battle_store.GYMS[k]["location"],
-            "badge_name": battle_store.GYMS[k]["badge_name"],
-            "flavor": battle_store.GYMS[k]["flavor"],
-            "leader_image": battle_store.GYMS[k].get("leader_image"),
-            "badge_image": battle_store.GYMS[k].get("badge_image"),
-            "earned": k in earned,
-            "is_next": k == next_key,
-        }
-        for k in battle_store.GYM_ORDER
-    ]
+    regions = []
+    for region in battle_store.GYM_REGIONS:
+        next_key = battle_store.next_gym_key(user_id, region)
+        gyms = [
+            {
+                "gym_key": k,
+                "order": battle_store.GYMS[k]["order"],
+                "leader_name": battle_store.GYMS[k]["leader_name"],
+                "type_theme": battle_store.GYMS[k]["type_theme"],
+                "location": battle_store.GYMS[k]["location"],
+                "badge_name": battle_store.GYMS[k]["badge_name"],
+                "flavor": battle_store.GYMS[k]["flavor"],
+                "leader_image": battle_store.GYMS[k].get("leader_image"),
+                "badge_image": battle_store.GYMS[k].get("badge_image"),
+                "earned": k in earned,
+                "is_next": k == next_key,
+            }
+            for k in battle_store.gym_order(region)
+        ]
+        regions.append({"region": region, "gyms": gyms})
+    return {"regions": regions}
 
 
 @app.get("/api/gyms/{gym_key}")
@@ -1739,7 +1753,8 @@ def get_gym_detail(gym_key: str, user_id: int = Depends(get_current_user_id)):
     if not gym:
         raise HTTPException(404, "Unknown gym")
     earned = gym_key in battle_store.get_badges(user_id)
-    is_next = gym_key == battle_store.next_gym_key(user_id)
+    is_next = gym_key == battle_store.next_gym_key(user_id, gym["generation"])
+    cleared_by = battle_store.get_gym_clearers(gym_key)
 
     roster = []
     for entry in gym["roster"]:
@@ -1755,6 +1770,7 @@ def get_gym_detail(gym_key: str, user_id: int = Depends(get_current_user_id)):
 
     return {
         "gym_key": gym_key,
+        "generation": gym["generation"],
         "order": gym["order"],
         "leader_name": gym["leader_name"],
         "type_theme": gym["type_theme"],
@@ -1766,6 +1782,7 @@ def get_gym_detail(gym_key: str, user_id: int = Depends(get_current_user_id)):
         "earned": earned,
         "is_next": is_next,
         "roster": roster,
+        "cleared_by": cleared_by,
     }
 
 
@@ -1779,11 +1796,11 @@ async def start_gym_battle(gym_key: str, user_id: int = Depends(get_current_user
     roster_a = battle_store.build_roster_for_player(user_id)
     if not roster_a:
         raise HTTPException(400, "You need to set your team first — use the Team page.")
-    next_key = battle_store.next_gym_key(user_id)
+    next_key = battle_store.next_gym_key(user_id, gym["generation"])
     if next_key is None:
-        raise HTTPException(400, "You've already earned all 8 badges!")
+        raise HTTPException(400, f"You've already earned all of {gym['generation'].title()}'s badges!")
     if gym_key != next_key:
-        raise HTTPException(400, "You need to beat the earlier gyms first, in order.")
+        raise HTTPException(400, "You need to beat the earlier gyms in this region first, in order.")
 
     def _do():
         roster_b = battle_store.build_roster_for_gym(gym_key)
@@ -1886,7 +1903,7 @@ async def start_elite_four_battle(generation: str, member_key: str, user_id: int
     if battle_store.has_active_battle(user_id):
         raise HTTPException(400, "You're already in a battle!")
     if not battle_store.league_unlocked(user_id):
-        raise HTTPException(400, "Earn all 8 Gym Badges first to unlock the Poké League.")
+        raise HTTPException(400, "Earn every Gym Badge across all 4 regions first to unlock the Poké League.")
     roster_a = battle_store.build_roster_for_player(user_id)
     if not roster_a:
         raise HTTPException(400, "You need to set your team first — use the Team page.")

@@ -274,7 +274,12 @@ async def gyms(request: Request):
     if status == 401:
         return clear_session(RedirectResponse("/"))
 
-    return templates.TemplateResponse(request, "gyms.html", {"gyms": data})
+    regions = data.get("regions", [])
+    all_gyms = [g for group in regions for g in group["gyms"]]
+    earned_count = sum(1 for g in all_gyms if g["earned"])
+    return templates.TemplateResponse(
+        request, "gyms.html", {"regions": regions, "earned_count": earned_count, "total_count": len(all_gyms)}
+    )
 
 
 @app.get("/league")

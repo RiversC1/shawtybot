@@ -59,6 +59,13 @@
       statusLine = "🔒 Beat the earlier gyms first to unlock this challenge.";
     }
 
+    const clearedBy = gym.cleared_by || [];
+    const clearedByHtml = clearedBy.length
+      ? `<ul class="gym-clearers-list">${clearedBy
+          .map((c) => `<li>${c.username}</li>`)
+          .join("")}</ul>`
+      : `<p class="muted">No one has beaten this gym yet — be the first!</p>`;
+
     body.innerHTML = `
         <div class="gym-hero">
             <span class="type-badge type-${gym.type_theme} gym-hero-type-tag">${typeLabel}</span>
@@ -81,6 +88,9 @@
         <hr>
         <h3>Gym Team</h3>
         <div class="gym-roster-grid">${rosterHtml}</div>
+        <hr>
+        <h3>Trainers Who've Beaten This Gym (${clearedBy.length})</h3>
+        ${clearedByHtml}
     `;
 
     const fightBtn = document.getElementById("gm-fight-btn");

@@ -53,14 +53,19 @@
         </div>
 
         <div class="badge-case">
-            <div class="badge-case-label">Gym Badges — {{ trainer.badges|selectattr("earned")|list|length }} / {{ trainer.badges|length }}</div>
-            <div class="badge-case-icons">
-                {% for b in trainer.badges %}
-                <img class="badge-case-icon{{ '' if b.earned else ' is-unearned' }}"
-                     src="{{ b.badge_image }}" alt="{{ b.badge_name }}"
-                     title="{{ b.badge_name }} ({{ b.leader_name }}){{ '' if b.earned else ' — not earned yet' }}">
-                {% endfor %}
+            <div class="badge-case-label">Gym Badges — {{ trainer.badges_total_earned }} / {{ trainer.badges_total }}</div>
+            {% for group in trainer.badges_by_region %}
+            <div class="badge-case-region">
+                <div class="badge-case-region-label">{{ group.region|capitalize }}</div>
+                <div class="badge-case-icons">
+                    {% for b in group.badges %}
+                    <img class="badge-case-icon{{ '' if b.earned else ' is-unearned' }}"
+                         src="{{ b.badge_image }}" alt="{{ b.badge_name }}"
+                         title="{{ b.badge_name }} ({{ b.leader_name }}){{ '' if b.earned else ' — not earned yet' }}">
+                    {% endfor %}
+                </div>
             </div>
+            {% endfor %}
         </div>
 
         {% if is_own %}

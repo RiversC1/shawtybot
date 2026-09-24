@@ -58,14 +58,23 @@ with open(DATA_PATH, encoding="utf-8") as f:
 
 with open(GYMS_DATA_PATH, encoding="utf-8") as f:
     GYMS: dict[str, dict] = {g["gym_key"]: g for g in json.load(f)}
-GYM_ORDER: list[str] = sorted(GYMS.keys(), key=lambda k: GYMS[k]["order"])
+GYM_REGIONS: list[str] = ["kanto", "johto", "hoenn", "sinnoh"]
+
+
+def gym_order(region: str) -> list[str]:
+    """The ordered list of gym_keys for one region's 8 gyms, sorted by each
+    entry's own `order` field (1-8, scoped to that region — not global)."""
+    return [
+        key for key, entry in sorted(GYMS.items(), key=lambda kv: kv[1]["order"])
+        if entry["generation"] == region
+    ]
 
 with open(TRAINER_CLASSES_DATA_PATH, encoding="utf-8") as f:
     TRAINER_CLASSES: list[dict] = json.load(f)
 TRAINER_CLASS_BY_KEY: dict[str, dict] = {c["class_key"]: c for c in TRAINER_CLASSES}
 
-# Poké League: the Elite Four + Champion tier, unlocked once all 8 gym
-# badges are earned. Keyed by "{generation}:{member_key}" (e.g.
+# Poké League: the Elite Four + Champion tier, unlocked once every gym
+# badge across all 4 regions is earned. Keyed by "{generation}:{member_key}" (e.g.
 # "kanto:lorelei") — that composite is what's stored in poke_battles'
 # side_b_npc_key and in poke_league_progress' league_key, exactly the same
 # role gym_key plays for gym battles.
@@ -451,17 +460,37 @@ def award_badge(user_id: int, gym_key: str):
         )
 
 
-def next_gym_key(user_id: int) -> str | None:
+def get_gym_clearers(gym_key: str, limit: int = 100) -> list[dict]:
+    """Trainers who've earned this gym's badge, most recent first — powers
+    the gym card's "trainers who beat this gym" list."""
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT pb.earned_at, pt.username FROM poke_badges pb "
+            "JOIN poke_trainers pt ON pt.user_id = pb.user_id "
+            "WHERE pb.gym_key = ? ORDER BY pb.earned_at DESC LIMIT ?",
+            (gym_key, limit),
+        ).fetchall()
+    return [{"username": r["username"] or "Trainer", "earned_at": r["earned_at"]} for r in rows]
+
+
+def next_gym_key(user_id: int, region: str) -> str | None:
+    """The next unbeaten gym in this region's fixed order, or None once all
+    8 of that region's gyms are defeated."""
     earned = get_badges(user_id)
-    for gym_key in GYM_ORDER:
+    for gym_key in gym_order(region):
         if gym_key not in earned:
             return gym_key
     return None
 
 
+def all_badges_earned(user_id: int) -> bool:
+    """Every gym across every region — the gate for the Poké League."""
+    return len(get_badges(user_id) & set(GYMS.keys())) >= len(GYMS)
+
+
 def league_unlocked(user_id: int) -> bool:
-    """The Poké League opens once all 8 gym badges are earned."""
-    return next_gym_key(user_id) is None
+    """The Poké League opens once every gym badge, across all 4 regions, is earned."""
+    return all_badges_earned(user_id)
 
 
 def get_league_progress(user_id: int) -> set[str]:

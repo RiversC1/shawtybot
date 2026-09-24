@@ -2130,7 +2130,11 @@ class Pokemon(commands.Cog):
         )
         await interaction.response.send_message(content=trainer.mention, embed=embed)
 
-    @poke.command(name="gyms", description="See the 8 Hoenn Gym Leaders and your badge progress")
+    GENERATION_CHOICES = [
+        app_commands.Choice(name=gen.title(), value=gen) for gen in battle_store.LEAGUE_GENERATIONS
+    ]
+
+    @poke.command(name="gyms", description="See all 32 Gym Leaders (Kanto/Johto/Hoenn/Sinnoh) and your badge progress")
     async def poke_gyms(self, interaction: discord.Interaction):
         if not self.get_trainer(interaction.user.id):
             await interaction.response.send_message(
@@ -2139,23 +2143,28 @@ class Pokemon(commands.Cog):
             return
 
         earned = battle_store.get_badges(interaction.user.id)
-        next_key = battle_store.next_gym_key(interaction.user.id)
         lines = []
-        for gym_key in battle_store.GYM_ORDER:
-            gym = battle_store.GYMS[gym_key]
-            mark = "🏅" if gym_key in earned else ("⚔️" if gym_key == next_key else "🔒")
-            lines.append(
-                f"{mark} **{gym['leader_name']}** ({gym['type_theme'].title()}-type) "
-                f"— {gym['location']} — *{gym['badge_name']}*"
-            )
+        for region in battle_store.GYM_REGIONS:
+            lines.append(f"**{region.title()} Gyms**")
+            next_key = battle_store.next_gym_key(interaction.user.id, region)
+            for gym_key in battle_store.gym_order(region):
+                gym = battle_store.GYMS[gym_key]
+                mark = "🏅" if gym_key in earned else ("⚔️" if gym_key == next_key else "🔒")
+                lines.append(f"{mark} {gym['leader_name']} ({gym['type_theme'].title()}-type) — *{gym['badge_name']}*")
+            lines.append("")
         embed = discord.Embed(
-            title="Hoenn Gym Leaders", description="\n".join(lines), color=discord.Color.gold()
+            title="Gym Leaders", description="\n".join(lines).strip(), color=discord.Color.gold()
         )
-        embed.set_footer(text=f"{len(earned)}/8 badges earned. Use /poke gym to challenge your next gym in order.")
+        embed.set_footer(
+            text=f"{len(earned)}/{len(battle_store.GYMS)} badges earned. "
+            "Use /poke gym <region> to challenge your next gym there."
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @poke.command(name="gym", description="Challenge the next Gym Leader in order")
-    async def poke_gym(self, interaction: discord.Interaction):
+    @poke.command(name="gym", description="Challenge the next Gym Leader in a region, in order")
+    @app_commands.describe(region="Which region's gym to challenge")
+    @app_commands.choices(region=GENERATION_CHOICES)
+    async def poke_gym(self, interaction: discord.Interaction, region: app_commands.Choice[str]):
         if not self.get_trainer(interaction.user.id):
             await interaction.response.send_message(
                 "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
@@ -2170,9 +2179,11 @@ class Pokemon(commands.Cog):
                 "You need to set your team first! Use `/poke team` or the Team page on the web app.", ephemeral=True
             )
             return
-        gym_key = battle_store.next_gym_key(interaction.user.id)
+        gym_key = battle_store.next_gym_key(interaction.user.id, region.value)
         if not gym_key:
-            await interaction.response.send_message("You've already earned all 8 badges! 🏆", ephemeral=True)
+            await interaction.response.send_message(
+                f"You've already earned all of {region.value.title()}'s badges! 🏆", ephemeral=True
+            )
             return
 
         gym = battle_store.GYMS[gym_key]
@@ -2226,10 +2237,6 @@ class Pokemon(commands.Cog):
         )
         await interaction.response.send_message(embed=embed)
 
-    GENERATION_CHOICES = [
-        app_commands.Choice(name=gen.title(), value=gen) for gen in battle_store.LEAGUE_GENERATIONS
-    ]
-
     @poke.command(name="league", description="See the Poké League: Elite Four + Champion progress")
     async def poke_league(self, interaction: discord.Interaction):
         if not self.get_trainer(interaction.user.id):
@@ -2240,7 +2247,8 @@ class Pokemon(commands.Cog):
 
         if not battle_store.league_unlocked(interaction.user.id):
             await interaction.response.send_message(
-                "🔒 The Poké League is locked. Earn all 8 Gym Badges (`/poke gym`) to enter.", ephemeral=True
+                "🔒 The Poké League is locked. Earn every Gym Badge across all 4 regions (`/poke gym`) to enter.",
+                ephemeral=True,
             )
             return
 
@@ -2281,7 +2289,8 @@ class Pokemon(commands.Cog):
             return
         if not battle_store.league_unlocked(interaction.user.id):
             await interaction.response.send_message(
-                "🔒 The Poké League is locked. Earn all 8 Gym Badges (`/poke gym`) to enter.", ephemeral=True
+                "🔒 The Poké League is locked. Earn every Gym Badge across all 4 regions (`/poke gym`) to enter.",
+                ephemeral=True,
             )
             return
         roster_a = battle_store.build_roster_for_player(interaction.user.id)
@@ -2331,7 +2340,8 @@ class Pokemon(commands.Cog):
             return
         if not battle_store.league_unlocked(interaction.user.id):
             await interaction.response.send_message(
-                "🔒 The Poké League is locked. Earn all 8 Gym Badges (`/poke gym`) to enter.", ephemeral=True
+                "🔒 The Poké League is locked. Earn every Gym Badge across all 4 regions (`/poke gym`) to enter.",
+                ephemeral=True,
             )
             return
         roster_a = battle_store.build_roster_for_player(interaction.user.id)

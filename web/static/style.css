@@ -609,6 +609,19 @@ code {
     opacity: 0.35;
 }
 
+.badge-case-region {
+    margin-bottom: 10px;
+}
+
+.badge-case-region-label {
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--red);
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
 .trainer-discord-avatar {
     position: absolute;
     top: 20px;
@@ -1961,6 +1974,24 @@ code {
     font-size: 0.82em;
     font-weight: bold;
     margin-top: 4px;
+}
+
+.gym-clearers-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.gym-clearers-list li {
+    background: var(--surface-alt);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.85em;
 }
 
 /* ---------- Poké League ---------- */

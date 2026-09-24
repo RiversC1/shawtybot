@@ -70,7 +70,8 @@
       }
     ],
     "leader_image": "/static/gym_leaders/roxanne.png",
-    "badge_image": "/static/badges/stone.png"
+    "badge_image": "/static/badges/stone.png",
+    "generation": "hoenn"
   },
   {
     "gym_key": "brawly",
@@ -143,7 +144,8 @@
       }
     ],
     "leader_image": "/static/gym_leaders/brawly.png",
-    "badge_image": "/static/badges/knuckle.png"
+    "badge_image": "/static/badges/knuckle.png",
+    "generation": "hoenn"
   },
   {
     "gym_key": "wattson",
@@ -216,7 +218,8 @@
       }
     ],
     "leader_image": "/static/gym_leaders/wattson.png",
-    "badge_image": "/static/badges/dynamo.png"
+    "badge_image": "/static/badges/dynamo.png",
+    "generation": "hoenn"
   },
   {
     "gym_key": "flannery",
@@ -289,7 +292,8 @@
       }
     ],
     "leader_image": "/static/gym_leaders/flannery.png",
-    "badge_image": "/static/badges/heat.png"
+    "badge_image": "/static/badges/heat.png",
+    "generation": "hoenn"
   },
   {
     "gym_key": "norman",
@@ -362,7 +366,8 @@
       }
     ],
     "leader_image": "/static/gym_leaders/norman.png",
-    "badge_image": "/static/badges/balance.png"
+    "badge_image": "/static/badges/balance.png",
+    "generation": "hoenn"
   },
   {
     "gym_key": "winona",
@@ -435,7 +440,8 @@
       }
     ],
     "leader_image": "/static/gym_leaders/winona.png",
-    "badge_image": "/static/badges/feather.png"
+    "badge_image": "/static/badges/feather.png",
+    "generation": "hoenn"
   },
   {
     "gym_key": "tate_and_liza",
@@ -508,7 +514,8 @@
       }
     ],
     "leader_image": "/static/gym_leaders/tate_and_liza.png",
-    "badge_image": "/static/badges/mind.png"
+    "badge_image": "/static/badges/mind.png",
+    "generation": "hoenn"
   },
   {
     "gym_key": "juan",
@@ -581,6 +588,1783 @@
       }
     ],
     "leader_image": "/static/gym_leaders/juan.png",
-    "badge_image": "/static/badges/rain.png"
+    "badge_image": "/static/badges/rain.png",
+    "generation": "hoenn"
+  },
+  {
+    "gym_key": "brock",
+    "generation": "kanto",
+    "order": 1,
+    "leader_name": "Brock",
+    "type_theme": "rock",
+    "location": "Pewter City",
+    "badge_name": "Boulder Badge",
+    "flavor": "A sturdy Rock-type gym leader who trains like a true rock hard-head.",
+    "roster": [
+      {
+        "dex_id": 76,
+        "ability": "rock-head",
+        "moves": [
+          "Stone Edge",
+          "Earthquake",
+          "Explosion",
+          "Stealth Rock"
+        ]
+      },
+      {
+        "dex_id": 95,
+        "ability": "rock-head",
+        "moves": [
+          "Stone Edge",
+          "Dig",
+          "Double Edge",
+          "Sandstorm"
+        ]
+      },
+      {
+        "dex_id": 112,
+        "ability": "lightning-rod",
+        "moves": [
+          "Earthquake",
+          "Stone Edge",
+          "Giga Impact",
+          "Leer"
+        ]
+      },
+      {
+        "dex_id": 306,
+        "ability": "sturdy",
+        "moves": [
+          "Iron Tail",
+          "Metal Burst",
+          "Double Edge",
+          "Iron Defense"
+        ]
+      },
+      {
+        "dex_id": 141,
+        "ability": "swift-swim",
+        "moves": [
+          "Stone Edge",
+          "Liquidation",
+          "Night Slash",
+          "Swords Dance"
+        ]
+      },
+      {
+        "dex_id": 248,
+        "ability": "sand-stream",
+        "moves": [
+          "Stone Edge",
+          "Crunch",
+          "Giga Impact",
+          "Sandstorm"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/76.png",
+    "badge_image": "/static/badges/rock.svg"
+  },
+  {
+    "gym_key": "misty",
+    "generation": "kanto",
+    "order": 2,
+    "leader_name": "Misty",
+    "type_theme": "water",
+    "location": "Cerulean City",
+    "badge_name": "Cascade Badge",
+    "flavor": "A tomboyish Water-type gym leader with a soft spot for cute Pokémon.",
+    "roster": [
+      {
+        "dex_id": 134,
+        "ability": "water-absorb",
+        "moves": [
+          "Hydro Pump",
+          "Muddy Water",
+          "Last Resort",
+          "Acid Armor"
+        ]
+      },
+      {
+        "dex_id": 130,
+        "ability": "intimidate",
+        "moves": [
+          "Hurricane",
+          "Hydro Pump",
+          "Hyper Beam",
+          "Rain Dance"
+        ]
+      },
+      {
+        "dex_id": 121,
+        "ability": "illuminate",
+        "moves": [
+          "Hydro Pump",
+          "Surf",
+          "Tackle",
+          "Confuse Ray"
+        ]
+      },
+      {
+        "dex_id": 131,
+        "ability": "water-absorb",
+        "moves": [
+          "Hydro Pump",
+          "Blizzard",
+          "Dragon Pulse",
+          "Perish Song"
+        ]
+      },
+      {
+        "dex_id": 230,
+        "ability": "swift-swim",
+        "moves": [
+          "Wave Crash",
+          "Hydro Pump",
+          "Rain Dance",
+          "Dragon Pulse"
+        ]
+      },
+      {
+        "dex_id": 350,
+        "ability": "marvel-scale",
+        "moves": [
+          "Hydro Pump",
+          "Surf",
+          "Rain Dance",
+          "Aqua Tail"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/134.png",
+    "badge_image": "/static/badges/water.svg"
+  },
+  {
+    "gym_key": "lt_surge",
+    "generation": "kanto",
+    "order": 3,
+    "leader_name": "Lt. Surge",
+    "type_theme": "electric",
+    "location": "Vermilion City",
+    "badge_name": "Thunder Badge",
+    "flavor": "A battle-hardened veteran and self-proclaimed Electric-type wizard.",
+    "roster": [
+      {
+        "dex_id": 26,
+        "ability": "static",
+        "moves": [
+          "Thunder",
+          "Thunderbolt",
+          "Iron Tail",
+          "Thunder Wave"
+        ]
+      },
+      {
+        "dex_id": 101,
+        "ability": "soundproof",
+        "moves": [
+          "Thunderbolt",
+          "Discharge",
+          "Explosion",
+          "Magnet Rise"
+        ]
+      },
+      {
+        "dex_id": 181,
+        "ability": "static",
+        "moves": [
+          "Thunder",
+          "Discharge",
+          "Dragon Pulse",
+          "Light Screen"
+        ]
+      },
+      {
+        "dex_id": 310,
+        "ability": "static",
+        "moves": [
+          "Thunder",
+          "Wild Charge",
+          "Bite",
+          "Electric Terrain"
+        ]
+      },
+      {
+        "dex_id": 466,
+        "ability": "motor-drive",
+        "moves": [
+          "Thunder",
+          "Thunderbolt",
+          "Giga Impact",
+          "Electric Terrain"
+        ]
+      },
+      {
+        "dex_id": 135,
+        "ability": "volt-absorb",
+        "moves": [
+          "Thunder",
+          "Discharge",
+          "Last Resort",
+          "Agility"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/26.png",
+    "badge_image": "/static/badges/electric.svg"
+  },
+  {
+    "gym_key": "erika",
+    "generation": "kanto",
+    "order": 4,
+    "leader_name": "Erika",
+    "type_theme": "grass",
+    "location": "Celadon City",
+    "badge_name": "Rainbow Badge",
+    "flavor": "A graceful, soft-spoken Grass-type gym leader who loves fragrant flowers.",
+    "roster": [
+      {
+        "dex_id": 45,
+        "ability": "chlorophyll",
+        "moves": [
+          "Solar Beam",
+          "Petal Dance",
+          "Sleep Powder",
+          "Petal Blizzard"
+        ]
+      },
+      {
+        "dex_id": 71,
+        "ability": "chlorophyll",
+        "moves": [
+          "Leaf Storm",
+          "Power Whip",
+          "Wrap",
+          "Sleep Powder"
+        ]
+      },
+      {
+        "dex_id": 465,
+        "ability": "chlorophyll",
+        "moves": [
+          "Power Whip",
+          "Sludge Bomb",
+          "Block",
+          "Slam"
+        ]
+      },
+      {
+        "dex_id": 407,
+        "ability": "natural-cure",
+        "moves": [
+          "Petal Dance",
+          "Energy Ball",
+          "Stun Spore",
+          "Poison Jab"
+        ]
+      },
+      {
+        "dex_id": 389,
+        "ability": "overgrow",
+        "moves": [
+          "Leaf Storm",
+          "Headlong Rush",
+          "Double Edge",
+          "Synthesis"
+        ]
+      },
+      {
+        "dex_id": 154,
+        "ability": "overgrow",
+        "moves": [
+          "Solar Beam",
+          "Petal Blizzard",
+          "Body Slam",
+          "Aromatherapy"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/45.png",
+    "badge_image": "/static/badges/grass.svg"
+  },
+  {
+    "gym_key": "koga",
+    "generation": "kanto",
+    "order": 5,
+    "leader_name": "Koga",
+    "type_theme": "poison",
+    "location": "Fuchsia City",
+    "badge_name": "Soul Badge",
+    "flavor": "A ninja master who uses Poison-type Pokémon and sleight of hand.",
+    "roster": [
+      {
+        "dex_id": 110,
+        "ability": "levitate",
+        "moves": [
+          "Belch",
+          "Sludge Bomb",
+          "Explosion",
+          "Memento"
+        ]
+      },
+      {
+        "dex_id": 89,
+        "ability": "stench",
+        "moves": [
+          "Gunk Shot",
+          "Belch",
+          "Memento",
+          "Sludge Wave"
+        ]
+      },
+      {
+        "dex_id": 49,
+        "ability": "shield-dust",
+        "moves": [
+          "Bug Buzz",
+          "Leech Life",
+          "Psychic",
+          "Quiver Dance"
+        ]
+      },
+      {
+        "dex_id": 169,
+        "ability": "inner-focus",
+        "moves": [
+          "Air Slash",
+          "Venoshock",
+          "Leech Life",
+          "Haze"
+        ]
+      },
+      {
+        "dex_id": 168,
+        "ability": "swarm",
+        "moves": [
+          "Poison Jab",
+          "Cross Poison",
+          "Psychic",
+          "Toxic Thread"
+        ]
+      },
+      {
+        "dex_id": 454,
+        "ability": "anticipation",
+        "moves": [
+          "Belch",
+          "Close Combat",
+          "Earth Power",
+          "Flatter"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/110.png",
+    "badge_image": "/static/badges/poison.svg"
+  },
+  {
+    "gym_key": "sabrina",
+    "generation": "kanto",
+    "order": 6,
+    "leader_name": "Sabrina",
+    "type_theme": "psychic",
+    "location": "Saffron City",
+    "badge_name": "Marsh Badge",
+    "flavor": "A cold, calculating Psychic-type gym leader with powerful ESP.",
+    "roster": [
+      {
+        "dex_id": 65,
+        "ability": "synchronize",
+        "moves": [
+          "Future Sight",
+          "Psychic",
+          "Trick",
+          "Psycho Cut"
+        ]
+      },
+      {
+        "dex_id": 196,
+        "ability": "synchronize",
+        "moves": [
+          "Future Sight",
+          "Psychic",
+          "Last Resort",
+          "Power Swap"
+        ]
+      },
+      {
+        "dex_id": 282,
+        "ability": "synchronize",
+        "moves": [
+          "Future Sight",
+          "Dream Eater",
+          "Hypnosis",
+          "Moonblast"
+        ]
+      },
+      {
+        "dex_id": 199,
+        "ability": "oblivious",
+        "moves": [
+          "Psychic",
+          "Headbutt",
+          "Heal Pulse",
+          "Trump Card"
+        ]
+      },
+      {
+        "dex_id": 376,
+        "ability": "clear-body",
+        "moves": [
+          "Meteor Mash",
+          "Psychic",
+          "Hyper Beam",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 475,
+        "ability": "steadfast",
+        "moves": [
+          "Close Combat",
+          "Stored Power",
+          "False Swipe",
+          "Wide Guard"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/65.png",
+    "badge_image": "/static/badges/psychic.svg"
+  },
+  {
+    "gym_key": "blaine",
+    "generation": "kanto",
+    "order": 7,
+    "leader_name": "Blaine",
+    "type_theme": "fire",
+    "location": "Cinnabar Island",
+    "badge_name": "Volcano Badge",
+    "flavor": "A quiz-loving Fire-type specialist stationed on a volcanic island.",
+    "roster": [
+      {
+        "dex_id": 59,
+        "ability": "intimidate",
+        "moves": [
+          "Flamethrower",
+          "Ember",
+          "Double Edge",
+          "Leer"
+        ]
+      },
+      {
+        "dex_id": 78,
+        "ability": "run-away",
+        "moves": [
+          "Flare Blitz",
+          "Fire Blast",
+          "Take Down",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 467,
+        "ability": "flame-body",
+        "moves": [
+          "Fire Blast",
+          "Flamethrower",
+          "Hyper Beam",
+          "Sunny Day"
+        ]
+      },
+      {
+        "dex_id": 38,
+        "ability": "flash-fire",
+        "moves": [
+          "Fire Blast",
+          "Flamethrower",
+          "Extrasensory",
+          "Nasty Plot"
+        ]
+      },
+      {
+        "dex_id": 6,
+        "ability": "blaze",
+        "moves": [
+          "Flare Blitz",
+          "Inferno",
+          "Slash",
+          "Heat Wave"
+        ]
+      },
+      {
+        "dex_id": 157,
+        "ability": "blaze",
+        "moves": [
+          "Eruption",
+          "Overheat",
+          "Double Edge",
+          "Burn Up"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/59.png",
+    "badge_image": "/static/badges/fire.svg"
+  },
+  {
+    "gym_key": "giovanni",
+    "generation": "kanto",
+    "order": 8,
+    "leader_name": "Giovanni",
+    "type_theme": "ground",
+    "location": "Viridian City",
+    "badge_name": "Earth Badge",
+    "flavor": "The secretive boss of Team Rocket, and a master of Ground-type Pokémon.",
+    "roster": [
+      {
+        "dex_id": 34,
+        "ability": "poison-point",
+        "moves": [
+          "Earth Power",
+          "Poison Sting",
+          "Megahorn",
+          "Thrash"
+        ]
+      },
+      {
+        "dex_id": 31,
+        "ability": "poison-point",
+        "moves": [
+          "Earth Power",
+          "Poison Sting",
+          "Superpower",
+          "Body Slam"
+        ]
+      },
+      {
+        "dex_id": 51,
+        "ability": "sand-veil",
+        "moves": [
+          "Earthquake",
+          "Earth Power",
+          "Slash",
+          "Sandstorm"
+        ]
+      },
+      {
+        "dex_id": 464,
+        "ability": "lightning-rod",
+        "moves": [
+          "Rock Wrecker",
+          "Earthquake",
+          "Giga Impact",
+          "Megahorn"
+        ]
+      },
+      {
+        "dex_id": 445,
+        "ability": "sand-veil",
+        "moves": [
+          "Outrage",
+          "Dragon Rush",
+          "Double Edge",
+          "Sandstorm"
+        ]
+      },
+      {
+        "dex_id": 472,
+        "ability": "hyper-cutter",
+        "moves": [
+          "Earthquake",
+          "Earth Power",
+          "Crabhammer",
+          "Swords Dance"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/34.png",
+    "badge_image": "/static/badges/ground.svg"
+  },
+  {
+    "gym_key": "falkner",
+    "generation": "johto",
+    "order": 1,
+    "leader_name": "Falkner",
+    "type_theme": "flying",
+    "location": "Violet City",
+    "badge_name": "Zephyr Badge",
+    "flavor": "A proud Flying-type gym leader carrying on his father's legacy.",
+    "roster": [
+      {
+        "dex_id": 18,
+        "ability": "keen-eye",
+        "moves": [
+          "Hurricane",
+          "Razor Wind",
+          "Mirror Move",
+          "Air Slash"
+        ]
+      },
+      {
+        "dex_id": 164,
+        "ability": "insomnia",
+        "moves": [
+          "Synchronoise",
+          "Roost",
+          "Dream Eater",
+          "Moonblast"
+        ]
+      },
+      {
+        "dex_id": 468,
+        "ability": "hustle",
+        "moves": [
+          "Moonblast",
+          "Air Slash",
+          "Extrasensory",
+          "Baby Doll Eyes"
+        ]
+      },
+      {
+        "dex_id": 398,
+        "ability": "intimidate",
+        "moves": [
+          "Giga Impact",
+          "Brave Bird",
+          "Close Combat",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 430,
+        "ability": "insomnia",
+        "moves": [
+          "Brave Bird",
+          "Foul Play",
+          "Quash",
+          "Dark Pulse"
+        ]
+      },
+      {
+        "dex_id": 227,
+        "ability": "keen-eye",
+        "moves": [
+          "Brave Bird",
+          "Air Slash",
+          "Night Slash",
+          "Autotomize"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/18.png",
+    "badge_image": "/static/badges/flying.svg"
+  },
+  {
+    "gym_key": "bugsy",
+    "generation": "johto",
+    "order": 2,
+    "leader_name": "Bugsy",
+    "type_theme": "bug",
+    "location": "Azalea Town",
+    "badge_name": "Hive Badge",
+    "flavor": "A young Bug-type researcher who's read every book on his favorite Pokémon.",
+    "roster": [
+      {
+        "dex_id": 212,
+        "ability": "swarm",
+        "moves": [
+          "Iron Head",
+          "Fury Cutter",
+          "Night Slash",
+          "Swords Dance"
+        ]
+      },
+      {
+        "dex_id": 214,
+        "ability": "swarm",
+        "moves": [
+          "Close Combat",
+          "Megahorn",
+          "Thrash",
+          "Swords Dance"
+        ]
+      },
+      {
+        "dex_id": 12,
+        "ability": "compound-eyes",
+        "moves": [
+          "Bug Buzz",
+          "Air Slash",
+          "Quiver Dance",
+          "Silver Wind"
+        ]
+      },
+      {
+        "dex_id": 15,
+        "ability": "swarm",
+        "moves": [
+          "Poison Jab",
+          "Fell Stinger",
+          "Outrage",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 469,
+        "ability": "speed-boost",
+        "moves": [
+          "Bug Buzz",
+          "Air Slash",
+          "Crunch",
+          "Screech"
+        ]
+      },
+      {
+        "dex_id": 416,
+        "ability": "pressure",
+        "moves": [
+          "Attack Order",
+          "Bug Buzz",
+          "Destiny Bond",
+          "Fell Stinger"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/212.png",
+    "badge_image": "/static/badges/bug.svg"
+  },
+  {
+    "gym_key": "whitney",
+    "generation": "johto",
+    "order": 3,
+    "leader_name": "Whitney",
+    "type_theme": "normal",
+    "location": "Goldenrod City",
+    "badge_name": "Plain Badge",
+    "flavor": "A cheerful Normal-type gym leader who cries when she loses.",
+    "roster": [
+      {
+        "dex_id": 241,
+        "ability": "thick-fat",
+        "moves": [
+          "Body Slam",
+          "High Horsepower",
+          "Heal Bell",
+          "Play Rough"
+        ]
+      },
+      {
+        "dex_id": 143,
+        "ability": "immunity",
+        "moves": [
+          "Hyper Beam",
+          "Giga Impact",
+          "Superpower",
+          "Belch"
+        ]
+      },
+      {
+        "dex_id": 242,
+        "ability": "natural-cure",
+        "moves": [
+          "Last Resort",
+          "Double Edge",
+          "Fling",
+          "Healing Wish"
+        ]
+      },
+      {
+        "dex_id": 217,
+        "ability": "guts",
+        "moves": [
+          "Thrash",
+          "Double Edge",
+          "Hammer Arm",
+          "Rest"
+        ]
+      },
+      {
+        "dex_id": 115,
+        "ability": "early-bird",
+        "moves": [
+          "Last Resort",
+          "Dizzy Punch",
+          "Outrage",
+          "Endure"
+        ]
+      },
+      {
+        "dex_id": 203,
+        "ability": "inner-focus",
+        "moves": [
+          "Psychic",
+          "Zen Headbutt",
+          "Crunch",
+          "Nasty Plot"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/241.png",
+    "badge_image": "/static/badges/normal.svg"
+  },
+  {
+    "gym_key": "morty",
+    "generation": "johto",
+    "order": 4,
+    "leader_name": "Morty",
+    "type_theme": "ghost",
+    "location": "Ecruteak City",
+    "badge_name": "Fog Badge",
+    "flavor": "A mystic Ghost-type gym leader awaiting a legendary Pokémon's return.",
+    "roster": [
+      {
+        "dex_id": 94,
+        "ability": "cursed-body",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Dream Eater",
+          "Mean Look"
+        ]
+      },
+      {
+        "dex_id": 477,
+        "ability": "pressure",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Future Sight",
+          "Destiny Bond"
+        ]
+      },
+      {
+        "dex_id": 429,
+        "ability": "levitate",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Power Gem",
+          "Hypnosis"
+        ]
+      },
+      {
+        "dex_id": 426,
+        "ability": "aftermath",
+        "moves": [
+          "Phantom Force",
+          "Shadow Ball",
+          "Explosion",
+          "Baton Pass"
+        ]
+      },
+      {
+        "dex_id": 354,
+        "ability": "insomnia",
+        "moves": [
+          "Phantom Force",
+          "Shadow Ball",
+          "Sucker Punch",
+          "Trick"
+        ]
+      },
+      {
+        "dex_id": 478,
+        "ability": "snow-cloak",
+        "moves": [
+          "Blizzard",
+          "Shadow Ball",
+          "Destiny Bond",
+          "Hail"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png",
+    "badge_image": "/static/badges/ghost.svg"
+  },
+  {
+    "gym_key": "chuck",
+    "generation": "johto",
+    "order": 5,
+    "leader_name": "Chuck",
+    "type_theme": "fighting",
+    "location": "Cianwood City",
+    "badge_name": "Storm Badge",
+    "flavor": "A boisterous Fighting-type gym leader who trains under waterfalls.",
+    "roster": [
+      {
+        "dex_id": 62,
+        "ability": "water-absorb",
+        "moves": [
+          "Superpower",
+          "Dynamic Punch",
+          "Pound",
+          "Mind Reader"
+        ]
+      },
+      {
+        "dex_id": 68,
+        "ability": "guts",
+        "moves": [
+          "Superpower",
+          "Cross Chop",
+          "Double Edge",
+          "Scary Face"
+        ]
+      },
+      {
+        "dex_id": 57,
+        "ability": "vital-spirit",
+        "moves": [
+          "Close Combat",
+          "Cross Chop",
+          "Thrash",
+          "Screech"
+        ]
+      },
+      {
+        "dex_id": 297,
+        "ability": "thick-fat",
+        "moves": [
+          "Close Combat",
+          "Wake Up Slap",
+          "Headlong Rush",
+          "Endure"
+        ]
+      },
+      {
+        "dex_id": 257,
+        "ability": "blaze",
+        "moves": [
+          "Flare Blitz",
+          "Sky Uppercut",
+          "Brave Bird",
+          "Mirror Move"
+        ]
+      },
+      {
+        "dex_id": 448,
+        "ability": "steadfast",
+        "moves": [
+          "Close Combat",
+          "Meteor Mash",
+          "Dragon Pulse",
+          "Heal Pulse"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/62.png",
+    "badge_image": "/static/badges/fighting.svg"
+  },
+  {
+    "gym_key": "jasmine",
+    "generation": "johto",
+    "order": 6,
+    "leader_name": "Jasmine",
+    "type_theme": "steel",
+    "location": "Olivine City",
+    "badge_name": "Mineral Badge",
+    "flavor": "A gentle, devoted Steel-type gym leader who cares deeply for her Pokémon.",
+    "roster": [
+      {
+        "dex_id": 208,
+        "ability": "rock-head",
+        "moves": [
+          "Iron Tail",
+          "Dig",
+          "Double Edge",
+          "Magnet Rise"
+        ]
+      },
+      {
+        "dex_id": 205,
+        "ability": "sturdy",
+        "moves": [
+          "Heavy Slam",
+          "Gyro Ball",
+          "Explosion",
+          "Magnet Rise"
+        ]
+      },
+      {
+        "dex_id": 437,
+        "ability": "levitate",
+        "moves": [
+          "Future Sight",
+          "Extrasensory",
+          "Feint Attack",
+          "Heal Block"
+        ]
+      },
+      {
+        "dex_id": 462,
+        "ability": "magnet-pull",
+        "moves": [
+          "Zap Cannon",
+          "Discharge",
+          "Magnet Rise",
+          "Mirror Shot"
+        ]
+      },
+      {
+        "dex_id": 395,
+        "ability": "torrent",
+        "moves": [
+          "Wave Crash",
+          "Hydro Pump",
+          "Double Edge",
+          "Mist"
+        ]
+      },
+      {
+        "dex_id": 379,
+        "ability": "clear-body",
+        "moves": [
+          "Flash Cannon",
+          "Iron Head",
+          "Explosion",
+          "Lock On"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/208.png",
+    "badge_image": "/static/badges/steel.svg"
+  },
+  {
+    "gym_key": "pryce",
+    "generation": "johto",
+    "order": 7,
+    "leader_name": "Pryce",
+    "type_theme": "ice",
+    "location": "Mahogany Town",
+    "badge_name": "Glacier Badge",
+    "flavor": "A wise, elderly Ice-type gym leader with decades of battle experience.",
+    "roster": [
+      {
+        "dex_id": 221,
+        "ability": "oblivious",
+        "moves": [
+          "Blizzard",
+          "Earthquake",
+          "Thrash",
+          "Amnesia"
+        ]
+      },
+      {
+        "dex_id": 473,
+        "ability": "oblivious",
+        "moves": [
+          "Blizzard",
+          "Earthquake",
+          "Thrash",
+          "Scary Face"
+        ]
+      },
+      {
+        "dex_id": 365,
+        "ability": "thick-fat",
+        "moves": [
+          "Blizzard",
+          "Surf",
+          "Body Slam",
+          "Hail"
+        ]
+      },
+      {
+        "dex_id": 362,
+        "ability": "inner-focus",
+        "moves": [
+          "Blizzard",
+          "Freeze Dry",
+          "Crunch",
+          "Hail"
+        ]
+      },
+      {
+        "dex_id": 460,
+        "ability": "snow-warning",
+        "moves": [
+          "Wood Hammer",
+          "Blizzard",
+          "Ingrain",
+          "Energy Ball"
+        ]
+      },
+      {
+        "dex_id": 461,
+        "ability": "pressure",
+        "moves": [
+          "Blizzard",
+          "Dark Pulse",
+          "Metal Claw",
+          "Screech"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/221.png",
+    "badge_image": "/static/badges/ice.svg"
+  },
+  {
+    "gym_key": "clair",
+    "generation": "johto",
+    "order": 8,
+    "leader_name": "Clair",
+    "type_theme": "dragon",
+    "location": "Blackthorn City",
+    "badge_name": "Rising Badge",
+    "flavor": "A proud Dragon-type master of the Blackthorn bloodline.",
+    "roster": [
+      {
+        "dex_id": 230,
+        "ability": "swift-swim",
+        "moves": [
+          "Wave Crash",
+          "Hydro Pump",
+          "Rain Dance",
+          "Dragon Pulse"
+        ]
+      },
+      {
+        "dex_id": 149,
+        "ability": "inner-focus",
+        "moves": [
+          "Outrage",
+          "Hurricane",
+          "Hyper Beam",
+          "Roost"
+        ]
+      },
+      {
+        "dex_id": 373,
+        "ability": "intimidate",
+        "moves": [
+          "Outrage",
+          "Fly",
+          "Double Edge",
+          "Scary Face"
+        ]
+      },
+      {
+        "dex_id": 334,
+        "ability": "natural-cure",
+        "moves": [
+          "Sky Attack",
+          "Dragon Pulse",
+          "Moonblast",
+          "Perish Song"
+        ]
+      },
+      {
+        "dex_id": 330,
+        "ability": "levitate",
+        "moves": [
+          "Dragon Rush",
+          "Earthquake",
+          "Hyper Beam",
+          "Sandstorm"
+        ]
+      },
+      {
+        "dex_id": 445,
+        "ability": "sand-veil",
+        "moves": [
+          "Outrage",
+          "Dragon Rush",
+          "Double Edge",
+          "Sandstorm"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/230.png",
+    "badge_image": "/static/badges/dragon.svg"
+  },
+  {
+    "gym_key": "roark",
+    "generation": "sinnoh",
+    "order": 1,
+    "leader_name": "Roark",
+    "type_theme": "rock",
+    "location": "Oreburgh City",
+    "badge_name": "Coal Badge",
+    "flavor": "A fossil-loving Rock-type gym leader who idolizes his miner father.",
+    "roster": [
+      {
+        "dex_id": 409,
+        "ability": "mold-breaker",
+        "moves": [
+          "Head Smash",
+          "Ancient Power",
+          "Double Edge",
+          "Screech"
+        ]
+      },
+      {
+        "dex_id": 411,
+        "ability": "sturdy",
+        "moves": [
+          "Iron Head",
+          "Heavy Slam",
+          "Double Edge",
+          "Stealth Rock"
+        ]
+      },
+      {
+        "dex_id": 476,
+        "ability": "sturdy",
+        "moves": [
+          "Stone Edge",
+          "Power Gem",
+          "Zap Cannon",
+          "Lock On"
+        ]
+      },
+      {
+        "dex_id": 76,
+        "ability": "rock-head",
+        "moves": [
+          "Stone Edge",
+          "Earthquake",
+          "Explosion",
+          "Stealth Rock"
+        ]
+      },
+      {
+        "dex_id": 95,
+        "ability": "rock-head",
+        "moves": [
+          "Stone Edge",
+          "Dig",
+          "Double Edge",
+          "Sandstorm"
+        ]
+      },
+      {
+        "dex_id": 306,
+        "ability": "sturdy",
+        "moves": [
+          "Iron Tail",
+          "Metal Burst",
+          "Double Edge",
+          "Iron Defense"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/409.png",
+    "badge_image": "/static/badges/rock.svg"
+  },
+  {
+    "gym_key": "gardenia",
+    "generation": "sinnoh",
+    "order": 2,
+    "leader_name": "Gardenia",
+    "type_theme": "grass",
+    "location": "Eterna City",
+    "badge_name": "Forest Badge",
+    "flavor": "An energetic Grass-type gym leader devoted to her forest town.",
+    "roster": [
+      {
+        "dex_id": 407,
+        "ability": "natural-cure",
+        "moves": [
+          "Petal Dance",
+          "Energy Ball",
+          "Stun Spore",
+          "Poison Jab"
+        ]
+      },
+      {
+        "dex_id": 421,
+        "ability": "flower-gift",
+        "moves": [
+          "Petal Dance",
+          "Solar Beam",
+          "Double Edge",
+          "Lucky Chant"
+        ]
+      },
+      {
+        "dex_id": 470,
+        "ability": "leaf-guard",
+        "moves": [
+          "Leaf Blade",
+          "Giga Drain",
+          "Last Resort",
+          "Swords Dance"
+        ]
+      },
+      {
+        "dex_id": 286,
+        "ability": "effect-spore",
+        "moves": [
+          "Focus Punch",
+          "Dynamic Punch",
+          "Mind Reader",
+          "Sky Uppercut"
+        ]
+      },
+      {
+        "dex_id": 465,
+        "ability": "chlorophyll",
+        "moves": [
+          "Power Whip",
+          "Sludge Bomb",
+          "Block",
+          "Slam"
+        ]
+      },
+      {
+        "dex_id": 389,
+        "ability": "overgrow",
+        "moves": [
+          "Leaf Storm",
+          "Headlong Rush",
+          "Double Edge",
+          "Synthesis"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/407.png",
+    "badge_image": "/static/badges/grass.svg"
+  },
+  {
+    "gym_key": "maylene",
+    "generation": "sinnoh",
+    "order": 3,
+    "leader_name": "Maylene",
+    "type_theme": "fighting",
+    "location": "Veilstone City",
+    "badge_name": "Cobble Badge",
+    "flavor": "A young but formidable Fighting-type gym leader and martial artist.",
+    "roster": [
+      {
+        "dex_id": 448,
+        "ability": "steadfast",
+        "moves": [
+          "Close Combat",
+          "Meteor Mash",
+          "Dragon Pulse",
+          "Heal Pulse"
+        ]
+      },
+      {
+        "dex_id": 392,
+        "ability": "blaze",
+        "moves": [
+          "Flare Blitz",
+          "Raging Fury",
+          "Double Edge",
+          "Calm Mind"
+        ]
+      },
+      {
+        "dex_id": 454,
+        "ability": "anticipation",
+        "moves": [
+          "Belch",
+          "Close Combat",
+          "Earth Power",
+          "Flatter"
+        ]
+      },
+      {
+        "dex_id": 68,
+        "ability": "guts",
+        "moves": [
+          "Superpower",
+          "Cross Chop",
+          "Double Edge",
+          "Scary Face"
+        ]
+      },
+      {
+        "dex_id": 308,
+        "ability": "pure-power",
+        "moves": [
+          "High Jump Kick",
+          "Axe Kick",
+          "Recover",
+          "Reversal"
+        ]
+      },
+      {
+        "dex_id": 237,
+        "ability": "intimidate",
+        "moves": [
+          "Close Combat",
+          "Triple Kick",
+          "Endeavor",
+          "Detect"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/448.png",
+    "badge_image": "/static/badges/fighting.svg"
+  },
+  {
+    "gym_key": "crasher_wake",
+    "generation": "sinnoh",
+    "order": 4,
+    "leader_name": "Crasher Wake",
+    "type_theme": "water",
+    "location": "Pastoria City",
+    "badge_name": "Fen Badge",
+    "flavor": "A flamboyant, wrestling-obsessed Water-type gym leader.",
+    "roster": [
+      {
+        "dex_id": 419,
+        "ability": "swift-swim",
+        "moves": [
+          "Wave Crash",
+          "Hydro Pump",
+          "Razor Wind",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 195,
+        "ability": "damp",
+        "moves": [
+          "Earthquake",
+          "Muddy Water",
+          "Mist",
+          "Haze"
+        ]
+      },
+      {
+        "dex_id": 340,
+        "ability": "oblivious",
+        "moves": [
+          "Earthquake",
+          "Earth Power",
+          "Future Sight",
+          "Rest"
+        ]
+      },
+      {
+        "dex_id": 395,
+        "ability": "torrent",
+        "moves": [
+          "Wave Crash",
+          "Hydro Pump",
+          "Double Edge",
+          "Mist"
+        ]
+      },
+      {
+        "dex_id": 130,
+        "ability": "intimidate",
+        "moves": [
+          "Hurricane",
+          "Hydro Pump",
+          "Hyper Beam",
+          "Rain Dance"
+        ]
+      },
+      {
+        "dex_id": 119,
+        "ability": "swift-swim",
+        "moves": [
+          "Waterfall",
+          "Megahorn",
+          "Soak",
+          "Fury Attack"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/419.png",
+    "badge_image": "/static/badges/water.svg"
+  },
+  {
+    "gym_key": "fantina",
+    "generation": "sinnoh",
+    "order": 5,
+    "leader_name": "Fantina",
+    "type_theme": "ghost",
+    "location": "Hearthome City",
+    "badge_name": "Relic Badge",
+    "flavor": "A charismatic, foreign Ghost-type gym leader beloved across Sinnoh.",
+    "roster": [
+      {
+        "dex_id": 429,
+        "ability": "levitate",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Power Gem",
+          "Hypnosis"
+        ]
+      },
+      {
+        "dex_id": 426,
+        "ability": "aftermath",
+        "moves": [
+          "Phantom Force",
+          "Shadow Ball",
+          "Explosion",
+          "Baton Pass"
+        ]
+      },
+      {
+        "dex_id": 442,
+        "ability": "pressure",
+        "moves": [
+          "Dark Pulse",
+          "Shadow Ball",
+          "Dream Eater",
+          "Hypnosis"
+        ]
+      },
+      {
+        "dex_id": 94,
+        "ability": "cursed-body",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Dream Eater",
+          "Mean Look"
+        ]
+      },
+      {
+        "dex_id": 479,
+        "ability": "levitate",
+        "moves": [
+          "Thunder",
+          "Discharge",
+          "Uproar",
+          "Charge"
+        ]
+      },
+      {
+        "dex_id": 477,
+        "ability": "pressure",
+        "moves": [
+          "Shadow Ball",
+          "Hex",
+          "Future Sight",
+          "Destiny Bond"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/429.png",
+    "badge_image": "/static/badges/ghost.svg"
+  },
+  {
+    "gym_key": "byron",
+    "generation": "sinnoh",
+    "order": 6,
+    "leader_name": "Byron",
+    "type_theme": "steel",
+    "location": "Canalave City",
+    "badge_name": "Mine Badge",
+    "flavor": "A tough, old-fashioned Steel-type gym leader and Roark's father.",
+    "roster": [
+      {
+        "dex_id": 306,
+        "ability": "sturdy",
+        "moves": [
+          "Iron Tail",
+          "Metal Burst",
+          "Double Edge",
+          "Iron Defense"
+        ]
+      },
+      {
+        "dex_id": 208,
+        "ability": "rock-head",
+        "moves": [
+          "Iron Tail",
+          "Dig",
+          "Double Edge",
+          "Magnet Rise"
+        ]
+      },
+      {
+        "dex_id": 411,
+        "ability": "sturdy",
+        "moves": [
+          "Iron Head",
+          "Heavy Slam",
+          "Double Edge",
+          "Stealth Rock"
+        ]
+      },
+      {
+        "dex_id": 437,
+        "ability": "levitate",
+        "moves": [
+          "Future Sight",
+          "Extrasensory",
+          "Feint Attack",
+          "Heal Block"
+        ]
+      },
+      {
+        "dex_id": 462,
+        "ability": "magnet-pull",
+        "moves": [
+          "Zap Cannon",
+          "Discharge",
+          "Magnet Rise",
+          "Mirror Shot"
+        ]
+      },
+      {
+        "dex_id": 376,
+        "ability": "clear-body",
+        "moves": [
+          "Meteor Mash",
+          "Psychic",
+          "Hyper Beam",
+          "Agility"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/306.png",
+    "badge_image": "/static/badges/steel.svg"
+  },
+  {
+    "gym_key": "candice",
+    "generation": "sinnoh",
+    "order": 7,
+    "leader_name": "Candice",
+    "type_theme": "ice",
+    "location": "Snowpoint City",
+    "badge_name": "Icicle Badge",
+    "flavor": "A fashionable, fortune-telling Ice-type gym leader and cheer captain.",
+    "roster": [
+      {
+        "dex_id": 460,
+        "ability": "snow-warning",
+        "moves": [
+          "Wood Hammer",
+          "Blizzard",
+          "Ingrain",
+          "Energy Ball"
+        ]
+      },
+      {
+        "dex_id": 471,
+        "ability": "snow-cloak",
+        "moves": [
+          "Blizzard",
+          "Freeze Dry",
+          "Last Resort",
+          "Barrier"
+        ]
+      },
+      {
+        "dex_id": 478,
+        "ability": "snow-cloak",
+        "moves": [
+          "Blizzard",
+          "Shadow Ball",
+          "Destiny Bond",
+          "Hail"
+        ]
+      },
+      {
+        "dex_id": 461,
+        "ability": "pressure",
+        "moves": [
+          "Blizzard",
+          "Dark Pulse",
+          "Metal Claw",
+          "Screech"
+        ]
+      },
+      {
+        "dex_id": 362,
+        "ability": "inner-focus",
+        "moves": [
+          "Blizzard",
+          "Freeze Dry",
+          "Crunch",
+          "Hail"
+        ]
+      },
+      {
+        "dex_id": 473,
+        "ability": "oblivious",
+        "moves": [
+          "Blizzard",
+          "Earthquake",
+          "Thrash",
+          "Scary Face"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/460.png",
+    "badge_image": "/static/badges/ice.svg"
+  },
+  {
+    "gym_key": "volkner",
+    "generation": "sinnoh",
+    "order": 8,
+    "leader_name": "Volkner",
+    "type_theme": "electric",
+    "location": "Sunyshore City",
+    "badge_name": "Beacon Badge",
+    "flavor": "A once-bored Electric-type gym leader reignited by a worthy challenger.",
+    "roster": [
+      {
+        "dex_id": 405,
+        "ability": "rivalry",
+        "moves": [
+          "Thunder",
+          "Wild Charge",
+          "Crunch",
+          "Swagger"
+        ]
+      },
+      {
+        "dex_id": 466,
+        "ability": "motor-drive",
+        "moves": [
+          "Thunder",
+          "Thunderbolt",
+          "Giga Impact",
+          "Electric Terrain"
+        ]
+      },
+      {
+        "dex_id": 26,
+        "ability": "static",
+        "moves": [
+          "Thunder",
+          "Thunderbolt",
+          "Iron Tail",
+          "Thunder Wave"
+        ]
+      },
+      {
+        "dex_id": 181,
+        "ability": "static",
+        "moves": [
+          "Thunder",
+          "Discharge",
+          "Dragon Pulse",
+          "Light Screen"
+        ]
+      },
+      {
+        "dex_id": 135,
+        "ability": "volt-absorb",
+        "moves": [
+          "Thunder",
+          "Discharge",
+          "Last Resort",
+          "Agility"
+        ]
+      },
+      {
+        "dex_id": 310,
+        "ability": "static",
+        "moves": [
+          "Thunder",
+          "Wild Charge",
+          "Bite",
+          "Electric Terrain"
+        ]
+      }
+    ],
+    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/405.png",
+    "badge_image": "/static/badges/electric.svg"
   }
 ]
