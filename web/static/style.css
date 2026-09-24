@@ -2371,11 +2371,55 @@ code {
 }
 
 .battle-result-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
     text-align: center;
+    padding: 10px 0 16px;
+}
+
+.battle-result-text {
     font-size: 1.2em;
     font-weight: bold;
     color: var(--yellow);
-    padding: 10px 0;
+}
+
+.battle-leave-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 26px;
+    border-radius: 10px;
+    font-weight: bold;
+    text-decoration: none;
+    color: #fff;
+    border: 1px solid transparent;
+    transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.battle-leave-btn:hover {
+    filter: brightness(1.1);
+}
+
+.battle-leave-btn:active {
+    transform: translateY(1px);
+}
+
+.battle-leave-btn.is-win {
+    background: #22a55a;
+    box-shadow: 0 6px 20px rgba(34, 165, 90, 0.35);
+}
+
+.battle-leave-btn.is-loss {
+    background: var(--red);
+    box-shadow: 0 6px 20px rgba(239, 51, 64, 0.3);
+}
+
+.battle-leave-btn.is-neutral {
+    background: var(--surface-alt);
+    border-color: var(--border);
+    color: var(--text);
 }
 
 /* ---------- Gyms ---------- */

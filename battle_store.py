@@ -937,7 +937,7 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             "SELECT * FROM poke_battle_sides WHERE battle_id = ? ORDER BY side, slot", (battle_id,)
         ).fetchall()
         event_rows = conn.execute(
-            "SELECT payload FROM poke_battle_events WHERE battle_id = ? ORDER BY turn_number DESC, seq DESC LIMIT 60",
+            "SELECT id, payload FROM poke_battle_events WHERE battle_id = ? ORDER BY turn_number DESC, seq DESC LIMIT 60",
             (battle_id,),
         ).fetchall()
 
@@ -976,7 +976,10 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
     reveal_b = viewer_user_id is not None and battle_row["side_b_user_id"] == viewer_user_id
     roster_a = [mon_summary(r, reveal_a, "A") for r in side_rows if r["side"] == "A"]
     roster_b = [mon_summary(r, reveal_b, "B") for r in side_rows if r["side"] == "B"]
-    events = [json.loads(r["payload"]) for r in reversed(event_rows)]
+    # Only the latest 60 events are sent, so clients can't find "what's new"
+    # by counting — each event carries its row id (insertion order, which
+    # matches turn/seq order) for them to track instead.
+    events = [{**json.loads(r["payload"]), "event_id": r["id"]} for r in reversed(event_rows)]
 
     winner_name = None
     if battle_row["winner_side"] in ("A", "B"):

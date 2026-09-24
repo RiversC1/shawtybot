@@ -46,7 +46,24 @@
   let visibleA = null;
   let visibleB = null;
   let revealed = [];
+  // The server only sends the latest 60 events, so "new" events are found by
+  // id (see battle_store.serialize_battle_detail), not by counting — once a
+  // battle passed 60 events, counting saw nothing new and silently skipped
+  // every later send-out animation and cry. Falls back to counting if a
+  // payload has no ids (an older API still deploying).
   let animatedEventCount = 0;
+  let lastEventId = 0;
+
+  function markAnimated(events) {
+    animatedEventCount = events.length;
+    const last = events[events.length - 1];
+    if (last && last.event_id != null) lastEventId = Math.max(lastEventId, last.event_id);
+  }
+
+  function unseenEvents(events) {
+    const hasIds = events.length > 0 && events.every((e) => e.event_id != null);
+    return hasIds ? events.filter((e) => e.event_id > lastEventId) : events.slice(animatedEventCount);
+  }
   let pendingEvents = [];
   let playing = false;
   let pollTimer = null;
@@ -596,20 +613,48 @@
     turnBadgeEl.textContent = truth.status === "pending" ? "Challenge" : `Turn ${truth.turn_number}`;
   }
 
+  // Where "Leave battle" goes: back to the page the battle was started from.
+  function leaveDestination() {
+    if (truth.battle_type === "gym") return "/gyms";
+    if (truth.battle_type === "elite_four" || truth.battle_type === "champion") return "/league";
+    return "/battles";
+  }
+
+  // Result text plus a Leave button colored by the viewer's own outcome:
+  // green if they won, red if they lost, neutral for spectators, draws and
+  // abandoned battles. Built with DOM nodes (not innerHTML) since the
+  // winner's name is a user-chosen display name.
   function renderResultBanner() {
+    let message = null;
     if (truth.status === "finished") {
       const lastEvent = truth.events[truth.events.length - 1];
       const forfeited = lastEvent && lastEvent.type === "battle_end" && lastEvent.reason === "forfeit";
-      resultEl.hidden = false;
-      resultEl.textContent = truth.winner_name
+      message = truth.winner_name
         ? `🏆 ${truth.winner_name} wins!${forfeited ? " (forfeit)" : ""}`
         : "The battle ended in a draw.";
     } else if (truth.status === "abandoned") {
-      resultEl.hidden = false;
-      resultEl.textContent = "⏱️ This battle was abandoned due to inactivity.";
-    } else {
-      resultEl.hidden = true;
+      message = "⏱️ This battle was abandoned due to inactivity.";
     }
+    if (!message) {
+      resultEl.hidden = true;
+      return;
+    }
+
+    const mySide = truth.you && truth.you.side;
+    const outcome = !mySide || !truth.winner_side || truth.status !== "finished"
+      ? "neutral"
+      : truth.winner_side === mySide ? "win" : "loss";
+
+    resultEl.replaceChildren();
+    const text = document.createElement("div");
+    text.className = "battle-result-text";
+    text.textContent = message;
+    const leave = document.createElement("a");
+    leave.href = leaveDestination();
+    leave.className = `battle-leave-btn is-${outcome}`;
+    leave.textContent = outcome === "win" ? "🎉 Leave battle" : "Leave battle";
+    resultEl.append(text, leave);
+    resultEl.hidden = false;
   }
 
   function renderFrame(animA, animB) {
@@ -678,8 +723,8 @@
 
   function applyUpdate(battle) {
     truth = battle;
-    const newEvents = battle.events.slice(animatedEventCount);
-    animatedEventCount = battle.events.length;
+    const newEvents = unseenEvents(battle.events);
+    markAnimated(battle.events);
 
     if (!newEvents.length) {
       // No new history to play (e.g. accept/decline, a reconnect with
@@ -786,9 +831,9 @@
     revealed = [];
     // Mark these as already claimed for animation *before* playQueue starts
     // (not after) — connectWs()'s first message can otherwise land mid- or
-    // right-after-animation and, seeing animatedEventCount still at 0,
+    // right-after-animation and, seeing nothing marked as played yet,
     // re-queue the exact same send-outs a second time.
-    animatedEventCount = truth.events.length;
+    markAnimated(truth.events);
     pendingEvents = truth.events.slice();
     renderFrame(null, null);
     playing = true;
@@ -799,7 +844,7 @@
     visibleA = truth.roster_a.find((m) => m.is_active) || truth.roster_a[0] || null;
     visibleB = truth.roster_b.find((m) => m.is_active) || truth.roster_b[0] || null;
     revealed = truth.events.slice();
-    animatedEventCount = truth.events.length;
+    markAnimated(truth.events);
     renderFrame(null, null);
     renderResultBanner();
     renderActionPanel(truth);
