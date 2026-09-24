@@ -48,7 +48,8 @@
             </div>
             <div class="stat">
                 <div class="stat-value">{{ trainer.battle_record.wins }}</div>
-                <div class="stat-label">Wins / {{ trainer.battle_record.games }} games</div>
+                {% set games = trainer.battle_record.games %}
+                <div class="stat-label">Wins · {{ games }} battle{{ '' if games == 1 else 's' }}</div>
             </div>
         </div>
 
@@ -62,15 +63,18 @@
             </div>
         </div>
 
-        <button id="badge-collection-btn" class="btn-secondary badge-collection-btn" type="button">Badge Collection</button>
-
-        {% if is_own %}
-        <button id="customize-btn" class="btn-primary"
-                data-character-key="{{ trainer.character.key }}"
-                data-favorite-dex-id="{{ trainer.favorite.dex_id if trainer.favorite else '' }}">Customize ✦</button>
-        {% else %}
-        <button id="trade-btn" class="btn-primary" data-target-user-id="{{ trainer.user_id }}">Trade ⇄</button>
-        <a href="/trainers" class="btn-secondary">← Back to Trainers</a>
+        <div class="trainer-actions">
+            <button id="badge-collection-btn" class="btn-secondary" type="button">Badge Collection</button>
+            {% if is_own %}
+            <button id="customize-btn" class="btn-primary"
+                    data-character-key="{{ trainer.character.key }}"
+                    data-favorite-dex-id="{{ trainer.favorite.dex_id if trainer.favorite else '' }}">Customize ✦</button>
+            {% else %}
+            <button id="trade-btn" class="btn-primary" data-target-user-id="{{ trainer.user_id }}">Trade ⇄</button>
+            {% endif %}
+        </div>
+        {% if not is_own %}
+        <a href="/trainers" class="trainer-back-link">← Back to Trainers</a>
         <p class="error" id="trade-error" hidden></p>
         {% endif %}
     </div>

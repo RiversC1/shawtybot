@@ -2,43 +2,60 @@
 {% block title %}Inventory — ShawtyBot Pokémon{% endblock %}
 {% block content %}
 <h1>Your Bag</h1>
+<p class="muted">Everything you've collected on your journey. Pick up more at the <a href="/store">Poké Store</a>.</p>
 
-<div class="card">
-    <h2>Balls</h2>
-    {% for item in inventory.balls %}
-    <div class="item-row">
-        <span class="item-name"><img src="{{ item.icon }}" alt="" class="item-icon">{{ item.label }}</span>
-        <span>{{ item.qty }}</span>
+<div class="bag-currency">
+    <div class="card bag-currency-tile">
+        <span class="bag-currency-icon" aria-hidden="true">🪙</span>
+        <div>
+            <div class="bag-currency-value">{{ "{:,}".format(inventory.coins or 0) }}</div>
+            <div class="muted">Poké Coins</div>
+        </div>
     </div>
-    {% else %}
-    <p class="muted">No balls yet.</p>
-    {% endfor %}
-</div>
-
-<div class="card">
-    <h2>Currency</h2>
-    <div class="item-row"><span>Poké Coins</span><span>🪙 {{ inventory.coins }}</span></div>
-    <div class="item-row"><span>Rare Candy</span><span>🍬 {{ inventory.rare_candy }}</span></div>
-</div>
-
-<div class="card">
-    <h2>Evolution Stones</h2>
-    {% for item in inventory.stones %}
-    <div class="item-row">
-        <span class="item-name"><img src="{{ item.icon }}" alt="" class="item-icon">{{ item.label }}</span>
-        <span>{{ item.qty }}</span>
+    <div class="card bag-currency-tile">
+        <span class="bag-currency-icon" aria-hidden="true">🍬</span>
+        <div>
+            <div class="bag-currency-value">{{ "{:,}".format(inventory.rare_candy or 0) }}</div>
+            <div class="muted">Rare Candy</div>
+        </div>
     </div>
-    {% else %}
-    <p class="muted">No evolution stones yet — check the <a href="/store">Store</a>!</p>
-    {% endfor %}
 </div>
 
-<div class="card">
-    <h2>Evolution Candy</h2>
-    {% for candy in inventory.family_candies %}
-    <div class="item-row"><span>🍬 {{ candy.name }} Candy</span><span>{{ candy.qty }}</span></div>
-    {% else %}
-    <p class="muted">No evolution candy yet — catch some Pokémon!</p>
-    {% endfor %}
+<div class="bag-sections">
+    <div class="card bag-section">
+        <h2>Poké Balls</h2>
+        {% for item in inventory.balls %}
+        <div class="item-row">
+            <span class="item-name"><img src="{{ item.icon }}" alt="" class="item-icon">{{ item.label }}</span>
+            <span class="item-qty">×{{ "{:,}".format(item.qty) }}</span>
+        </div>
+        {% else %}
+        <p class="muted">No balls yet.</p>
+        {% endfor %}
+    </div>
+
+    <div class="card bag-section">
+        <h2>Evolution Stones</h2>
+        {% for item in inventory.stones %}
+        <div class="item-row">
+            <span class="item-name"><img src="{{ item.icon }}" alt="" class="item-icon">{{ item.label }}</span>
+            <span class="item-qty">×{{ "{:,}".format(item.qty) }}</span>
+        </div>
+        {% else %}
+        <p class="muted">No evolution stones yet — check the <a href="/store">Store</a>!</p>
+        {% endfor %}
+    </div>
+
+    <div class="card bag-section">
+        <h2>Evolution Candy</h2>
+        {% for candy in inventory.family_candies %}
+        <div class="item-row">
+            <span class="item-name"><span class="item-icon item-icon-emoji" aria-hidden="true">🍬</span>{{ candy.name }} Candy</span>
+            <span class="item-qty">×{{ "{:,}".format(candy.qty) }}</span>
+        </div>
+        {% else %}
+        <p class="muted">No evolution candy yet — catch some Pokémon!</p>
+        {% endfor %}
+    </div>
 </div>
 {% endblock %}

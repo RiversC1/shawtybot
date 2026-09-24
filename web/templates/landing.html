@@ -1,11 +1,55 @@
 {% extends "base.html" %}
 {% block title %}ShawtyBot Pokémon{% endblock %}
 {% block content %}
-<div class="card center-card">
-    <h1>ShawtyBot Pokémon</h1>
-    {% if error %}
+{% if error and request.cookies.get("session") %}
+<div class="card center-card landing-error-card">
+    <div class="landing-error-icon" aria-hidden="true">?</div>
+    <h1>Hmm, that didn't work</h1>
     <p class="error">{{ error }}</p>
-    {% endif %}
-    <p>To view your profile, run <code>/poke web</code> in Discord and click the link it gives you.</p>
+    <div class="landing-error-actions">
+        <a href="/trainers" class="btn-secondary">Browse Trainers</a>
+        <a href="/profile" class="btn-primary">Back to your profile</a>
+    </div>
 </div>
+{% else %}
+<section class="landing-hero">
+    <img src="/static/favicon.png" alt="" class="landing-logo">
+    <div class="landing-eyebrow">Pokémon Center</div>
+    <h1 class="landing-title">ShawtyBot <span>Pokémon</span></h1>
+    <p class="landing-tagline">Catch, train and battle with your Discord server — then manage it all right here.</p>
+    {% if error %}<p class="error landing-error">{{ error }}</p>{% endif %}
+
+    <div class="card landing-steps">
+        <div class="landing-steps-title">How to sign in</div>
+        <ol>
+            <li><span class="landing-step-num">1</span><span>Open your Discord server with ShawtyBot</span></li>
+            <li><span class="landing-step-num">2</span><span>Run <code>/poke web</code></span></li>
+            <li><span class="landing-step-num">3</span><span>Click the private link the bot sends you</span></li>
+        </ol>
+    </div>
+</section>
+
+<section class="landing-features">
+    <div class="card landing-feature">
+        <div class="landing-feature-icon">🎯</div>
+        <h3>Catch</h3>
+        <p class="muted">Fill your Pokédex with all 493 species from Kanto to Sinnoh — shinies included.</p>
+    </div>
+    <div class="card landing-feature">
+        <div class="landing-feature-icon">🏅</div>
+        <h3>Earn badges</h3>
+        <p class="muted">Take on 32 Gym Leaders across four regions and build your badge collection.</p>
+    </div>
+    <div class="card landing-feature">
+        <div class="landing-feature-icon">👑</div>
+        <h3>Poké League</h3>
+        <p class="muted">Beat every Elite Four and Champion to claim a Mystery Pokémon.</p>
+    </div>
+    <div class="card landing-feature">
+        <div class="landing-feature-icon">⇄</div>
+        <h3>Trade</h3>
+        <p class="muted">Swap Pokémon with friends, with both sides confirming before anything moves.</p>
+    </div>
+</section>
+{% endif %}
 {% endblock %}

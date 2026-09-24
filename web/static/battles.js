@@ -34,6 +34,7 @@
 
   function typeLabel(battleType) {
     if (battleType === "pvp") return "PvP";
+    if (battleType === "elite_four") return "Elite Four";
     return battleType.charAt(0).toUpperCase() + battleType.slice(1);
   }
 

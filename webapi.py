@@ -1851,7 +1851,12 @@ def get_league(user_id: int = Depends(get_current_user_id)):
             }
         generations.append({"generation": generation, "elite_four": elite_four, "champion": champion})
 
-    return {"unlocked": unlocked, "generations": generations}
+    return {
+        "unlocked": unlocked,
+        "generations": generations,
+        "badges_earned": len(battle_store.get_badges(user_id) & set(battle_store.GYMS.keys())),
+        "badges_total": len(battle_store.GYMS),
+    }
 
 
 @app.get("/api/league/{generation}/{member_key}")

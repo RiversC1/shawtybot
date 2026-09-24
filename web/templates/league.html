@@ -4,9 +4,24 @@
 <h1>Poké League</h1>
 
 {% if not league.unlocked %}
+{% set b_earned = league.badges_earned or 0 %}
+{% set b_total = league.badges_total or 32 %}
 <div class="card league-locked-banner">
-    <p class="muted">🔒 Defeat every Gym Leader across all 4 regions to enter the Poké League.</p>
-    <p class="muted">Check your gym progress any time with <code>/poke gyms</code> in Discord.</p>
+    <div class="league-locked-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6l4 5 6-8 6 8 4-5-2 13H4z"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+    </div>
+    <h2>The League is sealed</h2>
+    <p class="muted">Defeat every Gym Leader across Kanto, Johto, Hoenn and Sinnoh to earn your way in.</p>
+    <div class="league-locked-progress">
+        <div class="badge-summary-top">
+            <span class="badge-summary-label">Gym Badges</span>
+            <span class="badge-summary-count">{{ b_earned }} / {{ b_total }}</span>
+        </div>
+        <div class="badge-summary-bar">
+            <div class="badge-summary-fill" style="width: {{ (b_earned / b_total * 100) | round(1) }}%"></div>
+        </div>
+    </div>
+    <a href="/gyms" class="btn-primary league-locked-cta">View Gyms →</a>
 </div>
 {% else %}
 <p class="muted">
@@ -17,7 +32,7 @@
 {% for gen in league.generations %}
 <section class="league-generation">
     <h2 class="league-generation-title">{{ gen.generation|capitalize }} League</h2>
-    <div class="grid">
+    <div class="gym-grid league-grid">
         {% for m in gen.elite_four %}
         <div class="card gym-card{{ '' if (m.earned or m.is_next) else ' is-locked' }}"
              data-generation="{{ gen.generation }}" data-member-key="{{ m.member_key }}">

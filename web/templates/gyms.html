@@ -8,20 +8,26 @@
 </p>
 
 {% for group in regions %}
+{% set region_earned = group.gyms | selectattr("earned") | list | length %}
 <section class="league-generation">
-    <h2 class="league-generation-title">{{ group.region|capitalize }} Gyms</h2>
-    <div class="grid">
+    <div class="gym-region-head">
+        <h2 class="league-generation-title">{{ group.region|capitalize }} Gyms</h2>
+        <span class="badge-region-count{{ ' is-complete' if region_earned == group.gyms|length else '' }}">
+            {{ "Complete ✓" if region_earned == group.gyms|length else region_earned ~ " / " ~ group.gyms|length ~ " badges" }}
+        </span>
+    </div>
+    <div class="gym-grid">
         {% for g in group.gyms %}
-        <div class="card gym-card{{ '' if (g.earned or g.is_next) else ' is-locked' }}" data-gym-key="{{ g.gym_key }}">
+        <div class="card gym-card{{ ' is-earned' if g.earned else (' is-next' if g.is_next else ' is-locked') }}" data-gym-key="{{ g.gym_key }}">
             <div class="gym-card-portrait">
                 <img src="{{ g.leader_image }}" alt="{{ g.leader_name }}" loading="lazy">
                 <img class="gym-card-badge-overlay{{ '' if g.earned else ' is-dim' }}" src="{{ g.badge_image }}" alt="{{ g.badge_name }}">
                 {% if not g.earned and not g.is_next %}<div class="gym-card-lock">🔒</div>{% endif %}
             </div>
             <div class="gym-card-name">{{ g.leader_name }}</div>
-            <div class="muted">{{ g.type_theme|capitalize }}-type</div>
+            <div class="gym-card-meta"><span class="type-badge type-{{ g.type_theme }}">{{ g.type_theme|capitalize }}</span></div>
             <div class="gym-card-location">{{ g.location }}</div>
-            <p class="muted" style="margin-top:6px;">{{ g.badge_name }}</p>
+            <div class="gym-card-status">{{ "Earned" if g.earned else ("Up next" if g.is_next else "Locked") }}</div>
         </div>
         {% endfor %}
     </div>

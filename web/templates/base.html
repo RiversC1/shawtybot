@@ -23,7 +23,10 @@
                     <div class="sidebar-brand-sub">Pokémon Center</div>
                 </div>
             </a>
-            <nav class="sidebar-nav">
+            <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar-nav">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+            </button>
+            <nav class="sidebar-nav" id="sidebar-nav">
                 <a href="/profile" class="sidebar-link{{ ' active' if request.url.path == '/profile' else '' }}">
                     <span class="sidebar-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -136,6 +139,16 @@
     document.addEventListener("submit", function () {
         overlay.classList.remove("page-loading-hidden");
     });
+
+    var toggle = document.getElementById("sidebar-toggle");
+    if (toggle) {
+        var sidebar = toggle.closest(".sidebar");
+        toggle.addEventListener("click", function () {
+            var open = sidebar.classList.toggle("nav-open");
+            toggle.setAttribute("aria-expanded", open ? "true" : "false");
+            toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+        });
+    }
 })();
 </script>
 </body>

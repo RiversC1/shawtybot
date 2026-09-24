@@ -519,7 +519,9 @@
 
   function renderMeta() {
     titleEl.textContent = `${truth.name_a} vs ${truth.name_b}`;
-    const typeLabel = truth.battle_type.charAt(0).toUpperCase() + truth.battle_type.slice(1);
+    const BATTLE_TYPE_LABELS = { pvp: "PvP", gym: "Gym", trainer: "Trainer", elite_four: "Elite Four", champion: "Champion" };
+    const typeLabel = BATTLE_TYPE_LABELS[truth.battle_type]
+      || truth.battle_type.charAt(0).toUpperCase() + truth.battle_type.slice(1);
     subtitleEl.textContent =
       truth.status === "finished" ? `${typeLabel} battle · Finished`
       : truth.status === "abandoned" ? `${typeLabel} battle · Abandoned`
