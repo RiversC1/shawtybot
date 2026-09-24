@@ -290,6 +290,19 @@ async def league(request: Request):
     return templates.TemplateResponse(request, "league.html", {"league": data})
 
 
+@app.get("/rewards")
+async def rewards(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/rewards")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "rewards.html", {"rewards": data})
+
+
 @app.get("/trades")
 async def trades(request: Request):
     session = request.cookies.get(SESSION_COOKIE)
@@ -514,6 +527,15 @@ async def proxy_get_league(request: Request):
     if not session:
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     status, data = await api_get(session, "/api/league")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/rewards")
+async def proxy_get_rewards(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/rewards")
     return JSONResponse(data, status_code=status)
 
 

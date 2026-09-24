@@ -1931,3 +1931,23 @@ async def start_champion_battle(generation: str, user_id: int = Depends(get_curr
 
     battle_id = await asyncio.to_thread(_do)
     return {"battle_id": battle_id}
+
+
+# ---------- Rewards ----------
+
+@app.get("/api/rewards")
+def get_rewards(user_id: int = Depends(get_current_user_id)):
+    earned, total = battle_store.league_completion(user_id)
+    reward_mon = POKEDEX.get(battle_store.LEAGUE_REWARD_DEX_ID, {})
+    return {
+        "league_earned": earned,
+        "league_total": total,
+        "league_complete": earned >= total,
+        "reward": {
+            "dex_id": battle_store.LEAGUE_REWARD_DEX_ID,
+            "name": reward_mon.get("name", "Mystery Pokémon"),
+            "artwork": reward_mon.get("artwork"),
+            "category": reward_mon.get("category"),
+            "obtained": battle_store.has_league_reward(user_id),
+        },
+    }

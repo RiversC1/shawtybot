@@ -219,6 +219,10 @@ LEGENDARY_SPAWN_WEIGHT = 0.15
 LEGENDARY_PENALTY = 0.08
 # The trainer who summoned the spawn (via /poke spawn-daily) gets a slight edge.
 SUMMONER_BONUS = 1.3
+# Species that only ever enter a collection through a specific reward path
+# (currently: the Poké League completionist Mystery Pokémon) — never a
+# natural wild spawn, even a rare-weighted one.
+REWARD_ONLY_DEX_IDS = {battle_store.LEAGUE_REWARD_DEX_ID}
 # Odds that any given spawn is shiny — intentionally very rare.
 SHINY_CHANCE = 1 / 200
 # Flat family-candy cost to evolve any Pokémon — a handful of catches, not a grind.
@@ -316,7 +320,7 @@ def roll_spawn_mon(pokedex: dict[int, dict]) -> dict:
     """Pick a random species (legendaries/mythicals are much rarer) and roll
     whether this particular spawn is shiny. Returns a shallow copy so the
     shared pokedex entries are never mutated."""
-    population = list(pokedex.values())
+    population = [p for p in pokedex.values() if p["id"] not in REWARD_ONLY_DEX_IDS]
     weights = [LEGENDARY_SPAWN_WEIGHT if is_rare(p) else 1.0 for p in population]
     base = random.choices(population, weights=weights, k=1)[0]
     mon = dict(base)
@@ -2367,6 +2371,32 @@ class Pokemon(commands.Cog):
             color=discord.Color.purple(),
         )
         await interaction.response.send_message(embed=embed)
+
+    @poke.command(name="rewards", description="See your progress toward the Poké League completionist reward")
+    async def poke_rewards(self, interaction: discord.Interaction):
+        if not self.get_trainer(interaction.user.id):
+            await interaction.response.send_message(
+                "You need to pick your starter Pokémon first! Use `/poke start`.", ephemeral=True
+            )
+            return
+
+        earned, total = battle_store.league_completion(interaction.user.id)
+        reward_mon = self.pokedex.get(battle_store.LEAGUE_REWARD_DEX_ID, {})
+        has_reward = battle_store.has_league_reward(interaction.user.id)
+
+        embed = discord.Embed(title="Poké League Completionist Reward", color=discord.Color.purple())
+        embed.add_field(name="Progress", value=f"{earned} / {total} League battles won", inline=False)
+        if has_reward:
+            embed.description = (
+                f"🎁 **Claimed!** You've defeated every Elite Four and Champion and received "
+                f"**{reward_mon.get('name', 'the Mystery Pokémon')}**! Check it out on the web Rewards page."
+            )
+        else:
+            embed.description = (
+                "Defeat every Elite Four member and Champion across all 4 regions "
+                "(`/poke elite4`, `/poke champion`) to unlock a special Mystery Pokémon."
+            )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

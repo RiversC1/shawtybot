@@ -501,6 +501,56 @@ def champion_unlocked(user_id: int, generation: str) -> bool:
     return next_elite_four_key(user_id, generation) is None
 
 
+# Poké League completionist reward: a one-off mystery Pokémon (real design
+# TBD — a "???" placeholder in data/pokemon.json for now) granted the moment
+# a user has defeated every Elite Four member and every Champion across all
+# 4 generations. Excluded from normal wild spawns (see cogs/pokemon.py's
+# roll_spawn_mon) so this is the only way to obtain it.
+LEAGUE_REWARD_DEX_ID = 494
+
+
+def league_completion(user_id: int) -> tuple[int, int]:
+    """(earned, total) across every Elite Four member + Champion in the game."""
+    earned = len(get_league_progress(user_id) & set(LEAGUE.keys()))
+    return earned, len(LEAGUE)
+
+
+def league_fully_completed(user_id: int) -> bool:
+    earned, total = league_completion(user_id)
+    return earned >= total
+
+
+def has_league_reward(user_id: int) -> bool:
+    with db() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM poke_collection WHERE user_id = ? AND dex_id = ? LIMIT 1",
+            (user_id, LEAGUE_REWARD_DEX_ID),
+        ).fetchone()
+    return row is not None
+
+
+def award_league_reward_if_new(user_id: int) -> bool:
+    """Grants the League completionist's mystery Pokémon exactly once — safe
+    to call unconditionally any time (checks league_fully_completed() itself,
+    on top of never granting a duplicate). Returns True only the one time it
+    actually granted it."""
+    if not league_fully_completed(user_id) or has_league_reward(user_id):
+        return False
+    now = datetime.now(timezone.utc).isoformat()
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, "
+            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
+            "VALUES (?, ?, ?, 0, 31, 31, 31, 31, 31, 31)",
+            (user_id, LEAGUE_REWARD_DEX_ID, now),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
+            (user_id, LEAGUE_REWARD_DEX_ID, now),
+        )
+    return True
+
+
 def add_xp_and_coins(user_id: int, xp: int, coin: int):
     """Mirrors cogs/pokemon.py's add_xp/add_item so a win grants the exact
     same account progression regardless of which process resolved the
@@ -592,6 +642,9 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         rewards = TRAINER_BATTLE_REWARDS[tclass["reward_tier"] if tclass else "low"]
         add_xp_and_coins(winner_user_id, rewards["xp"], rewards["coin"])
         summary = f"+{rewards['xp']} XP, +{rewards['coin']} coins"
+
+    if battle_type in ("elite_four", "champion") and award_league_reward_if_new(winner_user_id):
+        summary += " 🎁 You've conquered the entire Poké League and received a Mystery Pokémon! Check the Rewards page."
 
     return summary
 

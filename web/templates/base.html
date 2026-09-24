@@ -59,6 +59,11 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6l4 5 6-8 6 8 4-5-2 13H4z"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
                     </span> Poké League
                 </a>
+                <a href="/rewards" class="sidebar-link{{ ' active' if request.url.path.startswith('/rewards') else '' }}">
+                    <span class="sidebar-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="1"/><path d="M3 12h18"/><path d="M12 8v13"/><path d="M12 8c-1.5-3-5-4-6.5-2.5S6 8 12 8z"/><path d="M12 8c1.5-3 5-4 6.5-2.5S18 8 12 8z"/></svg>
+                    </span> Rewards
+                </a>
                 <a href="/trades" class="sidebar-link{{ ' active' if request.url.path.startswith('/trades') else '' }}">
                     <span class="sidebar-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3 3 7l4 4"/><path d="M3 7h13a4 4 0 0 1 4 4v1"/><path d="M17 21l4-4-4-4"/><path d="M21 17H8a4 4 0 0 1-4-4v-1"/></svg>
