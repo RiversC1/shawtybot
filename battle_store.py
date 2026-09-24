@@ -925,6 +925,18 @@ def summarize_battle(conn: sqlite3.Connection, row: sqlite3.Row, viewer_user_id:
     }
 
 
+def arena_type_for(battle_row: sqlite3.Row) -> str | None:
+    """The Pokémon type an NPC battle's arena is themed around (a gym's or
+    Elite Four member's specialty), or None for PvP, random trainers and
+    Champions (who use mixed teams)."""
+    npc_key = battle_row["side_b_npc_key"]
+    if battle_row["battle_type"] == "gym":
+        return GYMS.get(npc_key, {}).get("type_theme")
+    if battle_row["battle_type"] in ("elite_four", "champion"):
+        return LEAGUE.get(npc_key, {}).get("type_theme")
+    return None
+
+
 def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -> dict | None:
     battle, battle_row = load_battle_state(battle_id)
     if not battle_row:
@@ -952,6 +964,18 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             viewer_side = "B"
     back_side = viewer_side or "A"
 
+    # The opposing active Pokémon's types, so revealed moves can say how
+    # effective they'd be right now (the move tooltip on the battle page).
+    active_types = {
+        r["side"]: POKEDEX.get(r["dex_id"], {}).get("types", [])
+        for r in side_rows if r["is_active"] and not r["is_fainted"]
+    }
+    move_detail_keys = (
+        "category", "power", "accuracy", "priority", "description", "ailment", "ailment_chance",
+        "stat_changes", "stat_chance", "crit_rate", "drain_percent", "recoil_percent", "healing_percent",
+        "flinch_chance", "min_hits", "max_hits", "target", "flags",
+    )
+
     def mon_summary(r: sqlite3.Row, reveal_moves: bool, side: str) -> dict:
         mon = POKEDEX.get(r["dex_id"], {})
         name = mon.get("name", f"#{r['dex_id']}")
@@ -961,15 +985,22 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             "sprite": sprite_back if side == back_side else sprite_front,
             "types": mon.get("types", []), "current_hp": r["current_hp"], "max_hp": r["max_hp"],
             "status": r["status"], "is_active": bool(r["is_active"]), "is_fainted": bool(r["is_fainted"]),
+            "stat_stages": {k: v for k, v in json.loads(r["stat_stages"] or "{}").items() if v},
+            "confused": bool(r["confusion_counter"]),
         }
         if reveal_moves:
             moves = json.loads(r["moves"])
             pool_by_name = {m["name"]: m for m in mon.get("moves", [])}
-            out["moves"] = [
-                {"name": m["name"], "pp": m["pp"], "max_pp": pool_by_name.get(m["name"], {}).get("pp", m["pp"]),
-                 "type": pool_by_name.get(m["name"], {}).get("type")}
-                for m in moves
-            ]
+            foe_types = active_types.get("B" if side == "A" else "A")
+            out["moves"] = []
+            for m in moves:
+                info = pool_by_name.get(m["name"], {})
+                move = {"name": m["name"], "pp": m["pp"], "max_pp": info.get("pp", m["pp"]), "type": info.get("type")}
+                move.update({k: info.get(k) for k in move_detail_keys})
+                move["stat_self"] = be.stat_changes_affect_user(info)
+                if foe_types and info.get("category") != "status" and info.get("target") != "self":
+                    move["effectiveness"] = be.effectiveness_label(be.type_effectiveness(info.get("type"), foe_types))
+                out["moves"].append(move)
         return out
 
     reveal_a = viewer_user_id is not None and battle_row["side_a_user_id"] == viewer_user_id
@@ -992,6 +1023,7 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
         "roster_a": roster_a, "roster_b": roster_b,
         "turn_number": battle_row["current_turn_number"], "winner_side": battle_row["winner_side"],
         "winner_name": winner_name, "events": events,
+        "arena_type": arena_type_for(battle_row),
     }
     if viewer_user_id is not None:
         payload["you"] = get_viewer_info(battle, battle_row, viewer_user_id)

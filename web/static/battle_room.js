@@ -29,6 +29,9 @@
   const spriteA = document.getElementById("br-sprite-a");
   const spriteB = document.getElementById("br-sprite-b");
   const ballA = document.getElementById("br-ball-a");
+  const slotA = document.getElementById("br-slot-a");
+  const slotB = document.getElementById("br-slot-b");
+  const sceneEl = document.getElementById("br-scene");
   const ballB = document.getElementById("br-ball-b");
   const logEl = document.getElementById("br-log");
   const actionPanel = document.getElementById("br-action-panel");
@@ -43,6 +46,16 @@
   // the battle log grows in step with it, exactly like a real turn's
   // message box.
   let truth = JSON.parse(document.getElementById("battle-data").textContent);
+
+  // Arena backdrop: themed by battle kind, tinted by the gym's or Elite Four
+  // member's specialty type when there is one (see battle_store.arena_type_for).
+  BattleFX.init(sceneEl);
+  (function setupArena() {
+    const kind = { gym: "gym", elite_four: "elite", champion: "champion" }[truth.battle_type] || "field";
+    sceneEl.classList.add(`arena-${kind}`);
+    const tint = BattleFX.colorForType(truth.arena_type);
+    if (tint) sceneEl.style.setProperty("--arena-tint", tint);
+  })();
   let visibleA = null;
   let visibleB = null;
   let revealed = [];
@@ -245,7 +258,6 @@
       case "faint": return "anim-faint";
       case "damage": case "confusion_self_hit": case "status_damage": case "recoil":
         return "anim-hit";
-      case "move_used": return event.side === "A" ? "anim-attack-a" : "anim-attack-b";
       default: return null;
     }
   }
@@ -269,7 +281,20 @@
       }
       case "status_applied": {
         if (current) {
-          const updated = { ...current, status: event.status === "none" ? null : event.status };
+          let updated;
+          if (event.status === "confusion") updated = { ...current, confused: true };
+          else if (event.reason === "confusion_ended") updated = { ...current, confused: false };
+          else updated = { ...current, status: event.status === "none" ? null : event.status };
+          if (isA) visibleA = updated; else visibleB = updated;
+        }
+        break;
+      }
+      case "stat_changed": {
+        if (current) {
+          const stages = { ...(current.stat_stages || {}) };
+          stages[event.stat] = Math.max(-6, Math.min(6, (stages[event.stat] || 0) + event.change));
+          if (!stages[event.stat]) delete stages[event.stat];
+          const updated = { ...current, stat_stages: stages };
           if (isA) visibleA = updated; else visibleB = updated;
         }
         break;
@@ -318,7 +343,21 @@
         <div class="battle-hp-name">${activeMon.name}${statusBadgeHtml(activeMon.status)}${activeMon.is_fainted ? " (fainted)" : ""}</div>
         <div class="hp-bar-track"><div class="hp-bar-fill ${hpClass(activeMon.current_hp, activeMon.max_hp)}" style="width:${pct}%"></div></div>
         <div class="muted">${Math.max(0, activeMon.current_hp)}/${activeMon.max_hp} HP</div>
+        ${conditionChipsHtml(activeMon)}
     `;
+  }
+
+  const STAT_SHORT = {
+    attack: "Atk", defense: "Def", sp_attack: "SpA", sp_defense: "SpD", speed: "Spe", accuracy: "Acc", evasion: "Eva",
+  };
+
+  // Stat-stage and confusion chips under the HP bar ("+2 Atk", "-1 Spe").
+  function conditionChipsHtml(mon) {
+    const chips = Object.entries(mon.stat_stages || {})
+      .filter(([, v]) => v)
+      .map(([k, v]) => `<span class="cond-chip ${v > 0 ? "is-up" : "is-down"}">${v > 0 ? "+" : "−"}${Math.abs(v)} ${STAT_SHORT[k] || k}</span>`);
+    if (mon.confused) chips.push(`<span class="cond-chip is-confused">Confused</span>`);
+    return chips.length ? `<div class="cond-chips">${chips.join("")}</div>` : "";
   }
 
   function renderSprite(spriteEl, activeMon, animClass) {
@@ -374,6 +413,7 @@
   }
 
   function renderActionPanel(battle) {
+    if (window.MoveTooltip) window.MoveTooltip.hide();
     const you = battle.you;
     forfeitBtn.hidden = true;
 
@@ -452,8 +492,13 @@
       const moveButtons = (active.moves || [])
         .map((m, i) => {
           const disabled = !you.usable_move_indices.includes(i);
-          return `<button class="btn-secondary br-move-option" data-index="${i}" ${disabled ? "disabled" : ""}>
-              <strong>${m.name}</strong> ${typeBadge(m.type)}<br><span class="muted">${m.pp}/${m.max_pp} PP</span>
+          const effLabel = { super_effective: "Super effective", not_very_effective: "Not very effective", no_effect: "No effect" }[m.effectiveness];
+          const eff = effLabel ? `<span class="br-move-eff eff-${m.effectiveness}">${effLabel}</span>` : "";
+          return `<button class="br-move-option type-${m.type || "normal"}" data-index="${i}" ${disabled ? "disabled" : ""}>
+              <span class="br-move-name">${m.name}</span>
+              <span class="br-move-meta">${typeBadge(m.type)}<span class="br-move-cat">${m.category || ""}</span></span>
+              <span class="br-move-pp">${m.pp}/${m.max_pp} PP</span>
+              ${eff}
           </button>`;
         })
         .join("");
@@ -473,8 +518,14 @@
               : ""
           }
       `;
+      const foe = (truth.you.side === "A" ? truth.roster_b : truth.roster_a).find((m) => m.is_active && !m.is_fainted);
+      actionPanel.querySelectorAll(".br-move-option").forEach((btn) => {
+        const move = (active.moves || [])[parseInt(btn.dataset.index, 10)];
+        if (move && window.MoveTooltip) window.MoveTooltip.attach(btn, move, { targetName: foe && foe.name });
+      });
       actionPanel.querySelectorAll(".br-move-option").forEach((btn) =>
         btn.addEventListener("click", async () => {
+          if (window.MoveTooltip) window.MoveTooltip.hide();
           const data = await postAction(`/api/proxy/battles/${window.BATTLE_ID}/action`, {
             kind: "move", move_index: parseInt(btn.dataset.index, 10),
           });
@@ -677,6 +728,7 @@
     revealed.push(event);
     renderLog();
     renderMeta();
+    BattleFX.caption(currentLineFor(event), false);
 
     const avatarUrl = isA ? truth.avatar_a : truth.avatar_b;
     const trainerName = isA ? truth.name_a : truth.name_b;
@@ -691,6 +743,114 @@
     BattleAudio.handleEvent(event); // the cry plays as the Pokémon itself appears
     renderFrame(isA ? "anim-switch-in" : null, !isA ? "anim-switch-in" : null);
     await wait(SEND_OUT_SETTLE_MS);
+  }
+
+  // The log line for an event as of *now* (who's active on each side), for
+  // the in-scene caption box.
+  function currentLineFor(event) {
+    const nameBySide = { A: truth.name_a, B: truth.name_b };
+    const monBySide = { A: null, B: null };
+    for (const e of revealed) if (e.type === "switch_in") monBySide[e.side] = e.name;
+    return formatEvent(event, nameBySide, monBySide);
+  }
+
+  // Events that begin a new "beat" (someone acting) start a fresh caption;
+  // their consequences (damage, status, stat changes) append beneath it.
+  const CAPTION_STARTERS = new Set(["move_used", "charge_start", "cannot_act", "switch_in", "status_damage"]);
+
+  function pctOf(amount, max) {
+    if (!max) return "?";
+    const pct = Math.round((amount / max) * 100);
+    return pct < 1 && amount > 0 ? "<1" : String(pct);
+  }
+
+  // Visual effects for one event; resolves when its animation is done.
+  function playEventFx(event) {
+    const line = currentLineFor(event);
+    if (line) BattleFX.caption(line, !CAPTION_STARTERS.has(event.type));
+
+    const isA = event.side === "A";
+    const slot = isA ? slotA : slotB;
+    const otherSlot = isA ? slotB : slotA;
+    const sprite = isA ? spriteA : spriteB;
+    const mon = isA ? visibleA : visibleB;
+    const maxHp = event.max_hp || (mon && mon.max_hp);
+
+    switch (event.type) {
+      case "move_used": {
+        // Older events predate move_type/category, so fall back to the
+        // viewer's own move data when it's theirs, else a generic hit.
+        let e = event;
+        if (!e.move_type) {
+          const roster = isA ? truth.roster_a : truth.roster_b;
+          const known = roster.flatMap((m) => m.moves || []).find((m) => m.name === e.move_name);
+          e = { ...e, move_type: known && known.type, category: (known && known.category) || "physical", target: known && known.target };
+        }
+        return BattleFX.playMove(e, slot, otherSlot, sprite);
+      }
+      case "charge_start":
+        BattleFX.glowSprite(sprite, BattleFX.colorForType(event.move_type) || "#ffffff", 700);
+        return wait(500);
+      case "damage":
+      case "confusion_self_hit": {
+        if (event.effectiveness === "no_effect") {
+          BattleFX.floatText(slot, "No effect", "info");
+          return null;
+        }
+        BattleFX.floatText(slot, `−${pctOf(event.amount, maxHp)}%`, event.is_crit ? "crit" : "damage");
+        if (event.is_crit) setTimeout(() => BattleFX.floatText(slot, "Critical hit!", "crit"), 180);
+        if (event.effectiveness === "super_effective") setTimeout(() => BattleFX.floatText(slot, "Super effective!", "super"), 320);
+        if (event.effectiveness === "not_very_effective") setTimeout(() => BattleFX.floatText(slot, "Not very effective", "info"), 320);
+        return null;
+      }
+      case "status_damage":
+        BattleFX.statusEffect(slot, event.status, sprite);
+        BattleFX.floatText(slot, `−${pctOf(event.amount, maxHp)}%`, "damage");
+        return null;
+      case "recoil":
+        BattleFX.floatText(slot, `−${pctOf(event.amount, maxHp)}% recoil`, "damage");
+        return null;
+      case "drain":
+      case "heal":
+        BattleFX.healSparkles(slot);
+        BattleFX.floatText(slot, `+${pctOf(event.amount, maxHp)}%`, "heal");
+        return null;
+      case "status_applied": {
+        if (event.status === "none") {
+          const label = { woke_up: "Woke up!", thawed: "Thawed out!", confusion_ended: "Snapped out of it" }[event.reason] || "Recovered";
+          BattleFX.floatText(slot, label, "info");
+          return null;
+        }
+        const info = BattleFX.STATUS_FX[event.status];
+        BattleFX.statusEffect(slot, event.status, sprite);
+        if (info) BattleFX.floatText(slot, info.label, `status-${event.status}`);
+        return wait(300);
+      }
+      case "stat_changed": {
+        const up = event.change > 0;
+        BattleFX.statArrows(slot, up);
+        BattleFX.floatText(slot, `${STAT_SHORT[event.stat] || event.stat} ${up ? "+" : "−"}${Math.abs(event.change)}`, up ? "stat-up" : "stat-down");
+        return wait(250);
+      }
+      case "stat_change_fizzled":
+        BattleFX.floatText(slot, `${STAT_SHORT[event.stat] || event.stat} won't change`, "info");
+        return null;
+      case "move_missed":
+        BattleFX.floatText(otherSlot, "Missed!", "miss");
+        return null;
+      case "move_failed":
+        BattleFX.floatText(slot, "Failed!", "miss");
+        return null;
+      case "cannot_act": {
+        const byReason = { paralyzed: "paralysis", asleep: "sleep", frozen: "freeze" };
+        if (byReason[event.reason]) BattleFX.statusEffect(slot, byReason[event.reason], sprite);
+        const label = { recharge: "Recharging", flinched: "Flinched!", paralyzed: "Fully paralyzed", asleep: "Asleep", frozen: "Frozen solid" }[event.reason];
+        if (label) BattleFX.floatText(slot, label, "info");
+        return null;
+      }
+      default:
+        return null;
+    }
   }
 
   // Plays every queued event one at a time — HP bars drain to each event's
@@ -708,8 +868,10 @@
       const animA = event.side === "A" ? animationForEvent(event) : null;
       const animB = event.side === "B" ? animationForEvent(event) : null;
       renderFrame(animA, animB);
-      await wait(EVENT_DELAYS[event.type] || DEFAULT_EVENT_DELAY);
+      const fx = playEventFx(event);
+      await Promise.all([wait(EVENT_DELAYS[event.type] || DEFAULT_EVENT_DELAY), fx]);
     }
+    BattleFX.fadeCaption();
 
     // Safety-net resync in case any edge case in applyEventEffect drifted
     // from the server's authoritative state.

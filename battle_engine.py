@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 import random
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -57,6 +58,7 @@ TYPE_CHART: dict[str, dict[str, float]] = {
 
 CRIT_TABLE = {0: 1 / 16, 1: 1 / 8, 2: 1 / 2, 3: 1.0}
 STAT_KEYS = ("attack", "defense", "sp_attack", "sp_defense", "speed", "accuracy", "evasion")
+STAT_ALIASES = {"special_attack": "sp_attack", "special_defense": "sp_defense"}
 
 
 IV_STAT_KEYS = ("hp", "attack", "defense", "sp_attack", "sp_defense", "speed")
@@ -128,6 +130,32 @@ class MoveData:
     target: str  # "self" | "opponent"
     flags: frozenset
     fixed_damage_amount: Optional[int] = None
+    # For damaging moves: do the stat changes hit the user (Close Combat,
+    # Overheat, Metal Claw...) rather than the target? See stat_changes_affect_user.
+    stat_self: bool = False
+
+
+_LOWERS_USER = re.compile(r"\blowers?\s+(the\s+)?user", re.IGNORECASE)
+
+
+def stat_changes_affect_user(d: dict) -> bool:
+    """Whether a move's stat changes apply to its user instead of its target.
+
+    The move data (from PokeAPI) doesn't record who a stat change applies to.
+    Status moves already say it via `target` ("self" for Swords Dance etc.).
+    For damaging moves: every stat *raise* in the data affects the user
+    (Metal Claw, Flame Charge, Ancient Power...), and the drawbacks that
+    lower the user's own stats (Close Combat, Overheat, Superpower...) say
+    "lowers (the) user" in their description; any other drop hits the target.
+    """
+    changes = d.get("stat_changes") or []
+    if not changes:
+        return False
+    if d.get("category") == "status":
+        return d.get("target") == "self"
+    if all(c.get("change", 0) > 0 for c in changes):
+        return True
+    return bool(_LOWERS_USER.search(d.get("description") or ""))
 
 
 def move_data_from_dict(d: dict) -> MoveData:
@@ -155,6 +183,7 @@ def move_data_from_dict(d: dict) -> MoveData:
         target=d.get("target", "opponent"),
         flags=frozenset(d.get("flags") or []),
         fixed_damage_amount=d.get("fixed_damage_amount"),
+        stat_self=stat_changes_affect_user(d),
     )
 
 
@@ -703,7 +732,11 @@ def _maybe_apply_stat_changes(battle: BattleState, move: MoveData, target: Battl
     if battle.rng.random() * 100 >= move.stat_chance:
         return
     for sc in move.stat_changes:
-        stat = sc.get("stat")
+        # Move data (PokeAPI) spells the special stats "special_attack"/
+        # "special_defense"; the engine's stages use sp_attack/sp_defense.
+        # Without this, every Sp. Atk/Sp. Def change (Calm Mind, Nasty Plot,
+        # Overheat's drop, ...) was silently skipped below.
+        stat = STAT_ALIASES.get(sc.get("stat"), sc.get("stat"))
         change = sc.get("change", 0)
         if stat not in target.stat_stages:
             continue
@@ -811,7 +844,8 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
         no_pp = move_index is None or move_index >= len(active.moves) or active.moves[move_index].current_pp <= 0
         if no_pp:
             move = STRUGGLE_MOVE
-            events.append({"type": "move_used", "side": side.side_id, "move_name": move.name})
+            events.append({"type": "move_used", "side": side.side_id, "move_name": move.name,
+                           "move_type": move.type, "category": move.category, "target": move.target})
             dmg = compute_damage(active, defender, move, False, battle.rng)
             _apply_damage_and_emit(defender, dmg, events, opp.side_id, move.name, False, move.type)
             recoil = max(1, active.max_hp // 4)
@@ -834,7 +868,8 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
             # release turn that follows.
             if "semi_invulnerable" in move.flags:
                 v["invulnerable_until_turn"] = battle.turn_number
-            events.append({"type": "charge_start", "side": side.side_id, "move_name": move.name})
+            events.append({"type": "charge_start", "side": side.side_id, "move_name": move.name,
+                            "move_type": move.type})
             return events
 
         move_slot.current_pp = max(0, move_slot.current_pp - 1)
@@ -843,7 +878,8 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
         # already resolved above from volatile["charging_move"]; no new PP cost.
         move = active.moves[move_index].move
 
-    events.append({"type": "move_used", "side": side.side_id, "move_name": move.name})
+    events.append({"type": "move_used", "side": side.side_id, "move_name": move.name,
+                   "move_type": move.type, "category": move.category, "target": move.target})
 
     if move.target != "self" and defender.volatile.get("invulnerable_until_turn") == battle.turn_number:
         events.append({"type": "move_missed", "side": side.side_id, "move_name": move.name,
@@ -921,9 +957,14 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
         target_side_id = side.side_id if move.target == "self" else opp.side_id
         _maybe_apply_ailment(battle, move, target_mon, events, target_side_id)
         _maybe_apply_stat_changes(battle, move, target_mon, events, target_side_id)
-    elif not defender.is_fainted:
-        _maybe_apply_ailment(battle, move, defender, events, opp.side_id)
-        _maybe_apply_stat_changes(battle, move, defender, events, opp.side_id)
+    else:
+        if not defender.is_fainted:
+            _maybe_apply_ailment(battle, move, defender, events, opp.side_id)
+        if move.stat_self:
+            if not active.is_fainted:
+                _maybe_apply_stat_changes(battle, move, active, events, side.side_id)
+        elif not defender.is_fainted:
+            _maybe_apply_stat_changes(battle, move, defender, events, opp.side_id)
         _maybe_apply_flinch(battle, move, defender)
 
     if "multi_turn_lock" in move.flags:
