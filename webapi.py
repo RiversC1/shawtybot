@@ -479,6 +479,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
                     "leader_name": battle_store.GYMS[k]["leader_name"],
                     "badge_name": battle_store.GYMS[k]["badge_name"],
                     "badge_image": battle_store.GYMS[k].get("badge_image"),
+                    "type_theme": battle_store.GYMS[k].get("type_theme"),
                     "earned": k in earned_badges,
                 }
                 for k in battle_store.gym_order(region)

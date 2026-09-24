@@ -52,21 +52,17 @@
             </div>
         </div>
 
-        <div class="badge-case">
-            <div class="badge-case-label">Gym Badges — {{ trainer.badges_total_earned }} / {{ trainer.badges_total }}</div>
-            {% for group in trainer.badges_by_region %}
-            <div class="badge-case-region">
-                <div class="badge-case-region-label">{{ group.region|capitalize }}</div>
-                <div class="badge-case-icons">
-                    {% for b in group.badges %}
-                    <img class="badge-case-icon{{ '' if b.earned else ' is-unearned' }}"
-                         src="{{ b.badge_image }}" alt="{{ b.badge_name }}"
-                         title="{{ b.badge_name }} ({{ b.leader_name }}){{ '' if b.earned else ' — not earned yet' }}">
-                    {% endfor %}
-                </div>
+        <div class="badge-summary">
+            <div class="badge-summary-top">
+                <span class="badge-summary-label">Gym Badges</span>
+                <span class="badge-summary-count">{{ trainer.badges_total_earned }} / {{ trainer.badges_total }}</span>
             </div>
-            {% endfor %}
+            <div class="badge-summary-bar">
+                <div class="badge-summary-fill" style="width: {{ (trainer.badges_total_earned / trainer.badges_total * 100) | round(1) if trainer.badges_total else 0 }}%"></div>
+            </div>
         </div>
+
+        <button id="badge-collection-btn" class="btn-secondary badge-collection-btn" type="button">Badge Collection</button>
 
         {% if is_own %}
         <button id="customize-btn" class="btn-primary"
@@ -131,6 +127,55 @@
         {% endfor %}
     </div>
 </div>
+
+<div id="badge-modal" class="modal-overlay" hidden>
+    <div class="modal badge-modal">
+        <div class="modal-header">
+            <div>
+                <h2>Badge Collection</h2>
+                <div class="muted badge-modal-sub">{{ trainer.username or "Trainer" }} · {{ trainer.badges_total_earned }} of {{ trainer.badges_total }} earned</div>
+            </div>
+            <button id="badge-modal-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            {% for group in trainer.badges_by_region %}
+            {% set region_earned = group.badges | selectattr("earned") | list | length %}
+            <section class="badge-region">
+                <div class="badge-region-head">
+                    <h3>{{ group.region|capitalize }}</h3>
+                    <span class="badge-region-count{{ ' is-complete' if region_earned == group.badges|length else '' }}">
+                        {{ "Complete ✓" if region_earned == group.badges|length else region_earned ~ " / " ~ group.badges|length }}
+                    </span>
+                </div>
+                <div class="badge-grid">
+                    {% for b in group.badges %}
+                    <div class="badge-tile{{ ' is-earned' if b.earned else ' is-missing' }}">
+                        <div class="badge-tile-art">
+                            <img src="{{ b.badge_image }}" alt="{{ b.badge_name }}">
+                            {% if not b.earned %}<span class="badge-tile-lock" aria-hidden="true">🔒</span>{% endif %}
+                        </div>
+                        <div class="badge-tile-name">{{ b.badge_name }}</div>
+                        <div class="badge-tile-leader">{{ b.leader_name }}</div>
+                        <div class="badge-tile-status">{{ "Earned" if b.earned else "Missing" }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+  const modal = document.getElementById("badge-modal");
+  const open = () => { modal.hidden = false; document.body.style.overflow = "hidden"; };
+  const close = () => { modal.hidden = true; document.body.style.overflow = ""; };
+  document.getElementById("badge-collection-btn").addEventListener("click", open);
+  document.getElementById("badge-modal-close").addEventListener("click", close);
+  modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.hidden) close(); });
+})();
+</script>
 
 {% if is_own %}
 <div id="customize-modal" class="modal-overlay" hidden>
