@@ -3388,3 +3388,108 @@ body.lineup-dragging * {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
+
+/* ---------- Battle volume mixer ---------- */
+
+.volume-mixer {
+    position: relative;
+}
+
+.volume-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 40;
+    width: 280px;
+    padding: 14px 16px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+
+.volume-panel-title {
+    font-size: 0.72em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.volume-row {
+    display: grid;
+    grid-template-columns: 78px 1fr 40px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 0.88em;
+    cursor: pointer;
+}
+
+.volume-row-label {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.volume-row-value {
+    text-align: right;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.volume-row input[type="range"] {
+    --fill: 70%;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    margin: 0;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--red) 0%, var(--yellow) var(--fill), #0c0c14 var(--fill));
+    cursor: pointer;
+}
+
+.volume-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--red);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.volume-row input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--red);
+}
+
+.volume-row input[type="range"]:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 4px;
+}
+
+.volume-panel-hint {
+    margin: 8px 0 0;
+    font-size: 0.78em;
+}
+
+@media (max-width: 640px) {
+    .volume-panel {
+        position: fixed;
+        top: auto;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        width: auto;
+    }
+}
+
+.volume-btn-icon {
+    width: 16px;
+    height: 16px;
+}

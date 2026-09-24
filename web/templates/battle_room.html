@@ -8,6 +8,26 @@
     </div>
     <div class="battle-room-header-actions">
         <button id="br-mute-btn" class="btn-primary battle-mute-btn is-off" type="button" title="Play battle music and sounds"><span aria-hidden="true">🔊</span> Turn on music</button>
+        <div class="volume-mixer">
+            <button id="br-volume-btn" class="btn-secondary battle-mute-btn" type="button"
+                    aria-expanded="false" aria-controls="br-volume-panel" title="Volume mixer">
+                <svg class="volume-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="4" x2="6" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="18" y1="4" x2="18" y2="20"/><circle cx="6" cy="14" r="2.2" fill="currentColor"/><circle cx="12" cy="8" r="2.2" fill="currentColor"/><circle cx="18" cy="16" r="2.2" fill="currentColor"/></svg> Volume
+            </button>
+            <div id="br-volume-panel" class="volume-panel" hidden>
+                <div class="volume-panel-title">Volume</div>
+                <label class="volume-row">
+                    <span class="volume-row-label">🎵 Music</span>
+                    <input type="range" id="br-vol-music" min="0" max="100" step="1">
+                    <span class="volume-row-value" id="br-vol-music-value"></span>
+                </label>
+                <label class="volume-row">
+                    <span class="volume-row-label">💥 Effects</span>
+                    <input type="range" id="br-vol-fx" min="0" max="100" step="1">
+                    <span class="volume-row-value" id="br-vol-fx-value"></span>
+                </label>
+                <p class="volume-panel-hint muted">Effects include Pokémon cries, hits and the victory jingle.</p>
+            </div>
+        </div>
         <span class="muted" id="br-connection-status">Connecting...</span>
         <button id="br-forfeit-btn" class="btn-secondary" hidden>Forfeit</button>
     </div>

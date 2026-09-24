@@ -122,6 +122,61 @@
   });
   BattleAudio.onStateChange(updateMuteBtn);
   updateMuteBtn();
+
+  // ---------- Volume mixer ----------
+  (function setupVolumeMixer() {
+    const btn = document.getElementById("br-volume-btn");
+    const panel = document.getElementById("br-volume-panel");
+    const musicSlider = document.getElementById("br-vol-music");
+    const fxSlider = document.getElementById("br-vol-fx");
+    const musicValue = document.getElementById("br-vol-music-value");
+    const fxValue = document.getElementById("br-vol-fx-value");
+    if (!btn || !panel) return;
+
+    function paint(slider, label) {
+      label.textContent = `${slider.value}%`;
+      slider.style.setProperty("--fill", `${slider.value}%`);
+    }
+
+    const vols = BattleAudio.getVolumes();
+    musicSlider.value = Math.round(vols.music * 100);
+    fxSlider.value = Math.round(vols.effects * 100);
+    paint(musicSlider, musicValue);
+    paint(fxSlider, fxValue);
+
+    musicSlider.addEventListener("input", () => {
+      BattleAudio.setMusicVolume(musicSlider.value / 100);
+      paint(musicSlider, musicValue);
+    });
+    fxSlider.addEventListener("input", () => {
+      BattleAudio.setEffectsVolume(fxSlider.value / 100);
+      paint(fxSlider, fxValue);
+    });
+    // Play a short sample on release so the new effects level can be heard.
+    fxSlider.addEventListener("change", () => {
+      if (!BattleAudio.isMuted()) {
+        BattleAudio.ensureCtx();
+        BattleAudio.playSfx("hit");
+      }
+    });
+
+    function setOpen(open) {
+      panel.hidden = !open;
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setOpen(panel.hidden);
+    });
+    panel.addEventListener("click", (e) => e.stopPropagation());
+    document.addEventListener("click", () => setOpen(false));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !panel.hidden) {
+        setOpen(false);
+        btn.focus();
+      }
+    });
+  })();
   // A click anywhere (a move button, accept, etc.) also counts as the user
   // gesture browsers require before audio can actually play — retry starting
   // the music here too in case the very first play() attempt was blocked.

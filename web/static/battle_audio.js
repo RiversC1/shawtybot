@@ -39,6 +39,53 @@ window.BattleAudio = (function () {
   }
 
   let muted = readMutedPref();
+
+  // ---- volume mixer ----
+  // Two user-facing levels (0-1): the battle theme, and effects (cries plus
+  // synthesized hit/status/victory sounds). The default 0.7 reproduces the
+  // levels these sounds always played at; each is scaled from its own base
+  // so cries stay louder than the synth effects, as before.
+  const DEFAULT_VOLUME = 0.7;
+  const MUSIC_BASE = 0.5;   // 0.7 -> 0.35, the original theme volume
+  const SFX_BASE = 0.5;     // 0.7 -> 0.35, the original synth volume
+  const CRY_BASE = 0.785;   // 0.7 -> 0.55, the original cry volume
+
+  function readVolume(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      const v = raw === null ? NaN : parseFloat(raw);
+      return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : DEFAULT_VOLUME;
+    } catch (e) {
+      return DEFAULT_VOLUME;
+    }
+  }
+
+  function writeVolume(key, value) {
+    try {
+      localStorage.setItem(key, String(value));
+    } catch (e) {
+      // Not persisted this session; the in-memory level still applies.
+    }
+  }
+
+  let musicVolume = readVolume("sb_battle_vol_music");
+  let effectsVolume = readVolume("sb_battle_vol_fx");
+
+  function getVolumes() {
+    return { music: musicVolume, effects: effectsVolume };
+  }
+
+  function setMusicVolume(v) {
+    musicVolume = Math.min(1, Math.max(0, v));
+    writeVolume("sb_battle_vol_music", musicVolume);
+    if (musicEl) musicEl.volume = musicVolume * MUSIC_BASE;
+  }
+
+  function setEffectsVolume(v) {
+    effectsVolume = Math.min(1, Math.max(0, v));
+    writeVolume("sb_battle_vol_fx", effectsVolume);
+    if (sfxGain) sfxGain.gain.value = effectsVolume * SFX_BASE;
+  }
   let wantMusic = false;
 
   function ensureCtx() {
@@ -48,7 +95,7 @@ window.BattleAudio = (function () {
         if (!AC) return null;
         ctx = new AC();
         sfxGain = ctx.createGain();
-        sfxGain.gain.value = 0.35;
+        sfxGain.gain.value = effectsVolume * SFX_BASE;
         sfxGain.connect(ctx.destination);
       }
       if (ctx.state === "suspended") ctx.resume().catch(() => {});
@@ -171,10 +218,10 @@ window.BattleAudio = (function () {
     if (muted || !dexId) return;
     ensureCtx();
     const legacy = new Audio(`${CRY_BASE_LEGACY}${dexId}.ogg`);
-    legacy.volume = 0.55;
+    legacy.volume = Math.min(1, effectsVolume * CRY_BASE);
     legacy.play().catch(() => {
       const latest = new Audio(`${CRY_BASE_LATEST}${dexId}.ogg`);
-      latest.volume = 0.55;
+      latest.volume = Math.min(1, effectsVolume * CRY_BASE);
       latest.play().catch(() => {});
     });
   }
@@ -198,7 +245,7 @@ window.BattleAudio = (function () {
     if (!musicEl) {
       musicEl = new Audio(MUSIC_URL);
       musicEl.loop = true;
-      musicEl.volume = 0.35;
+      musicEl.volume = musicVolume * MUSIC_BASE;
       musicEl.preload = "auto";
       musicEl.addEventListener("playing", notifyState);
       musicEl.addEventListener("pause", notifyState);
@@ -271,6 +318,7 @@ window.BattleAudio = (function () {
 
   return {
     ensureCtx, isMuted, setMuted, startMusic, stopMusic, retryMusic, isMusicPlaying, onStateChange,
+    getVolumes, setMusicVolume, setEffectsVolume,
     playSfx, playCry, handleEvent,
   };
 })();
