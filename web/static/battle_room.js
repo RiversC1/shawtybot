@@ -425,7 +425,12 @@
   function formatEvent(event, nameBySide, monBySide) {
     const t = event.type;
     const side = nameBySide[event.side] || "";
-    const mon = monBySide[event.side] || side;
+    // When both active Pokémon are the same species, a bare "Charizard" is
+    // ambiguous, so prefix the trainer ("Brock's Charizard") in that case only.
+    const mirror = Boolean(monBySide.A) && monBySide.A === monBySide.B;
+    const owned = (s, name) => (mirror && nameBySide[s] ? `${nameBySide[s]}'s ${name}` : name);
+    const mon = monBySide[event.side] ? owned(event.side, monBySide[event.side]) : side;
+    const otherSide = event.side === "A" ? "B" : "A";
     switch (t) {
       case "turn_start":
       case "switch_out":
@@ -437,7 +442,7 @@
         return `<strong>${mon}</strong> used <strong>${event.move_name}</strong>!`;
       case "move_missed":
         if (event.reason === "invulnerable") {
-          return `${mon}'s attack missed! <strong>${event.target_name}</strong> was out of reach!`;
+          return `${mon}'s attack missed! <strong>${owned(otherSide, event.target_name)}</strong> was out of reach!`;
         }
         return `${mon}'s attack missed!`;
       case "move_failed":
@@ -492,7 +497,7 @@
         return `${mon} ${flavor[event.move_name] || "is charging its attack!"}`;
       }
       case "faint":
-        return `💀 <strong>${event.name}</strong> fainted!`;
+        return `💀 <strong>${owned(event.side, event.name)}</strong> fainted!`;
       default:
         return null;
     }
