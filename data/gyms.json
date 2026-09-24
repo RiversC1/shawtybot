@@ -663,7 +663,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/brock.png",
-    "badge_image": "/static/badges/rock.svg"
+    "badge_image": "/static/badges/brock.png"
   },
   {
     "gym_key": "misty",
@@ -737,7 +737,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/misty.png",
-    "badge_image": "/static/badges/water.svg"
+    "badge_image": "/static/badges/misty.png"
   },
   {
     "gym_key": "lt_surge",
@@ -811,7 +811,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/lt_surge.png",
-    "badge_image": "/static/badges/electric.svg"
+    "badge_image": "/static/badges/lt_surge.png"
   },
   {
     "gym_key": "erika",
@@ -885,7 +885,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/erika.png",
-    "badge_image": "/static/badges/grass.svg"
+    "badge_image": "/static/badges/erika.png"
   },
   {
     "gym_key": "koga",
@@ -959,7 +959,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/koga.png",
-    "badge_image": "/static/badges/poison.svg"
+    "badge_image": "/static/badges/koga.png"
   },
   {
     "gym_key": "sabrina",
@@ -1033,7 +1033,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/sabrina.png",
-    "badge_image": "/static/badges/psychic.svg"
+    "badge_image": "/static/badges/sabrina.png"
   },
   {
     "gym_key": "blaine",
@@ -1107,7 +1107,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/blaine.png",
-    "badge_image": "/static/badges/fire.svg"
+    "badge_image": "/static/badges/blaine.png"
   },
   {
     "gym_key": "giovanni",
@@ -1181,7 +1181,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/giovanni.png",
-    "badge_image": "/static/badges/ground.svg"
+    "badge_image": "/static/badges/giovanni.png"
   },
   {
     "gym_key": "falkner",
@@ -1255,7 +1255,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/falkner.png",
-    "badge_image": "/static/badges/flying.svg"
+    "badge_image": "/static/badges/falkner.png"
   },
   {
     "gym_key": "bugsy",
@@ -1329,7 +1329,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/bugsy.png",
-    "badge_image": "/static/badges/bug.svg"
+    "badge_image": "/static/badges/bugsy.png"
   },
   {
     "gym_key": "whitney",
@@ -1403,7 +1403,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/whitney.png",
-    "badge_image": "/static/badges/normal.svg"
+    "badge_image": "/static/badges/whitney.png"
   },
   {
     "gym_key": "morty",
@@ -1477,7 +1477,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/morty.png",
-    "badge_image": "/static/badges/ghost.svg"
+    "badge_image": "/static/badges/morty.png"
   },
   {
     "gym_key": "chuck",
@@ -1551,7 +1551,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/chuck.png",
-    "badge_image": "/static/badges/fighting.svg"
+    "badge_image": "/static/badges/chuck.png"
   },
   {
     "gym_key": "jasmine",
@@ -1625,7 +1625,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/jasmine.png",
-    "badge_image": "/static/badges/steel.svg"
+    "badge_image": "/static/badges/jasmine.png"
   },
   {
     "gym_key": "pryce",
@@ -1699,7 +1699,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/pryce.png",
-    "badge_image": "/static/badges/ice.svg"
+    "badge_image": "/static/badges/pryce.png"
   },
   {
     "gym_key": "clair",
@@ -1773,7 +1773,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/clair.png",
-    "badge_image": "/static/badges/dragon.svg"
+    "badge_image": "/static/badges/clair.png"
   },
   {
     "gym_key": "roark",
@@ -1847,7 +1847,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/roark.png",
-    "badge_image": "/static/badges/rock.svg"
+    "badge_image": "/static/badges/roark.png"
   },
   {
     "gym_key": "gardenia",
@@ -1921,7 +1921,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/gardenia.png",
-    "badge_image": "/static/badges/grass.svg"
+    "badge_image": "/static/badges/gardenia.png"
   },
   {
     "gym_key": "maylene",
@@ -1995,7 +1995,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/maylene.png",
-    "badge_image": "/static/badges/fighting.svg"
+    "badge_image": "/static/badges/maylene.png"
   },
   {
     "gym_key": "crasher_wake",
@@ -2069,7 +2069,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/crasher_wake.png",
-    "badge_image": "/static/badges/water.svg"
+    "badge_image": "/static/badges/crasher_wake.png"
   },
   {
     "gym_key": "fantina",
@@ -2143,7 +2143,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/fantina.png",
-    "badge_image": "/static/badges/ghost.svg"
+    "badge_image": "/static/badges/fantina.png"
   },
   {
     "gym_key": "byron",
@@ -2216,8 +2216,8 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/306.png",
-    "badge_image": "/static/badges/steel.svg"
+    "leader_image": "/static/gym_leaders/byron.png",
+    "badge_image": "/static/badges/byron.png"
   },
   {
     "gym_key": "candice",
@@ -2291,7 +2291,7 @@
       }
     ],
     "leader_image": "/static/gym_leaders/candice.png",
-    "badge_image": "/static/badges/ice.svg"
+    "badge_image": "/static/badges/candice.png"
   },
   {
     "gym_key": "volkner",
@@ -2365,6 +2365,6 @@
       }
     ],
     "leader_image": "/static/gym_leaders/volkner.png",
-    "badge_image": "/static/badges/electric.svg"
+    "badge_image": "/static/badges/volkner.png"
   }
 ]
