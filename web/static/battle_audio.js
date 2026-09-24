@@ -1,11 +1,17 @@
 // Battle sound: real Pokémon cries (streamed from PokeAPI's public cries
 // mirror) on switch-in, small synthesized SFX for hits/status/faints via the
 // Web Audio API, and a looping battle theme played from a locally hosted
-// audio file (web/static/audio/champion_battle.mp3).
+// audio file under web/static/audio/, chosen by battle type.
 window.BattleAudio = (function () {
   const CRY_BASE_LEGACY = "https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/legacy/";
   const CRY_BASE_LATEST = "https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/";
-  const MUSIC_URL = "/static/audio/champion_battle.mp3";
+  const MUSIC_BY_TYPE = {
+    gym: "/static/audio/gym_battle.mp3",
+    elite_four: "/static/audio/elite_battle.mp3",
+    champion: "/static/audio/champion_battle.mp3",
+  };
+  // PvP and random-trainer battles keep the original general battle theme.
+  const MUSIC_URL = MUSIC_BY_TYPE[window.BATTLE_TYPE] || "/static/audio/battle.mp3";
 
   let ctx = null;
   let sfxGain = null;
