@@ -69,7 +69,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/87.png"
+    "portrait": "/static/elite_four/lorelei.png"
   },
   {
     "member_key": "bruno",
@@ -141,7 +141,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/95.png"
+    "portrait": "/static/elite_four/bruno.png"
   },
   {
     "member_key": "agatha",
@@ -213,7 +213,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png"
+    "portrait": "/static/elite_four/agatha.png"
   },
   {
     "member_key": "lance",
@@ -285,7 +285,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/130.png"
+    "portrait": "/static/elite_four/lance.png"
   },
   {
     "member_key": "blue",
@@ -357,7 +357,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png"
+    "portrait": "/static/elite_four/blue.png"
   },
   {
     "member_key": "will",
@@ -429,7 +429,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/178.png"
+    "portrait": "/static/elite_four/will.png"
   },
   {
     "member_key": "koga",
@@ -501,7 +501,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/168.png"
+    "portrait": "/static/elite_four/koga.png"
   },
   {
     "member_key": "bruno",
@@ -573,7 +573,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/106.png"
+    "portrait": "/static/elite_four/bruno.png"
   },
   {
     "member_key": "karen",
@@ -645,7 +645,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/197.png"
+    "portrait": "/static/elite_four/karen.png"
   },
   {
     "member_key": "lance",
@@ -717,7 +717,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/149.png"
+    "portrait": "/static/elite_four/lance.png"
   },
   {
     "member_key": "sidney",
@@ -789,7 +789,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/262.png"
+    "portrait": "/static/elite_four/sidney.png"
   },
   {
     "member_key": "phoebe",
@@ -861,7 +861,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/356.png"
+    "portrait": "/static/elite_four/phoebe.png"
   },
   {
     "member_key": "glacia",
@@ -933,7 +933,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/362.png"
+    "portrait": "/static/elite_four/glacia.png"
   },
   {
     "member_key": "drake",
@@ -1005,7 +1005,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/334.png"
+    "portrait": "/static/elite_four/drake.png"
   },
   {
     "member_key": "wallace",
@@ -1077,7 +1077,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/365.png"
+    "portrait": "/static/elite_four/wallace.png"
   },
   {
     "member_key": "aaron",
@@ -1149,7 +1149,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/267.png"
+    "portrait": "/static/elite_four/aaron.png"
   },
   {
     "member_key": "bertha",
@@ -1221,7 +1221,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/450.png"
+    "portrait": "/static/elite_four/bertha.png"
   },
   {
     "member_key": "flint",
@@ -1293,7 +1293,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/78.png"
+    "portrait": "/static/elite_four/flint.png"
   },
   {
     "member_key": "lucian",
@@ -1365,7 +1365,7 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/122.png"
+    "portrait": "/static/elite_four/lucian.png"
   },
   {
     "member_key": "cynthia",
@@ -1437,6 +1437,6 @@
         ]
       }
     ],
-    "portrait": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/445.png"
+    "portrait": "/static/elite_four/cynthia.png"
   }
 ]
