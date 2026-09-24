@@ -4167,3 +4167,80 @@ body.lineup-dragging * {
     outline: 2px solid var(--blue);
     outline-offset: 2px;
 }
+
+/* ---------- Team page: "Choose a Pokemon" picker ---------- */
+
+.modal.team-picker-modal {
+    max-width: 920px;
+}
+
+.picker-grid.team-picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    max-height: min(62vh, 640px);
+    padding: 2px;
+}
+
+.team-picker-item {
+    --t: #a8a878;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 10px 12px;
+    border-radius: 12px;
+    border: 2px solid color-mix(in srgb, var(--t) 30%, transparent);
+    background:
+        radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--t) 28%, transparent), transparent 62%),
+        #0c0c14;
+    font-size: 0.95em;
+    transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.team-picker-item:hover {
+    border-color: var(--t);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--t) 30%, transparent);
+}
+
+.team-picker-item img {
+    width: 104px;
+    height: 104px;
+    image-rendering: auto;
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.45));
+}
+
+.team-picker-name {
+    font-weight: bold;
+}
+
+.team-picker-types {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+}
+
+.team-picker-types .type-badge {
+    font-size: 0.72em;
+}
+
+.team-picker-item.tint-normal { --t: #A8A878; } .team-picker-item.tint-fire { --t: #F08030; }
+.team-picker-item.tint-water { --t: #6890F0; } .team-picker-item.tint-grass { --t: #78C850; }
+.team-picker-item.tint-electric { --t: #F8D030; } .team-picker-item.tint-ice { --t: #98D8D8; }
+.team-picker-item.tint-fighting { --t: #C03028; } .team-picker-item.tint-poison { --t: #A040A0; }
+.team-picker-item.tint-ground { --t: #E0C068; } .team-picker-item.tint-flying { --t: #A890F0; }
+.team-picker-item.tint-psychic { --t: #F85888; } .team-picker-item.tint-bug { --t: #A8B820; }
+.team-picker-item.tint-rock { --t: #B8A038; } .team-picker-item.tint-ghost { --t: #705898; }
+.team-picker-item.tint-dragon { --t: #7038F8; } .team-picker-item.tint-dark { --t: #705848; }
+.team-picker-item.tint-steel { --t: #B8B8D0; } .team-picker-item.tint-fairy { --t: #EE99AC; }
+
+@media (max-width: 600px) {
+    .picker-grid.team-picker-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .team-picker-item img {
+        width: 84px;
+        height: 84px;
+    }
+}

@@ -257,8 +257,12 @@
     }
     for (const mon of species) {
       const item = document.createElement("div");
-      item.className = "picker-item";
-      item.innerHTML = `<img src="${mon.artwork}" alt="${mon.name}"><div>${mon.name}${mon.has_shiny ? " ✨" : ""}</div>`;
+      const mainType = (mon.types && mon.types[0]) || "normal";
+      item.className = `picker-item team-picker-item tint-${mainType}`;
+      item.innerHTML = `
+        <img src="${mon.artwork}" alt="${mon.name}" loading="lazy">
+        <div class="team-picker-name">${mon.name}${mon.has_shiny ? " ✨" : ""}</div>
+        <div class="team-picker-types">${typeBadges(mon.types)}</div>`;
       item.addEventListener("click", async () => {
         // Fetch the full enriched config (moves/stats/ability) for this species
         // so the new card renders identically to one loaded from /api/team.
@@ -279,7 +283,7 @@
 
   search.addEventListener("input", () => {
     const q = search.value.toLowerCase();
-    renderPickerGrid(allSpecies.filter((m) => m.name.toLowerCase().includes(q)));
+    renderPickerGrid(allSpecies.filter((m) => m.name.toLowerCase().includes(q) || (m.types || []).some((t) => t.startsWith(q))));
   });
 
   // ---------- Configure (moves + ability) modal ----------
