@@ -662,7 +662,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/76.png",
+    "leader_image": "/static/gym_leaders/brock.png",
     "badge_image": "/static/badges/rock.svg"
   },
   {
@@ -736,7 +736,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/134.png",
+    "leader_image": "/static/gym_leaders/misty.png",
     "badge_image": "/static/badges/water.svg"
   },
   {
@@ -810,7 +810,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/26.png",
+    "leader_image": "/static/gym_leaders/lt_surge.png",
     "badge_image": "/static/badges/electric.svg"
   },
   {
@@ -884,7 +884,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/45.png",
+    "leader_image": "/static/gym_leaders/erika.png",
     "badge_image": "/static/badges/grass.svg"
   },
   {
@@ -958,7 +958,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/110.png",
+    "leader_image": "/static/gym_leaders/koga.png",
     "badge_image": "/static/badges/poison.svg"
   },
   {
@@ -1032,7 +1032,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/65.png",
+    "leader_image": "/static/gym_leaders/sabrina.png",
     "badge_image": "/static/badges/psychic.svg"
   },
   {
@@ -1106,7 +1106,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/59.png",
+    "leader_image": "/static/gym_leaders/blaine.png",
     "badge_image": "/static/badges/fire.svg"
   },
   {
@@ -1180,7 +1180,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/34.png",
+    "leader_image": "/static/gym_leaders/giovanni.png",
     "badge_image": "/static/badges/ground.svg"
   },
   {
@@ -1254,7 +1254,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/18.png",
+    "leader_image": "/static/gym_leaders/falkner.png",
     "badge_image": "/static/badges/flying.svg"
   },
   {
@@ -1328,7 +1328,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/212.png",
+    "leader_image": "/static/gym_leaders/bugsy.png",
     "badge_image": "/static/badges/bug.svg"
   },
   {
@@ -1402,7 +1402,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/241.png",
+    "leader_image": "/static/gym_leaders/whitney.png",
     "badge_image": "/static/badges/normal.svg"
   },
   {
@@ -1476,7 +1476,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png",
+    "leader_image": "/static/gym_leaders/morty.png",
     "badge_image": "/static/badges/ghost.svg"
   },
   {
@@ -1550,7 +1550,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/62.png",
+    "leader_image": "/static/gym_leaders/chuck.png",
     "badge_image": "/static/badges/fighting.svg"
   },
   {
@@ -1624,7 +1624,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/208.png",
+    "leader_image": "/static/gym_leaders/jasmine.png",
     "badge_image": "/static/badges/steel.svg"
   },
   {
@@ -1698,7 +1698,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/221.png",
+    "leader_image": "/static/gym_leaders/pryce.png",
     "badge_image": "/static/badges/ice.svg"
   },
   {
@@ -1772,7 +1772,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/230.png",
+    "leader_image": "/static/gym_leaders/clair.png",
     "badge_image": "/static/badges/dragon.svg"
   },
   {
@@ -1846,7 +1846,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/409.png",
+    "leader_image": "/static/gym_leaders/roark.png",
     "badge_image": "/static/badges/rock.svg"
   },
   {
@@ -1920,7 +1920,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/407.png",
+    "leader_image": "/static/gym_leaders/gardenia.png",
     "badge_image": "/static/badges/grass.svg"
   },
   {
@@ -1994,7 +1994,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/448.png",
+    "leader_image": "/static/gym_leaders/maylene.png",
     "badge_image": "/static/badges/fighting.svg"
   },
   {
@@ -2068,7 +2068,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/419.png",
+    "leader_image": "/static/gym_leaders/crasher_wake.png",
     "badge_image": "/static/badges/water.svg"
   },
   {
@@ -2142,7 +2142,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/429.png",
+    "leader_image": "/static/gym_leaders/fantina.png",
     "badge_image": "/static/badges/ghost.svg"
   },
   {
@@ -2290,7 +2290,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/460.png",
+    "leader_image": "/static/gym_leaders/candice.png",
     "badge_image": "/static/badges/ice.svg"
   },
   {
@@ -2364,7 +2364,7 @@
         ]
       }
     ],
-    "leader_image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/405.png",
+    "leader_image": "/static/gym_leaders/volkner.png",
     "badge_image": "/static/badges/electric.svg"
   }
 ]
