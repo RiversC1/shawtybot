@@ -87,6 +87,7 @@
     card.querySelector(".remove-btn").addEventListener("click", () => {
       teamState[index] = null;
       render();
+      markDirty();
     });
 
     card.querySelectorAll(".move-grid .move-card").forEach((cell, i) => {
@@ -96,7 +97,110 @@
     return card;
   }
 
+  // ---------- Lineup strip (drag to reorder) ----------
+  // Pointer events rather than native HTML5 drag-and-drop, which doesn't fire
+  // for touch input — this way reordering works the same with a mouse or a
+  // finger. Dropping onto a filled slot swaps the two; onto an empty slot moves.
+
+  const lineup = document.getElementById("team-lineup");
+  let drag = null;
+
+  function markDirty() {
+    status.textContent = "Lineup changed — click Save Team to keep it.";
+    status.classList.remove("error");
+    saveBtn.classList.add("is-attention");
+  }
+
+  function renderLineup() {
+    lineup.innerHTML = "";
+    teamState.forEach((mon, i) => {
+      const tile = document.createElement("div");
+      tile.className = "lineup-slot" + (mon ? " is-filled" : " is-empty");
+      tile.dataset.index = i;
+      tile.innerHTML = mon
+        ? `<span class="lineup-slot-num">${i + 1}</span>
+           <img src="${mon.artwork}" alt="" draggable="false">
+           <span class="lineup-slot-name">${mon.name}</span>`
+        : `<span class="lineup-slot-num">${i + 1}</span><span class="lineup-slot-plus">+</span><span class="lineup-slot-name muted">Empty</span>`;
+      if (mon) {
+        tile.addEventListener("pointerdown", (e) => startDrag(e, tile, i));
+      } else {
+        tile.addEventListener("click", () => openPicker(i));
+      }
+      lineup.appendChild(tile);
+    });
+  }
+
+  function slotUnder(x, y) {
+    const el = document.elementFromPoint(x, y);
+    return el ? el.closest(".lineup-slot") : null;
+  }
+
+  function startDrag(e, tile, index) {
+    if (e.button !== undefined && e.button !== 0) return;
+    drag = { index, tile, startX: e.clientX, startY: e.clientY, ghost: null, over: null, pointerId: e.pointerId };
+    tile.setPointerCapture(e.pointerId);
+    tile.addEventListener("pointermove", onDragMove);
+    tile.addEventListener("pointerup", endDrag);
+    tile.addEventListener("pointercancel", cancelDrag);
+  }
+
+  function onDragMove(e) {
+    if (!drag) return;
+    if (!drag.ghost) {
+      // Small threshold so a plain tap/click doesn't start a drag.
+      if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 6) return;
+      const rect = drag.tile.getBoundingClientRect();
+      drag.offsetX = drag.startX - rect.left;
+      drag.offsetY = drag.startY - rect.top;
+      drag.ghost = drag.tile.cloneNode(true);
+      drag.ghost.classList.add("lineup-ghost");
+      drag.ghost.style.width = `${rect.width}px`;
+      drag.ghost.style.height = `${rect.height}px`;
+      document.body.appendChild(drag.ghost);
+      drag.tile.classList.add("is-dragging");
+      document.body.classList.add("lineup-dragging");
+    }
+    e.preventDefault();
+    drag.ghost.style.transform = `translate(${e.clientX - drag.offsetX}px, ${e.clientY - drag.offsetY}px)`;
+    const over = slotUnder(e.clientX, e.clientY);
+    if (over !== drag.over) {
+      if (drag.over) drag.over.classList.remove("is-drop-target");
+      drag.over = over && over !== drag.tile ? over : null;
+      if (drag.over) drag.over.classList.add("is-drop-target");
+    }
+  }
+
+  function cleanupDrag() {
+    if (!drag) return;
+    drag.tile.removeEventListener("pointermove", onDragMove);
+    drag.tile.removeEventListener("pointerup", endDrag);
+    drag.tile.removeEventListener("pointercancel", cancelDrag);
+    if (drag.ghost) drag.ghost.remove();
+    if (drag.over) drag.over.classList.remove("is-drop-target");
+    drag.tile.classList.remove("is-dragging");
+    document.body.classList.remove("lineup-dragging");
+  }
+
+  function endDrag() {
+    if (!drag) return;
+    const from = drag.index;
+    const target = drag.ghost && drag.over ? parseInt(drag.over.dataset.index, 10) : null;
+    cleanupDrag();
+    drag = null;
+    if (target === null || target === from) return;
+    [teamState[from], teamState[target]] = [teamState[target], teamState[from]];
+    render();
+    markDirty();
+  }
+
+  function cancelDrag() {
+    cleanupDrag();
+    drag = null;
+  }
+
   function render() {
+    renderLineup();
     cardsContainer.innerHTML = "";
     emptyContainer.innerHTML = "";
 
@@ -167,6 +271,7 @@
         };
         closePicker();
         render();
+        markDirty();
       });
       pickerGrid.appendChild(item);
     }
@@ -272,6 +377,7 @@
       return;
     }
     status.textContent = "Team saved!";
+    saveBtn.classList.remove("is-attention");
   });
 
   render();

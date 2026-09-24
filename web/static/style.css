@@ -3243,3 +3243,129 @@ code {
         justify-content: space-between;
     }
 }
+
+/* ---------- Team lineup (drag to reorder) ---------- */
+
+.team-lineup-card {
+    padding: 18px 20px 20px;
+}
+
+.team-lineup-hint {
+    margin: 4px 0 14px;
+}
+
+.team-lineup {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.lineup-slot {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 118px;
+    padding: 12px 6px 10px;
+    border-radius: 12px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    user-select: none;
+    -webkit-user-select: none;
+    transition: border-color 0.12s ease, transform 0.12s ease, background 0.12s ease;
+}
+
+.lineup-slot.is-filled {
+    cursor: grab;
+    touch-action: none;
+}
+
+.lineup-slot.is-filled:hover {
+    border-color: var(--text-dim);
+}
+
+.lineup-slot.is-empty {
+    cursor: pointer;
+    border-style: dashed;
+    background: transparent;
+}
+
+.lineup-slot.is-empty:hover {
+    border-color: var(--red);
+}
+
+.lineup-slot img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.lineup-slot-num {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    font-size: 0.72em;
+    font-weight: bold;
+    color: var(--text-dim);
+}
+
+.lineup-slot:first-child.is-filled .lineup-slot-num {
+    color: var(--yellow);
+}
+
+.lineup-slot-name {
+    font-size: 0.82em;
+    font-weight: bold;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.lineup-slot-plus {
+    font-size: 1.8em;
+    line-height: 1;
+    color: var(--text-dim);
+}
+
+.lineup-slot.is-dragging {
+    opacity: 0.35;
+}
+
+.lineup-slot.is-drop-target {
+    border-color: var(--red);
+    border-style: solid;
+    background: rgba(239, 51, 64, 0.12);
+    transform: scale(1.04);
+}
+
+.lineup-ghost {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 500;
+    pointer-events: none;
+    cursor: grabbing;
+    border-color: var(--red);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+    opacity: 0.95;
+}
+
+body.lineup-dragging,
+body.lineup-dragging * {
+    cursor: grabbing !important;
+}
+
+.btn-primary.is-attention {
+    box-shadow: 0 0 0 3px rgba(239, 51, 64, 0.35);
+}
+
+@media (max-width: 700px) {
+    .team-lineup {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
