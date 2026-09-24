@@ -190,6 +190,12 @@
       }
     });
 
+    const motionToggle = document.getElementById("br-motion-toggle");
+    if (motionToggle) {
+      motionToggle.checked = BattleFX.isMotionOn();
+      motionToggle.addEventListener("change", () => BattleFX.setMotion(motionToggle.checked));
+    }
+
     function setOpen(open) {
       panel.hidden = !open;
       btn.setAttribute("aria-expanded", open ? "true" : "false");

@@ -38,7 +38,30 @@ window.BattleFX = (function () {
     confusion: { label: "Confused", color: "#ff9ee0", type: null },
   };
 
-  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Motion effects (screen shake, lunges, particles) are on unless the
+  // viewer turns them off with the battle page's "Motion effects" switch.
+  // Deliberately NOT tied to the OS "reduce motion" preference: Windows turns
+  // that on whenever "Animation effects" is off, which silently disabled the
+  // move animations for people who never meant to opt out of them.
+  function readMotionPref() {
+    try {
+      return localStorage.getItem("sb_battle_motion") !== "0";
+    } catch (e) {
+      return true;
+    }
+  }
+  let motionOn = readMotionPref();
+  function reduceMotionNow() {
+    return !motionOn;
+  }
+  function setMotion(on) {
+    motionOn = !!on;
+    try {
+      localStorage.setItem("sb_battle_motion", motionOn ? "1" : "0");
+    } catch (e) {
+      // Not persisted; applies for this page view.
+    }
+  }
 
   let scene = null;
   let layer = null;
@@ -188,7 +211,7 @@ window.BattleFX = (function () {
 
   function impact(at, fx) {
     flash(at, fx);
-    if (reduceMotion) return;
+    if (reduceMotionNow()) return;
     ({ burst, splash, strike, rise, fall, rings })[fx.impact](at, fx);
   }
 
@@ -276,27 +299,27 @@ window.BattleFX = (function () {
 
     if (selfTarget) {
       glowSprite(attackerSprite, fx.glow, 800);
-      if (!reduceMotion) aura(from, fx, 12, true);
+      if (!reduceMotionNow()) aura(from, fx, 12, true);
       return wait(800);
     }
     if (category === "physical") {
-      if (!reduceMotion) lunge(attackerSlot, from, to);
+      if (!reduceMotionNow()) lunge(attackerSlot, from, to);
       setTimeout(() => impact(to, fx), 250);
       return wait(760);
     }
     if (category === "special") {
       chargeGlow(from, fx);
       glowSprite(attackerSprite, fx.glow, 500);
-      if (!reduceMotion) projectile(from, to, fx, 11, 18, 420);
+      if (!reduceMotionNow()) projectile(from, to, fx, 11, 18, 420);
       setTimeout(() => impact(to, fx), 520);
       return wait(960);
     }
     // Status move aimed at the opponent: a softer wave of sparkles.
     glowSprite(attackerSprite, fx.glow, 500);
-    if (!reduceMotion) projectile(from, to, { ...fx, shape: "star" }, 7, 26, 560);
+    if (!reduceMotionNow()) projectile(from, to, { ...fx, shape: "star" }, 7, 26, 560);
     setTimeout(() => {
       flash(to, fx, 54);
-      if (!reduceMotion) rings(to, fx);
+      if (!reduceMotionNow()) rings(to, fx);
     }, 560);
     return wait(1000);
   }
@@ -325,7 +348,7 @@ window.BattleFX = (function () {
     if (!info || !slot) return;
     const at = centerOf(slot);
     glowSprite(spriteEl, info.color, 700);
-    if (reduceMotion) return;
+    if (reduceMotionNow()) return;
     if (status === "sleep") {
       for (let i = 0; i < 3; i++) {
         const z = document.createElement("div");
@@ -369,7 +392,7 @@ window.BattleFX = (function () {
   }
 
   function statArrows(slot, up) {
-    if (!slot || reduceMotion) return;
+    if (!slot || reduceMotionNow()) return;
     const at = centerOf(slot);
     const fx = up ? { color: "#ff9a3c", glow: "#ffd9a0" } : { color: "#5aa2ff", glow: "#bcdcff" };
     for (let i = 0; i < 8; i++) {
@@ -390,7 +413,7 @@ window.BattleFX = (function () {
   }
 
   function healSparkles(slot) {
-    if (!slot || reduceMotion) return;
+    if (!slot || reduceMotionNow()) return;
     aura(centerOf(slot), { color: "#63e38a", glow: "#c9ffd8", shape: "star" }, 9, true);
   }
 
@@ -428,12 +451,15 @@ window.BattleFX = (function () {
 
   // Building blocks for battle_moves.js.
   const kit = {
-    scene: () => scene, layer: () => layer, reduceMotion, TYPE_FX, fxFor, wait, centerOf, rand, particle, run,
+    scene: () => scene, layer: () => layer, TYPE_FX, fxFor, wait, centerOf, rand, particle, run,
     flash, burst, splash, strike, rise, fall, rings, impact, lunge, projectile, chargeGlow, aura, glowSprite,
     healSparkles, floatText,
   };
 
+  Object.defineProperty(kit, "reduceMotion", { get: reduceMotionNow });
+
   return {
+    isMotionOn: () => motionOn, setMotion,
     init, playMove, floatText, statusEffect, statArrows, healSparkles, glowSprite,
     caption, fadeCaption, colorForType, STATUS_FX, kit,
   };

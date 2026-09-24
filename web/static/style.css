@@ -4110,3 +4110,60 @@ body.lineup-dragging * {
     color: #ffe3f3;
     text-shadow: 0 0 8px #ff7ac0;
 }
+
+/* "Motion effects" switch in the battle volume panel */
+.motion-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 0.85em;
+    cursor: pointer;
+}
+
+.motion-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+}
+
+.motion-toggle-track {
+    position: relative;
+    flex-shrink: 0;
+    width: 36px;
+    height: 20px;
+    border-radius: 999px;
+    background: #0c0c14;
+    border: 1px solid var(--border);
+    transition: background 0.15s ease;
+}
+
+.motion-toggle-track::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.motion-toggle input:checked + .motion-toggle-track {
+    background: var(--red);
+    border-color: var(--red);
+}
+
+.motion-toggle input:checked + .motion-toggle-track::after {
+    transform: translateX(16px);
+    background: #fff;
+}
+
+.motion-toggle input:focus-visible + .motion-toggle-track {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+}
