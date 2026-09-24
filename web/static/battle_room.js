@@ -429,6 +429,9 @@
       case "move_used":
         return `<strong>${side}</strong> used <strong>${event.move_name}</strong>!`;
       case "move_missed":
+        if (event.reason === "invulnerable") {
+          return `${side}'s attack missed! <strong>${event.target_name}</strong> was out of reach!`;
+        }
         return `${side}'s attack missed!`;
       case "move_failed":
         return `${side}'s move failed!`;
@@ -475,8 +478,12 @@
       case "drain":
       case "heal":
         return `${side} restored <strong>${event.amount}</strong> HP!`;
-      case "charge_start":
-        return `${side} is charging its attack!`;
+      case "charge_start": {
+        const flavor = {
+          Fly: "flew up high!", Bounce: "sprang up!", Dig: "burrowed underground!", Dive: "hid underwater!",
+        };
+        return `${side} ${flavor[event.move_name] || "is charging its attack!"}`;
+      }
       case "faint":
         return `💀 <strong>${event.name}</strong> fainted!`;
       default:
@@ -590,7 +597,14 @@
 
     if (!newEvents.length) {
       // No new history to play (e.g. accept/decline, a reconnect with
-      // nothing new) — just sync instantly.
+      // nothing new, or this exact update arriving twice — submitting a
+      // move gets its result both as the fetch response AND as this same
+      // client's own WebSocket broadcast). If an animation is already
+      // mid-flight, `truth` is now current but the in-progress playQueue()
+      // owns visibleA/visibleB/revealed until it finishes and runs this
+      // same resync itself — stomping on it here mid-faint is what used to
+      // make the wrong Pokémon appear to faint. Just leave it alone.
+      if (playing) return;
       visibleA = truth.roster_a.find((m) => m.is_active) || truth.roster_a[0] || null;
       visibleB = truth.roster_b.find((m) => m.is_active) || truth.roster_b[0] || null;
       revealed = truth.events.slice();

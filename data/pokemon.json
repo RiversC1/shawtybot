@@ -6523,7 +6523,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -6795,7 +6796,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       }
     ]
@@ -12368,7 +12370,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -12627,7 +12630,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -19286,7 +19290,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -19568,7 +19573,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -21689,7 +21695,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       }
     ]
@@ -21936,7 +21943,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       }
     ]
@@ -23966,7 +23974,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -32548,7 +32557,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       }
     ]
@@ -35762,7 +35772,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -46897,7 +46908,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -47133,7 +47145,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -47399,7 +47412,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -47660,7 +47674,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -51769,7 +51784,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -52443,7 +52459,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       }
     ]
@@ -56784,7 +56801,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -57004,7 +57022,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -72594,7 +72613,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -74593,7 +74613,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -80345,7 +80366,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -80372,7 +80394,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -80564,7 +80587,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -80621,7 +80645,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -81524,7 +81549,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -81771,7 +81797,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -82464,7 +82491,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       }
     ]
@@ -92228,7 +92256,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -92489,7 +92518,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -92721,7 +92751,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -93793,7 +93824,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -96610,7 +96642,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -107460,7 +107493,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -107744,7 +107778,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -111655,7 +111690,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -111878,7 +111914,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -112123,7 +112160,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -115007,7 +115045,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -115272,7 +115311,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -115499,7 +115539,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -123193,7 +123234,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {
@@ -123461,7 +123503,8 @@
         "max_turns": null,
         "target": "opponent",
         "flags": [
-          "charge"
+          "charge",
+          "semi_invulnerable"
         ]
       },
       {

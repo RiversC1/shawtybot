@@ -183,7 +183,7 @@ def default_stat_stages() -> dict:
 
 def default_volatile() -> dict:
     return {"must_recharge": False, "locked_move": None, "lock_turns_remaining": 0,
-            "charging_move": None, "flinched": False}
+            "charging_move": None, "flinched": False, "invulnerable_until_turn": None}
 
 
 @dataclass
@@ -827,6 +827,13 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
         if "charge" in move.flags:
             move_slot.current_pp = max(0, move_slot.current_pp - 1)
             v["charging_move"] = move.name
+            # Fly/Dig/Dive/Bounce make the user unhittable for the rest of
+            # THIS turn only — tagging it with the current turn number (not a
+            # plain bool cleared elsewhere) means the check below is correct
+            # no matter which side acts first, on the charge turn or the
+            # release turn that follows.
+            if "semi_invulnerable" in move.flags:
+                v["invulnerable_until_turn"] = battle.turn_number
             events.append({"type": "charge_start", "side": side.side_id, "move_name": move.name})
             return events
 
@@ -837,6 +844,13 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
         move = active.moves[move_index].move
 
     events.append({"type": "move_used", "side": side.side_id, "move_name": move.name})
+
+    if move.target != "self" and defender.volatile.get("invulnerable_until_turn") == battle.turn_number:
+        events.append({"type": "move_missed", "side": side.side_id, "move_name": move.name,
+                        "reason": "invulnerable", "target_name": defender.species_name})
+        if "recharge" in move.flags:
+            active.volatile["must_recharge"] = True
+        return events
 
     if "always_hit" not in move.flags and move.accuracy is not None:
         acc_mult = stat_stage_multiplier(

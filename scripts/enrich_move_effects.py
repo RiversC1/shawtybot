@@ -86,10 +86,13 @@ MOVE_FLAG_OVERRIDES: dict[str, list[str]] = {
     "Sky Attack": ["charge"],
     "Razor Wind": ["charge"],
     "Skull Bash": ["charge"],
-    "Fly": ["charge"],
-    "Dig": ["charge"],
-    "Dive": ["charge"],
-    "Bounce": ["charge"],
+    # Fly/Dig/Dive/Bounce grant real semi-invulnerability on their charge
+    # turn (the user can't be hit at all) unlike Solar Beam/Sky Attack/Razor
+    # Wind/Skull Bash, which stay fully vulnerable while charging.
+    "Fly": ["charge", "semi_invulnerable"],
+    "Dig": ["charge", "semi_invulnerable"],
+    "Dive": ["charge", "semi_invulnerable"],
+    "Bounce": ["charge", "semi_invulnerable"],
     "Freeze Shock": ["charge"],
     "Ice Burn": ["charge"],
     "Thrash": ["multi_turn_lock"],
