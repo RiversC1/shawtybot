@@ -4566,3 +4566,299 @@ img[src$="/trainers/nowa.png"] {
 .trainer-sprite[src$="/trainers/nowa.png"] {
     image-rendering: pixelated;
 }
+
+/* ---------- Custom gyms (Challenges & Gyms page) ---------- */
+
+.custom-gyms-section {
+    margin-top: 36px;
+}
+
+.custom-gym-cta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    border-color: rgba(255, 203, 5, 0.4);
+    background: radial-gradient(ellipse at 0% 50%, rgba(255, 203, 5, 0.09), transparent 60%), var(--surface);
+}
+
+.custom-gym-cta.is-locked {
+    border-color: var(--border);
+    background: var(--surface);
+}
+
+.custom-gym-cta p {
+    margin: 4px 0 0;
+}
+
+.custom-gym-cta-title {
+    font-weight: bold;
+    font-size: 1.05em;
+}
+
+.custom-gym-cta a {
+    text-decoration: none;
+}
+
+.gym-card-portrait img.custom-gym-leader {
+    width: 150px;
+    height: 150px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.gym-card.is-yours {
+    border-color: rgba(126, 200, 255, 0.5);
+}
+
+.gym-card.is-yours .gym-card-status {
+    color: #0c1a26;
+    background: var(--blue);
+}
+
+.gym-hero-leader.is-sprite {
+    image-rendering: pixelated;
+    object-fit: contain;
+}
+
+/* ---------- Gym builder (/gyms/mine) ---------- */
+
+.cg-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 20px;
+    align-items: start;
+    margin-top: 16px;
+}
+
+.cg-section {
+    margin-bottom: 20px;
+}
+
+.cg-section h2 {
+    margin: 0 0 12px;
+    font-size: 1.15em;
+}
+
+.cg-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.cg-field .search-input {
+    font-weight: normal;
+    font-size: 0.95em;
+}
+
+.cg-type-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.cg-type {
+    border: 2px solid transparent;
+    cursor: pointer;
+    opacity: 0.55;
+    font-family: inherit;
+    font-size: 0.8em;
+    padding: 4px 12px;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.cg-type:hover {
+    opacity: 0.85;
+}
+
+.cg-type.is-selected {
+    opacity: 1;
+    border-color: #fff;
+    transform: scale(1.06);
+}
+
+.cg-team-count {
+    font-size: 0.75em;
+    font-weight: normal;
+}
+
+.cg-selected {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 14px;
+}
+
+.cg-selected-mon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 6px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+
+.cg-selected-mon:hover {
+    border-color: var(--red);
+}
+
+.cg-selected-mon img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.cg-slot-num {
+    font-size: 0.75em;
+    font-weight: bold;
+    color: var(--text-muted);
+}
+
+.cg-remove {
+    color: var(--text-muted);
+    font-weight: bold;
+}
+
+.cg-search {
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.picker-grid.cg-picker {
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    max-height: 420px;
+}
+
+.cg-pick {
+    font-family: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.cg-pick img {
+    width: 72px;
+    height: 72px;
+    image-rendering: auto;
+}
+
+.cg-pick.is-full {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.cg-side {
+    position: sticky;
+    top: 20px;
+}
+
+.cg-badge-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px;
+    margin-bottom: 14px;
+    border-radius: 12px;
+    background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.07), transparent 65%), #0c0c14;
+}
+
+.cg-badge-preview img {
+    width: 150px;
+    height: 150px;
+    filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5));
+}
+
+.cg-badge-preview-name {
+    margin-top: 6px;
+    font-weight: bold;
+}
+
+.cg-option-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.cg-option {
+    padding: 3px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background: #0c0c14;
+    cursor: pointer;
+}
+
+.cg-option:hover {
+    border-color: var(--text-dim);
+}
+
+.cg-option.is-selected {
+    border-color: var(--yellow);
+}
+
+.cg-option img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+}
+
+.cg-colors {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.cg-colors input[type="color"] {
+    width: 100%;
+    height: 38px;
+    padding: 2px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #0c0c14;
+    cursor: pointer;
+}
+
+.cg-save .btn-primary {
+    width: 100%;
+    padding: 12px;
+    font-size: 1em;
+}
+
+.cg-status {
+    margin: 10px 0 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.cg-status.is-success {
+    border-color: rgba(74, 222, 128, 0.45);
+    color: #86efac;
+}
+
+.cg-status.is-error {
+    border-color: rgba(239, 51, 64, 0.5);
+    color: #ff8a93;
+}
+
+@media (max-width: 900px) {
+    .cg-layout {
+        grid-template-columns: 1fr;
+    }
+    .cg-side {
+        position: static;
+    }
+}

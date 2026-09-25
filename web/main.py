@@ -15,10 +15,17 @@ import logging
 from contextlib import asynccontextmanager
 
 import httpx
+
+# Production runs "uvicorn web.main:app" from the repo root; local runs from
+# inside web/ use "main:app". Support both.
+try:
+    from web import badge_svg
+except ImportError:
+    import badge_svg
 import websockets
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -293,9 +300,51 @@ async def gyms(request: Request):
     regions = data.get("regions", [])
     all_gyms = [g for group in regions for g in group["gyms"]]
     earned_count = sum(1 for g in all_gyms if g["earned"])
+    _, custom = await api_get(session, "/api/custom-gyms")
     return templates.TemplateResponse(
-        request, "gyms.html", {"regions": regions, "earned_count": earned_count, "total_count": len(all_gyms)}
+        request, "gyms.html",
+        {"regions": regions, "earned_count": earned_count, "total_count": len(all_gyms), "custom": custom or {}},
     )
+
+
+@app.get("/gyms/mine")
+async def my_gym(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/my-gym")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "custom_gym.html", {"my_gym": data})
+
+
+# ---------- Custom gym badges (SVG, drawn by badge_svg.py) ----------
+
+SVG_HEADERS = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'"}
+
+
+@app.get("/custom-badges/preview.svg")
+def custom_badge_preview(shape: str = "", primary: str = "", secondary: str = "", emblem: str = ""):
+    """Live preview for the gym builder's badge designer (no data stored)."""
+    svg = badge_svg.render({"shape": shape, "primary": primary, "secondary": secondary, "emblem": emblem})
+    return Response(svg, media_type="image/svg+xml", headers={**SVG_HEADERS, "Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/custom-badges/{owner_id}.svg")
+async def custom_badge(request: Request, owner_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    design = None
+    if session:
+        status, data = await api_get(session, f"/api/custom-gyms/{owner_id}")
+        if status == 200:
+            design = data.get("badge_design")
+    if design is None:
+        return Response(status_code=404)
+    # Pages link these with ?v=<last update>, so a redesign gets a new URL.
+    return Response(badge_svg.render(design), media_type="image/svg+xml",
+                    headers={**SVG_HEADERS, "Cache-Control": "private, max-age=3600"})
 
 
 @app.get("/league")
@@ -539,6 +588,34 @@ async def proxy_start_gym_battle(request: Request, gym_key: str):
     if not session:
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     status, data = await api_post(session, f"/api/battles/gym/{gym_key}", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/custom-gyms/{owner_id}")
+async def proxy_custom_gym_detail(request: Request, owner_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/custom-gyms/{owner_id}")
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/my-gym")
+async def proxy_save_my_gym(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, "/api/my-gym", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/battles/custom-gym/{owner_id}")
+async def proxy_start_custom_gym_battle(request: Request, owner_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/battles/custom-gym/{owner_id}", {})
     return JSONResponse(data, status_code=status)
 
 

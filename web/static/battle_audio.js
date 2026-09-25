@@ -9,6 +9,7 @@ window.BattleAudio = (function () {
   const AUDIO_BASE = window.AUDIO_BASE_URL || "https://poke-music.s3.us-east-1.amazonaws.com";
   const MUSIC_BY_TYPE = {
     gym: "gym_battle.mp3",
+    custom_gym: "gym_battle.mp3",
     elite_four: "elite_battle.mp3",
     champion: "champion_battle.mp3",
   };

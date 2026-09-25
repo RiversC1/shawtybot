@@ -166,6 +166,26 @@
                 </div>
             </section>
             {% endfor %}
+            {% if trainer.custom_badges %}
+            <section class="badge-region">
+                <div class="badge-region-head">
+                    <h3>Custom Gyms</h3>
+                    <span class="badge-region-count is-complete">{{ trainer.custom_badges|length }} earned</span>
+                </div>
+                <div class="badge-grid">
+                    {% for b in trainer.custom_badges %}
+                    <div class="badge-tile is-earned">
+                        <div class="badge-tile-art">
+                            <img src="/custom-badges/{{ b.owner_user_id }}.svg?v={{ b.badge_version|urlencode }}" alt="{{ b.badge_name }}">
+                        </div>
+                        <div class="badge-tile-name">{{ b.badge_name }}</div>
+                        <div class="badge-tile-leader">{{ b.gym_name }}</div>
+                        <div class="badge-tile-status">Earned</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
         </div>
     </div>
 </div>

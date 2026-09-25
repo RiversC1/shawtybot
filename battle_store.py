@@ -580,6 +580,155 @@ def award_league_reward_if_new(user_id: int) -> bool:
     return True
 
 
+# ---------- Custom (player-run) gyms ----------
+# A trainer who has completed the whole Poké League can open their own gym:
+# a name, a type, a badge they design, and a team of 3-6 of their own
+# Pokémon of that type. Other trainers challenge it as an NPC battle
+# (battle_type "custom_gym", side_b_npc_key = the owner's user id) against a
+# snapshot of that team. Custom badges are tracked separately from the 32
+# official ones and never count toward unlocking the League.
+
+CUSTOM_GYM_BATTLE_TYPE = "custom_gym"
+CUSTOM_GYM_MIN_TEAM = 3
+CUSTOM_GYM_MAX_TEAM = 6
+# One-off reward Pokémon for a trainer's first custom-gym victory. Like the
+# League's Mystery Pokémon: a placeholder until its real design exists, and
+# excluded from wild spawns (cogs/pokemon.py's REWARD_ONLY_DEX_IDS).
+CUSTOM_GYM_REWARD_DEX_ID = 495
+
+
+def _custom_gym_from_row(row: sqlite3.Row) -> dict:
+    return {
+        "owner_user_id": row["owner_user_id"],
+        "gym_name": row["gym_name"],
+        "type_theme": row["type_theme"],
+        "badge_name": row["badge_name"],
+        "flavor": row["flavor"] or "",
+        "badge_design": json.loads(row["badge_design"]),
+        "roster": json.loads(row["roster"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def get_custom_gym(owner_user_id: int) -> dict | None:
+    with db() as conn:
+        row = conn.execute("SELECT * FROM poke_custom_gyms WHERE owner_user_id = ?", (owner_user_id,)).fetchone()
+    return _custom_gym_from_row(row) if row else None
+
+
+def list_custom_gyms() -> list[dict]:
+    with db() as conn:
+        rows = conn.execute("SELECT * FROM poke_custom_gyms ORDER BY created_at").fetchall()
+    return [_custom_gym_from_row(r) for r in rows]
+
+
+def save_custom_gym(owner_user_id: int, gym_name: str, type_theme: str, badge_name: str, flavor: str,
+                    badge_design: dict, roster: list[dict]):
+    now = datetime.now(timezone.utc).isoformat()
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO poke_custom_gyms (owner_user_id, gym_name, type_theme, badge_name, flavor, badge_design, "
+            "roster, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(owner_user_id) DO UPDATE SET gym_name = excluded.gym_name, type_theme = excluded.type_theme, "
+            "badge_name = excluded.badge_name, flavor = excluded.flavor, badge_design = excluded.badge_design, "
+            "roster = excluded.roster, updated_at = excluded.updated_at",
+            (owner_user_id, gym_name, type_theme, badge_name, flavor, json.dumps(badge_design), json.dumps(roster), now, now),
+        )
+
+
+def snapshot_custom_gym_roster(owner_user_id: int, dex_ids: list[int]) -> list[dict]:
+    """The owner's current setup for each chosen species (their configured
+    moves/ability and their best individual's IVs), frozen into the gym."""
+    roster = []
+    for dex_id in dex_ids:
+        moves, ability = get_battle_pokemon_config(owner_user_id, dex_id)
+        roster.append({
+            "dex_id": dex_id, "moves": moves, "ability": ability,
+            "ivs": get_best_ivs_for_species(owner_user_id, dex_id),
+        })
+    return roster
+
+
+def build_roster_for_custom_gym(owner_user_id: int) -> list["be.BattlerState"] | None:
+    gym = get_custom_gym(owner_user_id)
+    if not gym:
+        return None
+    return [
+        be.build_battler_state(POKEDEX[m["dex_id"]], m["moves"], m.get("ability"), m.get("ivs"))
+        for m in gym["roster"] if m["dex_id"] in POKEDEX
+    ]
+
+
+def get_custom_badges(user_id: int) -> set[int]:
+    """Owner user ids of every custom gym this trainer has beaten."""
+    with db() as conn:
+        rows = conn.execute("SELECT owner_user_id FROM poke_custom_badges WHERE user_id = ?", (user_id,)).fetchall()
+    return {r["owner_user_id"] for r in rows}
+
+
+def award_custom_badge(user_id: int, owner_user_id: int) -> bool:
+    """Returns True only when this is a newly earned badge."""
+    with db() as conn:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO poke_custom_badges (user_id, owner_user_id, earned_at) VALUES (?, ?, ?)",
+            (user_id, owner_user_id, datetime.now(timezone.utc).isoformat()),
+        )
+        return cur.rowcount > 0
+
+
+def get_custom_gym_clearers(owner_user_id: int, limit: int = 100) -> list[dict]:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT cb.user_id, cb.earned_at, t.username FROM poke_custom_badges cb "
+            "LEFT JOIN poke_trainers t ON t.user_id = cb.user_id "
+            "WHERE cb.owner_user_id = ? ORDER BY cb.earned_at DESC LIMIT ?",
+            (owner_user_id, limit),
+        ).fetchall()
+    return [{"user_id": str(r["user_id"]), "username": r["username"] or "Trainer", "earned_at": r["earned_at"]} for r in rows]
+
+
+def custom_gym_clear_counts() -> dict[int, int]:
+    with db() as conn:
+        rows = conn.execute("SELECT owner_user_id, COUNT(*) AS n FROM poke_custom_badges GROUP BY owner_user_id").fetchall()
+    return {r["owner_user_id"]: r["n"] for r in rows}
+
+
+def award_custom_gym_reward_if_new(user_id: int) -> bool:
+    """Grants the Challenger Pokémon exactly once, on any custom-gym win."""
+    with db() as conn:
+        if conn.execute(
+            "SELECT 1 FROM poke_collection WHERE user_id = ? AND dex_id = ? LIMIT 1", (user_id, CUSTOM_GYM_REWARD_DEX_ID)
+        ).fetchone():
+            return False
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, "
+            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
+            "VALUES (?, ?, ?, 0, 31, 31, 31, 31, 31, 31)",
+            (user_id, CUSTOM_GYM_REWARD_DEX_ID, now),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
+            (user_id, CUSTOM_GYM_REWARD_DEX_ID, now),
+        )
+    return True
+
+
+def _custom_gym_owner(battle_row: sqlite3.Row) -> int | None:
+    try:
+        return int(battle_row["side_b_npc_key"])
+    except (TypeError, ValueError):
+        return None
+
+
+def trainer_character_sprite(user_id: int) -> str:
+    with db() as conn:
+        row = conn.execute("SELECT character FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
+    character = row["character"] if row and row["character"] in TRAINER_CHARACTER_KEYS else DEFAULT_TRAINER_CHARACTER
+    return f"{TRAINER_CHARACTER_SPRITE_BASE}/{character}.png"
+
+
 def add_xp_and_coins(user_id: int, xp: int, coin: int):
     """Mirrors cogs/pokemon.py's add_xp/add_item so a win grants the exact
     same account progression regardless of which process resolved the
@@ -599,7 +748,7 @@ def add_xp_and_coins(user_id: int, xp: int, coin: int):
 # HUD can show a human trainer's chosen character sprite without either
 # process reaching into the other's constants.
 TRAINER_CHARACTER_SPRITE_BASE = "https://shawtypoke-web.duckdns.org/static/trainers"
-TRAINER_CHARACTER_KEYS = ["red", "leaf", "gold", "kris", "brendan", "may", "lucas", "dawn"]
+TRAINER_CHARACTER_KEYS = ["red", "leaf", "gold", "kris", "brendan", "may", "lucas", "dawn", "rivers", "nowa"]
 DEFAULT_TRAINER_CHARACTER = "red"
 
 
@@ -609,11 +758,11 @@ def avatar_for_side(battle_row: sqlite3.Row, side: str) -> str | None:
     that trainer class's sprite for a random-trainer battle."""
     user_id = battle_row["side_a_user_id"] if side == "A" else battle_row["side_b_user_id"]
     if user_id:
-        with db() as conn:
-            row = conn.execute("SELECT character FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
-        character = row["character"] if row and row["character"] in TRAINER_CHARACTER_KEYS else DEFAULT_TRAINER_CHARACTER
-        return f"{TRAINER_CHARACTER_SPRITE_BASE}/{character}.png"
+        return trainer_character_sprite(user_id)
     npc_key = battle_row["side_b_npc_key"]
+    if battle_row["battle_type"] == CUSTOM_GYM_BATTLE_TYPE:
+        owner = _custom_gym_owner(battle_row)
+        return trainer_character_sprite(owner) if owner else None
     if battle_row["battle_type"] == "gym":
         return GYMS.get(npc_key, {}).get("leader_image")
     if battle_row["battle_type"] in ("elite_four", "champion"):
@@ -628,6 +777,12 @@ def display_name_for_side(battle_row: sqlite3.Row, side: str) -> str:
         with db() as conn:
             return trainer_display_name(conn, user_id)
     npc_key = battle_row["side_b_npc_key"]
+    if battle_row["battle_type"] == CUSTOM_GYM_BATTLE_TYPE:
+        owner = _custom_gym_owner(battle_row)
+        if owner:
+            with db() as conn:
+                return trainer_display_name(conn, owner)
+        return "Gym Leader"
     if battle_row["battle_type"] == "gym":
         return GYMS.get(npc_key, {}).get("leader_name", "Gym Leader")
     if battle_row["battle_type"] in ("elite_four", "champion"):
@@ -654,6 +809,15 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         award_badge(winner_user_id, gym_key)
         badge_name = GYMS.get(gym_key, {}).get("badge_name", "Badge")
         summary = f"+{GYM_BATTLE_XP} XP, +{GYM_BATTLE_COIN} coins, and the {badge_name}!"
+    elif battle_type == CUSTOM_GYM_BATTLE_TYPE:
+        owner = _custom_gym_owner(battle_row)
+        gym = get_custom_gym(owner) if owner else None
+        add_xp_and_coins(winner_user_id, GYM_BATTLE_XP, GYM_BATTLE_COIN)
+        summary = f"+{GYM_BATTLE_XP} XP, +{GYM_BATTLE_COIN} coins"
+        if owner and award_custom_badge(winner_user_id, owner):
+            summary += f", and the {gym['badge_name'] if gym else 'custom badge'}!"
+        if award_custom_gym_reward_if_new(winner_user_id):
+            summary += " 🎁 Your first custom-gym victory earned you a Challenger Pokémon! Check your collection."
     elif battle_type == "elite_four":
         league_key = battle_row["side_b_npc_key"]
         add_xp_and_coins(winner_user_id, LEAGUE_BATTLE_XP, LEAGUE_BATTLE_COIN)
@@ -930,6 +1094,10 @@ def arena_type_for(battle_row: sqlite3.Row) -> str | None:
     Elite Four member's specialty), or None for PvP, random trainers and
     Champions (who use mixed teams)."""
     npc_key = battle_row["side_b_npc_key"]
+    if battle_row["battle_type"] == CUSTOM_GYM_BATTLE_TYPE:
+        owner = _custom_gym_owner(battle_row)
+        gym = get_custom_gym(owner) if owner else None
+        return gym["type_theme"] if gym else None
     if battle_row["battle_type"] == "gym":
         return GYMS.get(npc_key, {}).get("type_theme")
     if battle_row["battle_type"] in ("elite_four", "champion"):

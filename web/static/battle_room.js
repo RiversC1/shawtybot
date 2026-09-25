@@ -51,7 +51,7 @@
   // member's specialty type when there is one (see battle_store.arena_type_for).
   BattleFX.init(sceneEl);
   (function setupArena() {
-    const kind = { gym: "gym", elite_four: "elite", champion: "champion" }[truth.battle_type] || "field";
+    const kind = { gym: "gym", custom_gym: "gym", elite_four: "elite", champion: "champion" }[truth.battle_type] || "field";
     sceneEl.classList.add(`arena-${kind}`);
     const tint = BattleFX.colorForType(truth.arena_type);
     if (tint) sceneEl.style.setProperty("--arena-tint", tint);
@@ -664,7 +664,7 @@
 
   function renderMeta() {
     titleEl.textContent = `${truth.name_a} vs ${truth.name_b}`;
-    const BATTLE_TYPE_LABELS = { pvp: "PvP", gym: "Gym", trainer: "Trainer", elite_four: "Elite Four", champion: "Champion" };
+    const BATTLE_TYPE_LABELS = { pvp: "PvP", gym: "Gym", custom_gym: "Custom Gym", trainer: "Trainer", elite_four: "Elite Four", champion: "Champion" };
     const typeLabel = BATTLE_TYPE_LABELS[truth.battle_type]
       || truth.battle_type.charAt(0).toUpperCase() + truth.battle_type.slice(1);
     subtitleEl.textContent =
@@ -677,7 +677,7 @@
 
   // Where "Leave battle" goes: back to the page the battle was started from.
   function leaveDestination() {
-    if (truth.battle_type === "gym") return "/gyms";
+    if (truth.battle_type === "gym" || truth.battle_type === "custom_gym") return "/gyms";
     if (truth.battle_type === "elite_four" || truth.battle_type === "champion") return "/league";
     return "/battles";
   }

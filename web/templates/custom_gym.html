@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Your Gym — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<a href="/gyms" class="trainer-back-link">← Challenges &amp; Gyms</a>
+<h1>{{ "Edit Your Gym" if my_gym.gym else "Create Your Gym" }}</h1>
+
+{% if not my_gym.unlocked %}
+<div class="card league-locked-banner">
+    <div class="league-locked-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6l4 5 6-8 6 8 4-5-2 13H4z"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+    </div>
+    <h2>Only Poké League Champions can open a gym</h2>
+    <p class="muted">Defeat every Elite Four member and Champion across all four regions to earn your own gym.</p>
+    <div class="league-locked-progress">
+        <div class="badge-summary-top">
+            <span class="badge-summary-label">League battles won</span>
+            <span class="badge-summary-count">{{ my_gym.league_earned }} / {{ my_gym.league_total }}</span>
+        </div>
+        <div class="badge-summary-bar">
+            <div class="badge-summary-fill" style="width: {{ (my_gym.league_earned / my_gym.league_total * 100) | round(1) if my_gym.league_total else 0 }}%"></div>
+        </div>
+    </div>
+    <a href="/league" class="btn-primary league-locked-cta">Go to the Poké League →</a>
+</div>
+{% else %}
+<p class="muted">
+    Your gym appears under <strong>Custom Gyms</strong> for every trainer to challenge.
+    {% if my_gym.gym %}{{ my_gym.gym.cleared_count }} trainer{{ '' if my_gym.gym.cleared_count == 1 else 's' }} have beaten it so far.{% endif %}
+</p>
+
+<div class="cg-layout">
+    <div class="cg-main">
+        <section class="card cg-section">
+            <h2>Gym details</h2>
+            <label class="cg-field">
+                <span>Gym name</span>
+                <input type="text" id="cg-name" class="search-input" maxlength="30" placeholder="e.g. Dreamland Gym">
+            </label>
+            <label class="cg-field">
+                <span>Description <span class="muted">(optional)</span></span>
+                <input type="text" id="cg-flavor" class="search-input" maxlength="160" placeholder="A line challengers see before they battle you">
+            </label>
+            <div class="cg-field">
+                <span>Gym type</span>
+                <div class="cg-type-grid" id="cg-types" role="radiogroup" aria-label="Gym type"></div>
+            </div>
+        </section>
+
+        <section class="card cg-section">
+            <h2>Gym team <span class="muted cg-team-count" id="cg-team-count"></span></h2>
+            <p class="muted">Pick {{ my_gym.min_team }}–{{ my_gym.max_team }} of your Pokémon of the gym's type. Their current moves, ability and your best one's stats are saved into the gym.</p>
+            <div class="cg-selected" id="cg-selected"></div>
+            <input type="text" id="cg-search" class="search-input cg-search" placeholder="Search your Pokémon...">
+            <div class="picker-grid cg-picker" id="cg-picker"></div>
+        </section>
+    </div>
+
+    <aside class="cg-side">
+        <section class="card cg-section cg-badge-card">
+            <h2>Your badge</h2>
+            <div class="cg-badge-preview">
+                <img id="cg-badge-img" alt="Badge preview">
+                <div class="cg-badge-preview-name" id="cg-badge-preview-name">Badge</div>
+            </div>
+            <label class="cg-field">
+                <span>Badge name</span>
+                <input type="text" id="cg-badge-name" class="search-input" maxlength="24" placeholder="e.g. Dream Badge">
+            </label>
+            <div class="cg-field">
+                <span>Shape</span>
+                <div class="cg-option-grid" id="cg-shapes"></div>
+            </div>
+            <div class="cg-field">
+                <span>Emblem</span>
+                <div class="cg-option-grid" id="cg-emblems"></div>
+            </div>
+            <div class="cg-colors">
+                <label class="cg-field">
+                    <span>Main color</span>
+                    <input type="color" id="cg-primary">
+                </label>
+                <label class="cg-field">
+                    <span>Trim color</span>
+                    <input type="color" id="cg-secondary">
+                </label>
+            </div>
+        </section>
+
+        <div class="cg-save">
+            <button type="button" class="btn-primary" id="cg-save-btn">{{ "Save changes" if my_gym.gym else "Open my gym" }}</button>
+            <p class="cg-status" id="cg-status" hidden></p>
+        </div>
+    </aside>
+</div>
+
+<script type="application/json" id="my-gym-data">{{ my_gym|tojson }}</script>
+<script src="/static/custom_gym.js"></script>
+{% endif %}
+{% endblock %}

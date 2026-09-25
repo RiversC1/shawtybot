@@ -124394,5 +124394,62 @@
         "flags": []
       }
     ]
+  },
+  {
+    "id": 495,
+    "name": "Challenger Pokémon",
+    "types": [
+      "normal"
+    ],
+    "category": "Mystery Pokémon",
+    "artwork": "/static/mystery_pokemon.svg",
+    "sprite": "/static/mystery_pokemon.svg",
+    "is_legendary": false,
+    "is_mythical": true,
+    "abilities": [
+      {
+        "name": "unknown",
+        "is_hidden": false
+      }
+    ],
+    "artwork_shiny": "/static/mystery_pokemon.svg",
+    "sprite_shiny": "/static/mystery_pokemon.svg",
+    "evolves_to": [],
+    "family_id": 495,
+    "base_stats": {
+      "hp": 100,
+      "attack": 100,
+      "defense": 100,
+      "sp_attack": 100,
+      "sp_defense": 100,
+      "speed": 100
+    },
+    "moves": [
+      {
+        "name": "Tackle",
+        "type": "normal",
+        "category": "physical",
+        "pp": 35,
+        "power": 40,
+        "accuracy": 100,
+        "priority": 0,
+        "description": "Inflicts regular damage with no additional effect.",
+        "ailment": null,
+        "ailment_chance": 0,
+        "stat_changes": [],
+        "stat_chance": 0,
+        "crit_rate": 0,
+        "drain_percent": null,
+        "recoil_percent": null,
+        "healing_percent": null,
+        "flinch_chance": 0,
+        "min_hits": null,
+        "max_hits": null,
+        "min_turns": null,
+        "max_turns": null,
+        "target": "opponent",
+        "flags": []
+      }
+    ]
   }
 ]

@@ -4,7 +4,7 @@
 <div class="battle-room-header">
     <div>
         <h1 id="br-title">{{ battle.name_a }} vs {{ battle.name_b }}</h1>
-        <p class="muted" id="br-subtitle">{{ {"pvp": "PvP", "elite_four": "Elite Four"}.get(battle.battle_type, battle.battle_type|capitalize) }} battle · Turn {{ battle.turn_number }}</p>
+        <p class="muted" id="br-subtitle">{{ {"pvp": "PvP", "elite_four": "Elite Four", "custom_gym": "Custom Gym"}.get(battle.battle_type, battle.battle_type|capitalize) }} battle · Turn {{ battle.turn_number }}</p>
     </div>
     <div class="battle-room-header-actions">
         <button id="br-mute-btn" class="btn-primary battle-mute-btn is-off" type="button" title="Play battle music and sounds"><span aria-hidden="true">🔊</span> Turn on music</button>

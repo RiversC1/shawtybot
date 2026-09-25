@@ -34,6 +34,54 @@
 </section>
 {% endfor %}
 
+{% set cgyms = custom.gyms or [] %}
+<section class="league-generation custom-gyms-section">
+    <div class="gym-region-head">
+        <h2 class="league-generation-title">Custom Gyms</h2>
+        <span class="badge-region-count">{{ cgyms|length }} gym{{ '' if cgyms|length == 1 else 's' }}</span>
+    </div>
+
+    <div class="card custom-gym-cta{{ ' is-locked' if not custom.can_create else '' }}">
+        {% if custom.has_gym %}
+        <div>
+            <div class="custom-gym-cta-title">Your gym is open for challengers</div>
+            <p class="muted">Change its name, type, team or badge any time.</p>
+        </div>
+        <a href="/gyms/mine" class="btn-primary">Edit your gym</a>
+        {% elif custom.can_create %}
+        <div>
+            <div class="custom-gym-cta-title">👑 You've conquered the Poké League!</div>
+            <p class="muted">Open your own gym: choose its type, pick your team and design your badge.</p>
+        </div>
+        <a href="/gyms/mine" class="btn-primary">Create your gym</a>
+        {% else %}
+        <div>
+            <div class="custom-gym-cta-title">🔒 Open your own gym</div>
+            <p class="muted">Complete the entire Poké League to open a gym of your own ({{ custom.league_earned or 0 }} / {{ custom.league_total or 20 }} League battles won).</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if cgyms %}
+    <div class="gym-grid">
+        {% for g in cgyms %}
+        <div class="card gym-card custom-gym-card{{ ' is-earned' if g.earned else (' is-yours' if g.is_yours else ' is-next') }}" data-custom-owner="{{ g.owner_user_id }}">
+            <div class="gym-card-portrait">
+                <img class="custom-gym-leader" src="{{ g.leader_image }}" alt="{{ g.owner_name }}" loading="lazy">
+                <img class="gym-card-badge-overlay{{ '' if g.earned or g.is_yours else ' is-dim' }}" src="/custom-badges/{{ g.owner_user_id }}.svg?v={{ g.badge_version|urlencode }}" alt="{{ g.badge_name }}">
+            </div>
+            <div class="gym-card-name">{{ g.gym_name }}</div>
+            <div class="gym-card-meta"><span class="type-badge type-{{ g.type_theme }}">{{ g.type_theme|capitalize }}</span></div>
+            <div class="gym-card-location">Leader: {{ g.owner_name }}</div>
+            <div class="gym-card-status">{{ "Your gym" if g.is_yours else ("Earned" if g.earned else "Challenge") }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No custom gyms yet. The first trainer to conquer the Poké League can open one.</p>
+    {% endif %}
+</section>
+
 <div id="gym-modal" class="modal-overlay" hidden>
     <div class="modal collection-modal">
         <div class="modal-header">

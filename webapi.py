@@ -10,6 +10,7 @@ CD test marker: deploy-bot.yml pipeline
 """
 import asyncio
 import os
+import re
 import sqlite3
 import json
 import logging
@@ -519,6 +520,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
             ).fetchone()[0],
         },
         "badges_by_region": badges_by_region,
+        "custom_badges": custom_badges_for(target_id),
         "badges_total_earned": badges_total_earned,
         "badges_total": badges_total,
         "achievements": {"unlocked": unlocked_count, "total": TOTAL_ACHIEVEMENT_TIERS},
@@ -649,7 +651,7 @@ def get_rankings(user_id: int = Depends(get_current_user_id)):
         "totals": {
             "badges": len(gym_keys),
             "league": len(battle_store.LEAGUE),
-            "pokedex": len([d for d in POKEDEX if d not in (battle_store.LEAGUE_REWARD_DEX_ID,)]),
+            "pokedex": len([d for d in POKEDEX if d not in (battle_store.LEAGUE_REWARD_DEX_ID, battle_store.CUSTOM_GYM_REWARD_DEX_ID)]),
             "win_rate_min_battles": RANKING_MIN_BATTLES_FOR_WIN_RATE,
         },
     }
@@ -1892,6 +1894,204 @@ async def start_gym_battle(gym_key: str, user_id: int = Depends(get_current_user
     def _do():
         roster_b = battle_store.build_roster_for_gym(gym_key)
         battle_id = battle_store.create_battle("gym", user_id, None, gym_key, 0, 0)
+        battle_store.start_battle_sides(battle_id, roster_a, roster_b)
+        return battle_id
+
+    battle_id = await asyncio.to_thread(_do)
+    return {"battle_id": battle_id}
+
+
+# ---------- Custom (player-run) gyms ----------
+
+CUSTOM_GYM_SHAPES = {"circle", "hexagon", "octagon", "diamond", "shield", "star"}
+CUSTOM_GYM_EMBLEMS = {"star", "bolt", "flame", "drop", "leaf", "snowflake", "heart", "moon", "crown", "gem", "mountain", "wing"}
+POKEMON_TYPES = sorted(be.TYPE_CHART.keys())
+REWARD_ONLY_DEX_IDS = {battle_store.LEAGUE_REWARD_DEX_ID, battle_store.CUSTOM_GYM_REWARD_DEX_ID}
+
+
+def _clean_text(value: str, field: str, min_len: int, max_len: int) -> str:
+    value = " ".join((value or "").split())  # collapse whitespace/newlines
+    if any(ord(c) < 32 for c in value):
+        raise HTTPException(400, f"{field} contains invalid characters.")
+    if not (min_len <= len(value) <= max_len):
+        raise HTTPException(400, f"{field} must be {min_len}-{max_len} characters.")
+    return value
+
+
+def _custom_gym_summary(gym: dict, viewer_id: int, earned: set[int], clear_counts: dict[int, int],
+                        names: dict[int, str]) -> dict:
+    owner = gym["owner_user_id"]
+    return {
+        "owner_user_id": str(owner),  # snowflake: see list_trainers()
+        "owner_name": names.get(owner, "Trainer"),
+        "leader_image": battle_store.trainer_character_sprite(owner),
+        "gym_name": gym["gym_name"],
+        "type_theme": gym["type_theme"],
+        "badge_name": gym["badge_name"],
+        "flavor": gym["flavor"],
+        "badge_version": gym["updated_at"],
+        "team_size": len(gym["roster"]),
+        "cleared_count": clear_counts.get(owner, 0),
+        "earned": owner in earned,
+        "is_yours": owner == viewer_id,
+    }
+
+
+def _trainer_names(conn: sqlite3.Connection) -> dict[int, str]:
+    return {r["user_id"]: r["username"] or "Trainer" for r in conn.execute("SELECT user_id, username FROM poke_trainers")}
+
+
+def custom_badges_for(user_id: int) -> list[dict]:
+    earned = battle_store.get_custom_badges(user_id)
+    out = []
+    for owner in earned:
+        gym = battle_store.get_custom_gym(owner)
+        if gym:
+            out.append({"owner_user_id": str(owner), "gym_name": gym["gym_name"],
+                        "badge_name": gym["badge_name"], "badge_version": gym["updated_at"]})
+    return sorted(out, key=lambda b: b["badge_name"].lower())
+
+
+@app.get("/api/custom-gyms")
+def list_custom_gyms(user_id: int = Depends(get_current_user_id)):
+    earned = battle_store.get_custom_badges(user_id)
+    counts = battle_store.custom_gym_clear_counts()
+    with db() as conn:
+        names = _trainer_names(conn)
+    gyms = [_custom_gym_summary(g, user_id, earned, counts, names) for g in battle_store.list_custom_gyms()]
+    gyms.sort(key=lambda g: (not g["is_yours"], -g["cleared_count"], g["gym_name"].lower()))
+    league_earned, league_total = battle_store.league_completion(user_id)
+    return {
+        "gyms": gyms,
+        "can_create": league_earned >= league_total,
+        "has_gym": any(g["is_yours"] for g in gyms),
+        "league_earned": league_earned,
+        "league_total": league_total,
+    }
+
+
+@app.get("/api/custom-gyms/{owner_id}")
+def get_custom_gym_detail(owner_id: int, user_id: int = Depends(get_current_user_id)):
+    gym = battle_store.get_custom_gym(owner_id)
+    if not gym:
+        raise HTTPException(404, "That gym doesn't exist.")
+    earned = battle_store.get_custom_badges(user_id)
+    with db() as conn:
+        names = _trainer_names(conn)
+    summary = _custom_gym_summary(gym, user_id, earned, battle_store.custom_gym_clear_counts(), names)
+    roster = []
+    for entry in gym["roster"]:
+        mon = POKEDEX.get(entry["dex_id"], {})
+        roster.append({
+            "dex_id": entry["dex_id"],
+            "name": mon.get("name", f"#{entry['dex_id']}"),
+            "artwork": mon.get("artwork"),
+            "types": mon.get("types", []),
+            "moves": entry["moves"],
+            "ability": format_ability_name(entry["ability"]) if entry.get("ability") else None,
+        })
+    return {**summary, "badge_design": gym["badge_design"], "roster": roster,
+            "cleared_by": battle_store.get_custom_gym_clearers(owner_id)}
+
+
+@app.get("/api/my-gym")
+def get_my_gym(user_id: int = Depends(get_current_user_id)):
+    league_earned, league_total = battle_store.league_completion(user_id)
+    gym = battle_store.get_custom_gym(user_id)
+    return {
+        "unlocked": league_earned >= league_total,
+        "league_earned": league_earned,
+        "league_total": league_total,
+        "types": POKEMON_TYPES,
+        "shapes": sorted(CUSTOM_GYM_SHAPES),
+        "emblems": sorted(CUSTOM_GYM_EMBLEMS),
+        "min_team": battle_store.CUSTOM_GYM_MIN_TEAM,
+        "max_team": battle_store.CUSTOM_GYM_MAX_TEAM,
+        "gym": None if not gym else {
+            "gym_name": gym["gym_name"], "type_theme": gym["type_theme"], "badge_name": gym["badge_name"],
+            "flavor": gym["flavor"], "badge_design": gym["badge_design"],
+            "dex_ids": [m["dex_id"] for m in gym["roster"]],
+            "cleared_count": battle_store.custom_gym_clear_counts().get(user_id, 0),
+        },
+    }
+
+
+class BadgeDesign(BaseModel):
+    shape: str
+    primary: str
+    secondary: str
+    emblem: str
+
+
+class CustomGymRequest(BaseModel):
+    gym_name: str
+    type_theme: str
+    badge_name: str
+    flavor: str = ""
+    badge_design: BadgeDesign
+    dex_ids: list[int]
+
+
+@app.post("/api/my-gym")
+def save_my_gym(body: CustomGymRequest, user_id: int = Depends(get_current_user_id)):
+    if not battle_store.league_fully_completed(user_id):
+        raise HTTPException(403, "Complete the entire Poké League to open your own gym.")
+
+    gym_name = _clean_text(body.gym_name, "Gym name", 3, 30)
+    badge_name = _clean_text(body.badge_name, "Badge name", 3, 24)
+    flavor = _clean_text(body.flavor, "Description", 0, 160)
+    if body.type_theme not in POKEMON_TYPES:
+        raise HTTPException(400, "Pick a valid gym type.")
+    design = body.badge_design
+    if design.shape not in CUSTOM_GYM_SHAPES or design.emblem not in CUSTOM_GYM_EMBLEMS:
+        raise HTTPException(400, "Invalid badge shape or emblem.")
+    for color in (design.primary, design.secondary):
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", color or ""):
+            raise HTTPException(400, "Badge colors must be hex colors like #ff0000.")
+
+    dex_ids = body.dex_ids
+    if not (battle_store.CUSTOM_GYM_MIN_TEAM <= len(dex_ids) <= battle_store.CUSTOM_GYM_MAX_TEAM):
+        raise HTTPException(400, f"Your gym team needs {battle_store.CUSTOM_GYM_MIN_TEAM}-{battle_store.CUSTOM_GYM_MAX_TEAM} Pokémon.")
+    if len(set(dex_ids)) != len(dex_ids):
+        raise HTTPException(400, "Each Pokémon can only be on your gym team once.")
+    with db() as conn:
+        owned = {r[0] for r in conn.execute("SELECT DISTINCT dex_id FROM poke_collection WHERE user_id = ?", (user_id,))}
+    for dex_id in dex_ids:
+        mon = POKEDEX.get(dex_id)
+        if not mon or dex_id in REWARD_ONLY_DEX_IDS:
+            raise HTTPException(400, "That Pokémon can't be used in a gym.")
+        if dex_id not in owned:
+            raise HTTPException(400, f"You don't own a {mon['name']}.")
+        if body.type_theme not in mon.get("types", []):
+            raise HTTPException(400, f"{mon['name']} isn't {body.type_theme.title()}-type — gym teams must match the gym's type.")
+
+    roster = battle_store.snapshot_custom_gym_roster(user_id, dex_ids)
+    battle_store.save_custom_gym(
+        user_id, gym_name, body.type_theme, badge_name, flavor,
+        {"shape": design.shape, "primary": design.primary.lower(), "secondary": design.secondary.lower(), "emblem": design.emblem},
+        roster,
+    )
+    return {"ok": True}
+
+
+@app.post("/api/battles/custom-gym/{owner_id}")
+async def start_custom_gym_battle(owner_id: int, user_id: int = Depends(get_current_user_id)):
+    gym = battle_store.get_custom_gym(owner_id)
+    if not gym:
+        raise HTTPException(404, "That gym doesn't exist.")
+    if owner_id == user_id:
+        raise HTTPException(400, "You can't challenge your own gym.")
+    if owner_id in battle_store.get_custom_badges(user_id):
+        raise HTTPException(400, "You've already earned this gym's badge!")
+    if battle_store.has_active_battle(user_id):
+        raise HTTPException(400, "You're already in a battle!")
+    roster_a = battle_store.build_roster_for_player(user_id)
+    if not roster_a:
+        raise HTTPException(400, "You need to set your team first — use the Team page.")
+
+    def _do():
+        roster_b = battle_store.build_roster_for_custom_gym(owner_id)
+        battle_id = battle_store.create_battle(battle_store.CUSTOM_GYM_BATTLE_TYPE, user_id, None, str(owner_id), 0, 0)
         battle_store.start_battle_sides(battle_id, roster_a, roster_b)
         return battle_id
 

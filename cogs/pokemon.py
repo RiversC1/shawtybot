@@ -224,7 +224,7 @@ SUMMONER_BONUS = 1.3
 # Species that only ever enter a collection through a specific reward path
 # (currently: the Poké League completionist Mystery Pokémon) — never a
 # natural wild spawn, even a rare-weighted one.
-REWARD_ONLY_DEX_IDS = {battle_store.LEAGUE_REWARD_DEX_ID}
+REWARD_ONLY_DEX_IDS = {battle_store.LEAGUE_REWARD_DEX_ID, battle_store.CUSTOM_GYM_REWARD_DEX_ID}
 # Odds that any given spawn is shiny — intentionally very rare.
 SHINY_CHANCE = 1 / 200
 # Flat family-candy cost to evolve any Pokémon — a handful of catches, not a grind.
@@ -1152,6 +1152,33 @@ class Pokemon(commands.Cog):
                     league_key TEXT NOT NULL,
                     earned_at TEXT NOT NULL,
                     PRIMARY KEY (user_id, league_key)
+                )
+            """)
+            # Player-run gyms, unlocked by completing the Poké League: one per
+            # trainer. roster is a JSON snapshot (dex_id/moves/ability/ivs per
+            # Pokémon) taken when the owner saves, so the gym doesn't change
+            # if they later trade or reconfigure those Pokémon. badge_design
+            # is JSON {shape, primary, secondary, emblem}, rendered to SVG by
+            # the web app (web/badge_svg.py).
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_custom_gyms (
+                    owner_user_id INTEGER PRIMARY KEY,
+                    gym_name TEXT NOT NULL,
+                    type_theme TEXT NOT NULL,
+                    badge_name TEXT NOT NULL,
+                    flavor TEXT NOT NULL DEFAULT '',
+                    badge_design TEXT NOT NULL,
+                    roster TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_custom_badges (
+                    user_id INTEGER NOT NULL,
+                    owner_user_id INTEGER NOT NULL,
+                    earned_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, owner_user_id)
                 )
             """)
 
