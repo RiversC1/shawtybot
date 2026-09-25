@@ -14,6 +14,7 @@ window.BattleAudio = (function () {
   };
   // PvP and random-trainer battles keep the original general battle theme.
   const MUSIC_URL = `${AUDIO_BASE}/${MUSIC_BY_TYPE[window.BATTLE_TYPE] || "battle.mp3"}`;
+  const VICTORY_URL = `${AUDIO_BASE}/victory.mp3`;
 
   let ctx = null;
   let sfxGain = null;
@@ -271,6 +272,19 @@ window.BattleAudio = (function () {
     el.play().catch(notifyState);
   }
 
+  // Swaps the battle theme for the looping victory theme (the same audio
+  // element, so the Music volume slider and the mute button apply to it).
+  function playVictoryMusic() {
+    const el = ensureMusicEl();
+    el.pause();
+    el.src = VICTORY_URL;
+    el.loop = true;
+    el.currentTime = 0;
+    wantMusic = true;
+    retryMusic();
+    notifyState();
+  }
+
   function stopMusic() {
     wantMusic = false;
     if (musicEl) {
@@ -317,7 +331,7 @@ window.BattleAudio = (function () {
   }
 
   return {
-    ensureCtx, isMuted, setMuted, startMusic, stopMusic, retryMusic, isMusicPlaying, onStateChange,
+    ensureCtx, isMuted, setMuted, startMusic, stopMusic, retryMusic, isMusicPlaying, onStateChange, playVictoryMusic,
     getVolumes, setMusicVolume, setEffectsVolume,
     playSfx, playCry, handleEvent,
   };

@@ -84,6 +84,10 @@
   let wsConnectTimer = null;
   let usingWs = false;
   let resultSoundPlayed = false;
+  // The victory theme only plays for a win that happens while this page is
+  // open, not when revisiting an already-finished battle from history.
+  const wasLiveOnLoad = ["pending", "active", "awaiting_forced_switch"].includes(truth.status);
+  let victoryMusicOn = false;
 
   function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -94,7 +98,7 @@
   // block audio until the first click, so a saved "sound on" preference alone
   // isn't enough — until playback starts the button offers to turn it on.
   function battleHasMusic() {
-    return truth.status === "active" || truth.status === "awaiting_forced_switch";
+    return truth.status === "active" || truth.status === "awaiting_forced_switch" || victoryMusicOn;
   }
 
   function isAudible() {
@@ -121,13 +125,18 @@
     updateMuteBtn();
     if (truth.status === "active" || truth.status === "awaiting_forced_switch") {
       BattleAudio.startMusic();
-    } else {
+    } else if (!victoryMusicOn) {
       BattleAudio.stopMusic();
     }
     if (truth.status === "finished" && !resultSoundPlayed) {
       resultSoundPlayed = true;
-      if (truth.you && truth.you.side) {
-        BattleAudio.playSfx(truth.winner_side === truth.you.side ? "victory" : "defeat");
+      const iWon = truth.you && truth.you.side && truth.winner_side === truth.you.side;
+      if (iWon && wasLiveOnLoad) {
+        victoryMusicOn = true;
+        BattleAudio.playVictoryMusic();
+        updateMuteBtn();
+      } else if (truth.you && truth.you.side) {
+        BattleAudio.playSfx(iWon ? "victory" : "defeat");
       } else if (truth.winner_side) {
         BattleAudio.playSfx("victory");
       }
