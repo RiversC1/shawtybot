@@ -569,6 +569,90 @@ def list_trainers(user_id: int = Depends(get_current_user_id)):
     return results
 
 
+RANKING_MIN_BATTLES_FOR_WIN_RATE = 5
+
+
+@app.get("/api/rankings")
+def get_rankings(user_id: int = Depends(get_current_user_id)):
+    """Every trainer's leaderboard stats in one payload; the page sorts it per
+    category client-side. Each stat is one aggregate query over its table
+    (not a query per trainer), so this stays cheap as the server grows."""
+    gym_keys = set(battle_store.GYMS.keys())
+    with db() as conn:
+        trainers = conn.execute("SELECT user_id, username, avatar_url, character FROM poke_trainers").fetchall()
+
+        # Finished battles only: abandoned ones never produced a result.
+        battle_rows = conn.execute(
+            "SELECT side_a_user_id AS uid, winner_side = 'A' AS won, battle_type FROM poke_battles "
+            "WHERE status = 'finished' AND side_a_user_id IS NOT NULL "
+            "UNION ALL "
+            "SELECT side_b_user_id AS uid, winner_side = 'B' AS won, battle_type FROM poke_battles "
+            "WHERE status = 'finished' AND side_b_user_id IS NOT NULL"
+        ).fetchall()
+
+        def per_user(sql: str) -> dict[int, int]:
+            return {r[0]: r[1] for r in conn.execute(sql).fetchall()}
+
+        xp = per_user("SELECT user_id, qty FROM poke_items WHERE item = 'xp'")
+        dex = per_user("SELECT user_id, COUNT(*) FROM poke_dex_seen GROUP BY user_id")
+        caught = per_user("SELECT user_id, COUNT(*) FROM poke_collection GROUP BY user_id")
+        shinies = per_user("SELECT user_id, COUNT(*) FROM poke_collection WHERE is_shiny = 1 GROUP BY user_id")
+        league = per_user("SELECT user_id, COUNT(*) FROM poke_league_progress GROUP BY user_id")
+        badge_rows = conn.execute("SELECT user_id, gym_key FROM poke_badges").fetchall()
+
+    wins: dict[int, int] = {}
+    games: dict[int, int] = {}
+    pvp_wins: dict[int, int] = {}
+    for r in battle_rows:
+        uid = r["uid"]
+        games[uid] = games.get(uid, 0) + 1
+        if r["won"]:
+            wins[uid] = wins.get(uid, 0) + 1
+            if r["battle_type"] == "pvp":
+                pvp_wins[uid] = pvp_wins.get(uid, 0) + 1
+    badges: dict[int, int] = {}
+    for r in badge_rows:
+        if r["gym_key"] in gym_keys:
+            badges[r["user_id"]] = badges.get(r["user_id"], 0) + 1
+
+    results = []
+    for t in trainers:
+        uid = t["user_id"]
+        character = TRAINER_CHARACTERS.get(t["character"] or DEFAULT_CHARACTER, TRAINER_CHARACTERS[DEFAULT_CHARACTER])
+        level, _, _ = compute_level(xp.get(uid, 0))
+        g = games.get(uid, 0)
+        w = wins.get(uid, 0)
+        results.append({
+            "user_id": str(uid),  # snowflake: see list_trainers()
+            "username": t["username"] or "Trainer",
+            "avatar_url": t["avatar_url"],
+            "character_sprite": character["sprite"],
+            "is_you": uid == user_id,
+            "wins": w,
+            "losses": g - w,
+            "battles": g,
+            "win_rate": round(w / g * 100, 1) if g >= RANKING_MIN_BATTLES_FOR_WIN_RATE else None,
+            "pvp_wins": pvp_wins.get(uid, 0),
+            "badges": badges.get(uid, 0),
+            "league": league.get(uid, 0),
+            "pokedex": dex.get(uid, 0),
+            "caught": caught.get(uid, 0),
+            "shinies": shinies.get(uid, 0),
+            "level": level,
+            "xp": xp.get(uid, 0),
+        })
+
+    return {
+        "trainers": results,
+        "totals": {
+            "badges": len(gym_keys),
+            "league": len(battle_store.LEAGUE),
+            "pokedex": len([d for d in POKEDEX if d not in (battle_store.LEAGUE_REWARD_DEX_ID,)]),
+            "win_rate_min_battles": RANKING_MIN_BATTLES_FOR_WIN_RATE,
+        },
+    }
+
+
 @app.get("/api/trainer/{target_id}")
 def get_trainer(target_id: int, user_id: int = Depends(get_current_user_id)):
     with db() as conn:

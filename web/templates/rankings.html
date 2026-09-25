@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Rankings — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Rankings</h1>
+<p class="muted">See how every trainer on the server stacks up.</p>
+
+<div class="rank-tabs" id="rank-tabs" role="tablist" aria-label="Ranking category"></div>
+
+<div id="rank-you" class="rank-you" hidden></div>
+
+<div class="rank-podium" id="rank-podium"></div>
+
+<div class="card rank-table-card">
+    <div class="rank-table-head">
+        <h2 id="rank-title">Battle Wins</h2>
+        <span class="muted" id="rank-subtitle"></span>
+    </div>
+    <ol class="rank-list" id="rank-list"></ol>
+    <p class="muted rank-empty" id="rank-empty" hidden>No trainers qualify for this ranking yet.</p>
+</div>
+
+<script type="application/json" id="rankings-data">{{ rankings|tojson }}</script>
+<script src="/static/rankings.js"></script>
+{% endblock %}
