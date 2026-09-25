@@ -54,6 +54,8 @@ TRAINER_CHARACTERS = {
     "may": {"label": "May", "generation": "Hoenn", "sprite": f"{WEB_STATIC_BASE}/may.png"},
     "lucas": {"label": "Lucas", "generation": "Sinnoh", "sprite": f"{WEB_STATIC_BASE}/lucas.png"},
     "dawn": {"label": "Dawn", "generation": "Sinnoh", "sprite": f"{WEB_STATIC_BASE}/dawn.png"},
+    "rivers": {"label": "Rivers", "generation": "Custom", "sprite": f"{WEB_STATIC_BASE}/rivers.png"},
+    "nowa": {"label": "Nowa", "generation": "Custom", "sprite": f"{WEB_STATIC_BASE}/nowa.png"},
 }
 DEFAULT_CHARACTER = "red"
 
