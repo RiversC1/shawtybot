@@ -4551,3 +4551,18 @@ body.lineup-dragging * {
 .rank-row.is-unranked.is-you {
     opacity: 0.85;
 }
+
+/* Custom trainer characters (Rivers, Nowa) are drawn at native 220px
+   resolution rather than the built-in 80px sprites. The big profile sprite
+   shows them 1:1 (crisp); everywhere they're shrunk (lists, rankings,
+   pickers, battle portraits) use smooth scaling, since nearest-neighbor
+   downscaling drops pixels and speckles the art. */
+img[src$="/trainers/rivers.png"],
+img[src$="/trainers/nowa.png"] {
+    image-rendering: auto;
+}
+
+.trainer-sprite[src$="/trainers/rivers.png"],
+.trainer-sprite[src$="/trainers/nowa.png"] {
+    image-rendering: pixelated;
+}
