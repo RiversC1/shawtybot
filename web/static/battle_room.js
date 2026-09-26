@@ -11,6 +11,7 @@
     drain: 500, heal: 500, faint: 750, status_applied: 550, stat_changed: 500,
     cannot_act: 550, move_missed: 550, move_failed: 500, charge_start: 500, multi_hit_summary: 450,
     badge_awarded: 3200,
+    weather_start: 1100, weather_end: 700, weather_damage: 650,
   };
   const DEFAULT_EVENT_DELAY = 250; // structural events with no on-screen effect (turn_start, switch_out, battle_end)
 
@@ -51,6 +52,43 @@
   // Arena backdrop: themed by battle kind, tinted by the gym's or Elite Four
   // member's specialty type when there is one (see battle_store.arena_type_for).
   BattleFX.init(sceneEl);
+
+  // ---------- Weather (sun / rain / sandstorm / hail) ----------
+  const WEATHER_INFO = {
+    sun: { icon: "☀️", label: "Harsh sunlight" },
+    rain: { icon: "🌧️", label: "Rain" },
+    sand: { icon: "🌪️", label: "Sandstorm" },
+    hail: { icon: "🌨️", label: "Hail" },
+  };
+  const weatherLayer = document.createElement("div");
+  weatherLayer.className = "battle-weather-layer";
+  weatherLayer.setAttribute("aria-hidden", "true");
+  const weatherChip = document.createElement("div");
+  weatherChip.className = "battle-weather-chip";
+  weatherChip.hidden = true;
+  sceneEl.append(weatherLayer, weatherChip);
+  // What the scene currently shows; follows weather events during playback
+  // and resyncs to the server's state afterward.
+  let visibleWeather = null; // { weather, turns, suppressed }
+
+  function weatherFromTruth() {
+    return truth.weather_raw
+      ? { weather: truth.weather_raw, turns: truth.weather_turns, suppressed: !truth.weather }
+      : null;
+  }
+
+  function renderWeather() {
+    const w = visibleWeather;
+    for (const k of Object.keys(WEATHER_INFO)) sceneEl.classList.toggle(`weather-${k}`, !!w && w.weather === k && !w.suppressed);
+    if (!w) {
+      weatherChip.hidden = true;
+      return;
+    }
+    const info = WEATHER_INFO[w.weather] || { icon: "", label: w.weather };
+    const turns = w.turns ? ` · ${w.turns} turn${w.turns === 1 ? "" : "s"}` : "";
+    weatherChip.textContent = `${info.icon} ${info.label}${w.suppressed ? " (no effect)" : turns}`;
+    weatherChip.hidden = false;
+  }
   (function setupArena() {
     const kind = { gym: "gym", custom_gym: "gym", elite_four: "elite", champion: "champion" }[truth.battle_type] || "field";
     sceneEl.classList.add(`arena-${kind}`);
@@ -312,6 +350,22 @@
           if (event.status === "confusion") updated = { ...current, confused: true };
           else if (event.reason === "confusion_ended") updated = { ...current, confused: false };
           else updated = { ...current, status: event.status === "none" ? null : event.status };
+          if (isA) visibleA = updated; else visibleB = updated;
+        }
+        break;
+      }
+      case "weather_start":
+        visibleWeather = { weather: event.weather, turns: event.turns, suppressed: false };
+        break;
+      case "weather_tick":
+        if (visibleWeather) visibleWeather = { ...visibleWeather, turns: event.turns_left };
+        break;
+      case "weather_end":
+        visibleWeather = null;
+        break;
+      case "weather_damage": {
+        if (current && event.new_hp !== undefined) {
+          const updated = { ...current, current_hp: event.new_hp };
           if (isA) visibleA = updated; else visibleB = updated;
         }
         break;
@@ -650,7 +704,28 @@
         return `${mon} was hurt${event.status ? ` by its ${event.status}` : ""}! (-${event.amount})`;
       case "drain":
       case "heal":
-        return `${mon} restored <strong>${event.amount}</strong> HP!`;
+        return event.reason
+          ? `${mon} restored <strong>${event.amount}</strong> HP with ${esc(event.reason)}!`
+          : `${mon} restored <strong>${event.amount}</strong> HP!`;
+      case "weather_start": {
+        const text = {
+          sun: "The sunlight turned harsh!", rain: "It started to rain!",
+          sand: "A sandstorm kicked up!", hail: "It started to hail!",
+        }[event.weather] || "The weather changed!";
+        const icon = (WEATHER_INFO[event.weather] || {}).icon || "";
+        return event.source === "ability"
+          ? `${icon} <strong>${mon}</strong>'s ${esc(event.ability)}: ${text}`
+          : `${icon} ${text}`;
+      }
+      case "weather_end":
+        return {
+          sun: "☀️ The harsh sunlight faded.", rain: "🌧️ The rain stopped.",
+          sand: "🌪️ The sandstorm subsided.", hail: "🌨️ The hail stopped.",
+        }[event.weather] || "The weather cleared.";
+      case "weather_damage":
+        if (event.reason === "sand") return `${mon} is buffeted by the sandstorm!`;
+        if (event.reason === "hail") return `${mon} is pelted by hail!`;
+        return `${mon} is hurt by its ${esc(event.reason)}!`;
       case "charge_start": {
         const flavor = {
           Fly: "flew up high!", Bounce: "sprang up!", Dig: "burrowed underground!", Dive: "hid underwater!",
@@ -759,6 +834,7 @@
     renderHpLabel(hpLabelB, visibleB, truth.winner_side === "B");
     renderSprite(spriteA, visibleA, animA);
     renderSprite(spriteB, visibleB, animB);
+    renderWeather();
     renderLog();
     renderMeta();
   }
@@ -800,7 +876,7 @@
 
   // Events that begin a new "beat" (someone acting) start a fresh caption;
   // their consequences (damage, status, stat changes) append beneath it.
-  const CAPTION_STARTERS = new Set(["move_used", "charge_start", "cannot_act", "switch_in", "status_damage", "badge_awarded", "league_defeated"]);
+  const CAPTION_STARTERS = new Set(["move_used", "charge_start", "cannot_act", "switch_in", "status_damage", "badge_awarded", "league_defeated", "weather_end", "weather_damage"]);
 
   function pctOf(amount, max) {
     if (!max) return "?";
@@ -881,6 +957,21 @@
         // lands together with it.
         if (!pendingEvents.some((e) => e.type === "badge_awarded" || e.type === "league_defeated")) playResultSound();
         return null;
+      case "weather_start":
+        // A move (Sunny Day...) already animated itself; an ability gets a glow
+        // on its Pokémon plus the weather sweeping in.
+        if (event.source === "ability") {
+          BattleFX.glowSprite(sprite, "#ffe08a", 900);
+          if (event.ability) BattleFX.floatText(slot, event.ability, "info");
+          if (window.BattleMoves && window.BattleMoves.weather && !BattleFX.kit.reduceMotion) window.BattleMoves.weather(event.weather);
+        }
+        return null;
+      case "weather_damage":
+        BattleFX.floatText(slot, `\u2212${pctOf(event.amount, maxHp)}%`, "damage");
+        sprite.classList.remove("anim-hit");
+        void sprite.offsetWidth;
+        sprite.classList.add("anim-hit");
+        return null;
       case "badge_awarded":
         playResultSound();
         if (event.badge_image) BattleFX.showBadge(event.badge_image, event.badge_name);
@@ -938,6 +1029,7 @@
     // from the server's authoritative state.
     visibleA = truth.roster_a.find((m) => m.is_active) || truth.roster_a[0] || null;
     visibleB = truth.roster_b.find((m) => m.is_active) || truth.roster_b[0] || null;
+    visibleWeather = weatherFromTruth();
     renderFrame(null, null);
     renderResultBanner();
     renderActionPanel(truth);
@@ -962,6 +1054,7 @@
       visibleA = truth.roster_a.find((m) => m.is_active) || truth.roster_a[0] || null;
       visibleB = truth.roster_b.find((m) => m.is_active) || truth.roster_b[0] || null;
       revealed = truth.events.slice();
+      visibleWeather = weatherFromTruth();
       renderFrame(null, null);
       renderResultBanner();
       renderActionPanel(truth);
@@ -1046,7 +1139,7 @@
   // beat a live switch-in gets, so the very first "X sends out Y!" throw
   // isn't the one send-out in the whole battle that never plays.
   const onlyOpeningSendOuts =
-    truth.events.length > 0 && truth.events.every((e) => e.type === "turn_start" || e.type === "switch_in");
+    truth.events.length > 0 && truth.events.every((e) => e.type === "turn_start" || e.type === "switch_in" || e.type === "weather_start");
 
   if (onlyOpeningSendOuts) {
     visibleA = null;
@@ -1068,6 +1161,7 @@
     visibleB = truth.roster_b.find((m) => m.is_active) || truth.roster_b[0] || null;
     revealed = truth.events.slice();
     markAnimated(truth.events);
+    visibleWeather = weatherFromTruth();
     renderFrame(null, null);
     renderResultBanner();
     renderActionPanel(truth);

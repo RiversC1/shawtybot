@@ -1111,6 +1111,7 @@ class Pokemon(commands.Cog):
             cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_battle_sides)").fetchall()]
             if "ivs" not in cols:
                 conn.execute("ALTER TABLE poke_battle_sides ADD COLUMN ivs TEXT")
+            battle_store.ensure_weather_columns(conn)
             # The durable turn-by-turn event log — both the Discord embed and
             # the web spectate poll read from this.
             conn.execute("""

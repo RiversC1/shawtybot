@@ -293,6 +293,23 @@ def abandon_battle(battle_id: int):
         )
 
 
+_weather_columns_ready = False
+
+
+def ensure_weather_columns(conn: sqlite3.Connection):
+    """Migration: weather state on poke_battles. Called by the bot's DB setup,
+    and lazily here too so the API works even if it starts first."""
+    global _weather_columns_ready
+    if _weather_columns_ready:
+        return
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_battles)").fetchall()]
+    if "weather" not in cols:
+        conn.execute("ALTER TABLE poke_battles ADD COLUMN weather TEXT")
+    if "weather_turns" not in cols:
+        conn.execute("ALTER TABLE poke_battles ADD COLUMN weather_turns INTEGER NOT NULL DEFAULT 0")
+    _weather_columns_ready = True
+
+
 def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster_b: list["be.BattlerState"]):
     now = datetime.now(timezone.utc).isoformat()
     deadline = (datetime.now(timezone.utc) + timedelta(seconds=BATTLE_TURN_TIMEOUT_SECONDS)).isoformat()
@@ -327,6 +344,17 @@ def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster
         {"type": "switch_in", "side": "A", "dex_id": roster_a[0].dex_id, "name": roster_a[0].species_name},
         {"type": "switch_in", "side": "B", "dex_id": roster_b[0].dex_id, "name": roster_b[0].species_name},
     ])
+
+    # The leads' entry abilities (e.g. Drought, Sand Stream) take effect as
+    # the battle begins.
+    opening = be.build_battle_state(battle_id, "A", roster_a, "B", roster_b)
+    ability_events = be.apply_opening_abilities(opening)
+    if ability_events:
+        with db() as conn:
+            ensure_weather_columns(conn)
+            conn.execute("UPDATE poke_battles SET weather = ?, weather_turns = ? WHERE battle_id = ?",
+                         (opening.weather, opening.weather_turns, battle_id))
+        append_battle_events(battle_id, 1, ability_events)
 
 
 def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | tuple[None, None]:
@@ -368,13 +396,21 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
         battle_id=battle_id, side_a=side_a, side_b=side_b,
         turn_number=battle_row["current_turn_number"], status=battle_row["status"],
         winner_side=battle_row["winner_side"], forced_switch_sides=forced,
+        weather=_row_get(battle_row, "weather"), weather_turns=_row_get(battle_row, "weather_turns") or 0,
     )
     return battle, battle_row
+
+
+def _row_get(row: sqlite3.Row, key: str):
+    return row[key] if key in row.keys() else None
 
 
 def persist_battle_state(battle_id: int, battle: "be.BattleState"):
     now = datetime.now(timezone.utc).isoformat()
     with db() as conn:
+        ensure_weather_columns(conn)
+        conn.execute("UPDATE poke_battles SET weather = ?, weather_turns = ? WHERE battle_id = ?",
+                     (battle.weather, battle.weather_turns, battle_id))
         for side_label, side in (("A", battle.side_a), ("B", battle.side_b)):
             for slot, b in enumerate(side.roster):
                 fields = be.battler_state_to_row_fields(b)
@@ -1272,6 +1308,9 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
         "turn_number": battle_row["current_turn_number"], "winner_side": battle_row["winner_side"],
         "winner_name": winner_name, "events": events,
         "arena_type": arena_type_for(battle_row),
+        "weather": be.current_weather(battle) if battle else None,
+        "weather_raw": battle.weather if battle else None,
+        "weather_turns": battle.weather_turns if battle else 0,
     }
     if viewer_user_id is not None:
         payload["you"] = get_viewer_info(battle, battle_row, viewer_user_id)

@@ -77,6 +77,15 @@ window.MoveTooltip = (function () {
     if (flags.has("always_hit")) lines.push("Never misses");
     if (flags.has("ohko")) lines.push("Knocks out the target in one hit if it lands");
     if (flags.has("multi_turn_lock")) lines.push("Locks the user in for several turns");
+    const WEATHER = {
+      "Sunny Day": "Harsh sunlight for 5 turns: Fire moves x1.5, Water moves x0.5",
+      "Rain Dance": "Rain for 5 turns: Water moves x1.5, Fire moves x0.5, Thunder never misses",
+      "Sandstorm": "Sandstorm for 5 turns: hurts non-Rock/Ground/Steel Pokémon each turn, Rock types get 1.5x Sp. Def",
+      "Hail": "Hail for 5 turns: hurts non-Ice Pokémon each turn, Blizzard never misses",
+      "Weather Ball": "Changes type and doubles in power in any weather",
+      "Solar Beam": "Fires instantly in harsh sunlight (halved in rain, sand or hail)",
+    };
+    if (WEATHER[move.name]) lines.push(WEATHER[move.name]);
     if (move.priority > 0) lines.push(`Moves first (priority +${move.priority})`);
     if (move.priority < 0) lines.push(`Moves last (priority ${move.priority})`);
     return lines;

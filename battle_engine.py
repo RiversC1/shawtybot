@@ -5,10 +5,11 @@ web API can import it safely.
 
 Scope (see the approved battle-system plan): an accurate damage formula,
 types/STAB/effectiveness, accuracy rolls, critical hits, priority + speed
-turn order, stat-stage changes, and the main status conditions (burn,
-paralysis, poison, toxic, sleep, freeze, confusion, flinch). Abilities/held
-items/weather are NOT simulated in v1 — ability is carried as flavor text
-only. Every battler is effectively level 100 (see webapi.py's
+turn order, stat-stage changes, the main status conditions (burn,
+paralysis, poison, toxic, sleep, freeze, confusion, flinch), and weather
+(sun, rain, sandstorm, hail: moves, weather-setting abilities, and the
+abilities that depend on weather; see the Weather section). Other abilities
+and held items are not simulated; ability is flavor text for those. Every battler is effectively level 100 (see webapi.py's
 stat_at_level_100 — an owned Pokémon's stats are already fixed at that
 level's value), which is why the damage formula below folds the level term
 into a constant instead of taking a level parameter.
@@ -17,6 +18,8 @@ Singles format only: one active Pokémon per side, up to 6 per team.
 """
 from __future__ import annotations
 
+import contextvars
+import dataclasses
 import math
 import random
 import re
@@ -256,6 +259,8 @@ class BattleState:
     winner_side: Optional[str] = None
     forced_switch_sides: list = field(default_factory=list)
     rng: random.Random = field(default_factory=random.Random)
+    weather: Optional[str] = None  # "sun" | "rain" | "sand" | "hail"
+    weather_turns: int = 0         # turns left, counting the current one
 
     def side(self, side_id: str) -> BattleSide:
         return self.side_a if side_id == "A" else self.side_b
@@ -458,22 +463,24 @@ def pick_npc_forced_switch(battle: BattleState, side_id: str) -> int:
 # of a bad type matchup instead of only doing so when forced by a faint.
 # ---------------------------------------------------------------------------
 
-def estimate_damage(attacker: BattlerState, defender: BattlerState, move: MoveData) -> float:
+def estimate_damage(attacker: BattlerState, defender: BattlerState, move: MoveData,
+                    weather: Optional[str] = None) -> float:
     """Deterministic average-case damage estimate (no RNG consumed) — used
     only for NPC decision-making, never for real turn resolution, so it
     never perturbs the battle's own RNG stream."""
+    move = weather_adjusted_move(move, weather)
     if move.category == "status" or not move.power:
         return 0.0
     a_key, d_key = ("attack", "defense") if move.category == "physical" else ("sp_attack", "sp_defense")
-    A = attacker.stats[a_key] * stat_stage_multiplier(attacker.stat_stages[a_key])
-    D = defender.stats[d_key] * stat_stage_multiplier(defender.stat_stages[d_key])
+    A = attacker.stats[a_key] * stat_stage_multiplier(attacker.stat_stages[a_key]) * weather_stat_multiplier(weather, attacker, a_key)
+    D = defender.stats[d_key] * stat_stage_multiplier(defender.stat_stages[d_key]) * weather_stat_multiplier(weather, defender, d_key)
     eff = type_effectiveness(move.type, defender.types)
     if eff == 0:
         return 0.0
     base = math.floor(LEVEL_100_STAGE_BASE * move.power * A / D / 50) + 2
     stab = 1.5 if move.type and move.type in attacker.types else 1.0
     burn_mult = 0.5 if (attacker.status == "burn" and move.category == "physical") else 1.0
-    return base * stab * eff * 0.925 * burn_mult  # 0.925 ~= average of the real 0.85-1.00 roll
+    return base * stab * eff * 0.925 * burn_mult * weather_damage_multiplier(weather, move, attacker)  # 0.925 ~= avg roll
 
 
 def _best_move_damage(attacker: BattlerState, defender: BattlerState) -> float:
@@ -508,6 +515,12 @@ def _matchup_score(candidate: BattlerState, opponent: BattlerState) -> float:
 
 _RACE_TURNS = 12
 
+# The weather the AI is currently reasoning under. Set by the pick_* entry
+# points for the duration of one decision (a ContextVar, so concurrent
+# decisions on different server threads can't see each other's value), and
+# read by the estimates below.
+_AI_WEATHER: contextvars.ContextVar = contextvars.ContextVar("ai_weather", default=None)
+
 
 def _hit_chance(move: MoveData) -> float:
     return 1.0 if move.accuracy is None or "always_hit" in move.flags else move.accuracy / 100
@@ -535,8 +548,8 @@ def _best_attack(attacker: BattlerState, defender: BattlerState) -> float:
     for slot in attacker.moves:
         if slot.current_pp <= 0:
             continue
-        m = slot.move
-        dmg = estimate_damage(attacker, defender, m)
+        m = weather_adjusted_move(slot.move, _AI_WEATHER.get())
+        dmg = estimate_damage(attacker, defender, m, _AI_WEATHER.get())
         if dmg <= 0:
             continue
         if m.min_hits and m.max_hits:
@@ -555,10 +568,11 @@ def _race(me: BattlerState, foe: BattlerState, my_hp: float, foe_hp: float, *,
     """Plays out the 1v1 from now. my_first_hit: damage of my move this turn
     (None = my action this turn deals no damage). Returns +(my HP left
     fraction) if I win, -(foe HP left fraction) if I lose."""
+    w = _AI_WEATHER.get()
     my_dmg = _best_attack(me, foe)
     foe_dmg = _best_attack(foe, me) * foe_dmg_mult
-    first = i_act_first if i_act_first is not None else _effective_speed(me) > _effective_speed(foe)
-    speed_first = _effective_speed(me) > _effective_speed(foe)
+    first = i_act_first if i_act_first is not None else _effective_speed(me, w) > _effective_speed(foe, w)
+    speed_first = _effective_speed(me, w) > _effective_speed(foe, w)
     for turn in range(_RACE_TURNS):
         mine = (my_first_hit or 0.0) if turn == 0 else (0.0 if turn <= my_skips_after_first else my_dmg)
         theirs = 0.0 if turn < foe_skips else foe_dmg
@@ -586,15 +600,35 @@ def _race(me: BattlerState, foe: BattlerState, my_hp: float, foe_hp: float, *,
 def _value_move(battle: BattleState, side_id: str, move: MoveData) -> float:
     me = battle.side(side_id).active
     foe = battle.other(side_id).active
+    weather = _AI_WEATHER.get()
+    move = weather_adjusted_move(move, weather)
     acc = _hit_chance(move)
     if move.priority != 0:
         first = move.priority > 0
     else:
-        first = _effective_speed(me) > _effective_speed(foe)
+        first = _effective_speed(me, weather) > _effective_speed(foe, weather)
     wasted = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first)
 
+    # Setting the weather: play the matchup out under the new weather.
+    if move.name in WEATHER_MOVES:
+        new = WEATHER_MOVES[move.name]
+        suppressed = any(ability_key(m) in WEATHER_NEGATING_ABILITIES for m in (me, foe))
+        if battle.weather == new or suppressed:
+            return wasted - 0.05
+        chip = 0.0
+        if new == "sand" and not (set(foe.types) & SAND_IMMUNE_TYPES) and ability_key(foe) not in SAND_IMMUNE_ABILITIES:
+            chip = 1 / 16
+        if new == "hail" and "ice" not in foe.types and ability_key(foe) not in HAIL_IMMUNE_ABILITIES:
+            chip = 1 / 16
+        token = _AI_WEATHER.set(new)
+        try:
+            v = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first, foe_chip=chip)
+        finally:
+            _AI_WEATHER.reset(token)
+        return v - 0.02
+
     if move.category != "status" and move.power:
-        dmg = estimate_damage(me, foe, move)
+        dmg = estimate_damage(me, foe, move, weather)
         if dmg <= 0:
             return wasted - 0.01
         if move.min_hits and move.max_hits:
@@ -695,6 +729,14 @@ def _value_switch(battle: BattleState, side_id: str, index: int) -> float:
 
 
 def pick_npc_action_hard(battle: BattleState, side_id: str) -> Action:
+    token = _AI_WEATHER.set(current_weather(battle))
+    try:
+        return _pick_npc_action_hard(battle, side_id)
+    finally:
+        _AI_WEATHER.reset(token)
+
+
+def _pick_npc_action_hard(battle: BattleState, side_id: str) -> Action:
     la = legal_actions(battle, side_id)
     side = battle.side(side_id)
 
@@ -725,8 +767,186 @@ def pick_npc_forced_switch_hard(battle: BattleState, side_id: str) -> int:
         raise ValueError("No switchable Pokémon left")
     side = battle.side(side_id)
     foe = battle.other(side_id).active
-    # A replacement after a faint comes in without taking a hit.
-    return max(la["switchable_indices"], key=lambda i: _race(side.roster[i], foe, side.roster[i].current_hp, foe.current_hp))
+    token = _AI_WEATHER.set(current_weather(battle))
+    try:
+        # A replacement after a faint comes in without taking a hit.
+        return max(la["switchable_indices"], key=lambda i: _race(side.roster[i], foe, side.roster[i].current_hp, foe.current_hp))
+    finally:
+        _AI_WEATHER.reset(token)
+
+
+# ---------------------------------------------------------------------------
+# Weather
+# ---------------------------------------------------------------------------
+# Sun, rain, sandstorm and hail, set by Sunny Day / Rain Dance / Sandstorm /
+# Hail or by an ability when its Pokémon enters battle (Drought, Drizzle,
+# Sand Stream, Snow Warning), lasting 5 turns either way (modern rules).
+# Cloud Nine / Air Lock on the field suppress every weather effect.
+
+WEATHER_TURNS = 5
+WEATHER_MOVES = {"Sunny Day": "sun", "Rain Dance": "rain", "Sandstorm": "sand", "Hail": "hail"}
+WEATHER_ABILITIES = {"drought": "sun", "drizzle": "rain", "sand-stream": "sand", "snow-warning": "hail"}
+WEATHER_NEGATING_ABILITIES = {"cloud-nine", "air-lock"}
+SPEED_DOUBLERS = {"swift-swim": "rain", "chlorophyll": "sun", "sand-rush": "sand"}
+SAND_IMMUNE_TYPES = {"rock", "ground", "steel"}
+SAND_IMMUNE_ABILITIES = {"sand-veil", "sand-rush", "sand-force", "overcoat"}
+HAIL_IMMUNE_ABILITIES = {"ice-body", "snow-cloak", "overcoat"}
+WEATHER_BALL_TYPES = {"sun": "fire", "rain": "water", "sand": "rock", "hail": "ice"}
+SUN_HEAL_MOVES = {"Synthesis", "Morning Sun", "Moonlight"}
+
+
+def ability_key(mon: BattlerState) -> str:
+    return (mon.ability or "").strip().lower().replace(" ", "-").replace("_", "-")
+
+
+def ability_label(mon: BattlerState) -> str:
+    return ability_key(mon).replace("-", " ").title()
+
+
+def current_weather(battle: BattleState) -> Optional[str]:
+    """The weather in effect right now (None if clear or suppressed)."""
+    if not battle.weather:
+        return None
+    for side in (battle.side_a, battle.side_b):
+        mon = side.active
+        if not mon.is_fainted and ability_key(mon) in WEATHER_NEGATING_ABILITIES:
+            return None
+    return battle.weather
+
+
+def set_weather(battle: BattleState, weather: str, events: list, side_id: str, source: str,
+                mon: BattlerState) -> bool:
+    """Starts `weather` for WEATHER_TURNS turns. Returns False (no change) if
+    that weather is already active."""
+    if battle.weather == weather:
+        return False
+    battle.weather = weather
+    battle.weather_turns = WEATHER_TURNS
+    event = {"type": "weather_start", "weather": weather, "side": side_id, "source": source,
+             "name": mon.species_name, "turns": WEATHER_TURNS}
+    if source == "ability":
+        event["ability"] = ability_label(mon)
+    events.append(event)
+    return True
+
+
+def trigger_entry_ability(battle: BattleState, side_id: str, events: list) -> None:
+    """Abilities that act as a Pokémon enters battle (currently: weather)."""
+    mon = battle.side(side_id).active
+    weather = WEATHER_ABILITIES.get(ability_key(mon))
+    if weather and not mon.is_fainted:
+        set_weather(battle, weather, events, side_id, "ability", mon)
+
+
+def apply_opening_abilities(battle: BattleState) -> list:
+    """Entry abilities of both leads at the start of a battle. The slower
+    lead's activates first, so the faster lead's weather is the one that
+    sticks (as in the games)."""
+    events: list = []
+    a, b = battle.side_a.active, battle.side_b.active
+    order = ["A", "B"] if _effective_speed(a) <= _effective_speed(b) else ["B", "A"]
+    for side_id in order:
+        trigger_entry_ability(battle, side_id, events)
+    return events
+
+
+def weather_adjusted_move(move: MoveData, weather: Optional[str]) -> MoveData:
+    """The move as it behaves in the current weather: Weather Ball's type and
+    power, Solar Beam skipping its charge in sun (and halved in other
+    weather), Thunder/Hurricane/Blizzard accuracy, sun-boosted healing moves,
+    and Growth's doubled boost in sun."""
+    if not weather:
+        return move
+    changes: dict = {}
+    name = move.name
+    if name == "Weather Ball":
+        changes.update(type=WEATHER_BALL_TYPES[weather], power=(move.power or 50) * 2)
+    elif name == "Solar Beam":
+        if weather == "sun":
+            changes["flags"] = frozenset(f for f in move.flags if f != "charge")
+        else:
+            changes["power"] = (move.power or 120) // 2
+    elif name in ("Thunder", "Hurricane"):
+        if weather == "rain":
+            changes["accuracy"] = None
+        elif weather == "sun":
+            changes["accuracy"] = 50
+    elif name == "Blizzard" and weather == "hail":
+        changes["accuracy"] = None
+    elif name in SUN_HEAL_MOVES:
+        changes["healing_percent"] = 66 if weather == "sun" else 25
+    elif name == "Growth" and weather == "sun":
+        changes["stat_changes"] = tuple({**sc, "change": sc.get("change", 0) * 2} for sc in move.stat_changes)
+    return dataclasses.replace(move, **changes) if changes else move
+
+
+def weather_damage_multiplier(weather: Optional[str], move: MoveData, attacker: BattlerState) -> float:
+    mult = 1.0
+    if weather == "sun":
+        mult *= {"fire": 1.5, "water": 0.5}.get(move.type, 1.0)
+    elif weather == "rain":
+        mult *= {"water": 1.5, "fire": 0.5}.get(move.type, 1.0)
+    elif weather == "sand" and ability_key(attacker) == "sand-force" and move.type in SAND_IMMUNE_TYPES:
+        mult *= 1.3
+    return mult
+
+
+def weather_stat_multiplier(weather: Optional[str], mon: BattlerState, stat: str) -> float:
+    if weather == "sand" and stat == "sp_defense" and "rock" in mon.types:
+        return 1.5
+    if weather == "sun" and stat == "sp_attack" and ability_key(mon) == "solar-power":
+        return 1.5
+    return 1.0
+
+
+def weather_evasion_multiplier(weather: Optional[str], defender: BattlerState) -> float:
+    """Sand Veil / Snow Cloak: moves aimed at this Pokémon hit 20% less often."""
+    ability = ability_key(defender)
+    if (weather == "sand" and ability == "sand-veil") or (weather == "hail" and ability == "snow-cloak"):
+        return 0.8
+    return 1.0
+
+
+def _apply_end_of_turn_weather(battle: BattleState, mon: BattlerState, side_id: str, weather: str) -> list:
+    """Sandstorm/hail chip damage and weather-dependent abilities."""
+    events: list = []
+    ability = ability_key(mon)
+
+    def hurt(amount: int, reason: str):
+        mon.current_hp = max(0, mon.current_hp - amount)
+        events.append({"type": "weather_damage", "side": side_id, "weather": weather, "reason": reason,
+                       "amount": amount, "new_hp": mon.current_hp, "max_hp": mon.max_hp})
+        _check_and_emit_faint(mon, side_id, events)
+
+    def heal(amount: int, reason: str):
+        if mon.current_hp >= mon.max_hp:
+            return
+        amount = min(amount, mon.max_hp - mon.current_hp)
+        mon.current_hp += amount
+        events.append({"type": "heal", "side": side_id, "amount": amount, "reason": reason,
+                       "new_hp": mon.current_hp, "max_hp": mon.max_hp})
+
+    if weather == "sand":
+        if not (set(mon.types) & SAND_IMMUNE_TYPES) and ability not in SAND_IMMUNE_ABILITIES:
+            hurt(max(1, mon.max_hp // 16), "sand")
+    elif weather == "hail":
+        if "ice" not in mon.types and ability not in HAIL_IMMUNE_ABILITIES:
+            hurt(max(1, mon.max_hp // 16), "hail")
+        elif ability == "ice-body":
+            heal(max(1, mon.max_hp // 16), "Ice Body")
+    elif weather == "rain":
+        if ability == "rain-dish":
+            heal(max(1, mon.max_hp // 16), "Rain Dish")
+        elif ability == "dry-skin":
+            heal(max(1, mon.max_hp // 8), "Dry Skin")
+        elif ability == "hydration" and mon.status is not None:
+            mon.status = None
+            mon.status_counter = 0
+            events.append({"type": "status_applied", "side": side_id, "status": "none", "reason": "hydration"})
+    elif weather == "sun":
+        if ability in ("dry-skin", "solar-power"):
+            hurt(max(1, mon.max_hp // 8), ability_label(mon))
+    return events
 
 
 # ---------------------------------------------------------------------------
@@ -737,7 +957,7 @@ LEVEL_100_STAGE_BASE = math.floor(2 * 100 / 5 + 2)  # 42, constant since every m
 
 
 def compute_damage(attacker: BattlerState, defender: BattlerState, move: MoveData,
-                    is_crit: bool, rng: random.Random) -> int:
+                    is_crit: bool, rng: random.Random, weather: Optional[str] = None) -> int:
     if move.category == "status" or not move.power:
         return 0
 
@@ -748,8 +968,8 @@ def compute_damage(attacker: BattlerState, defender: BattlerState, move: MoveDat
 
     a_stage = 0 if is_crit and attacker.stat_stages[a_key] < 0 else attacker.stat_stages[a_key]
     d_stage = 0 if is_crit and defender.stat_stages[d_key] > 0 else defender.stat_stages[d_key]
-    A = attacker.stats[a_key] * stat_stage_multiplier(a_stage)
-    D = defender.stats[d_key] * stat_stage_multiplier(d_stage)
+    A = attacker.stats[a_key] * stat_stage_multiplier(a_stage) * weather_stat_multiplier(weather, attacker, a_key)
+    D = defender.stats[d_key] * stat_stage_multiplier(d_stage) * weather_stat_multiplier(weather, defender, d_key)
 
     eff = type_effectiveness(move.type, defender.types)
     if eff == 0:
@@ -760,8 +980,9 @@ def compute_damage(attacker: BattlerState, defender: BattlerState, move: MoveDat
     crit_mult = 2.0 if is_crit else 1.0
     random_roll = rng.uniform(0.85, 1.00)
     burn_mult = 0.5 if (attacker.status == "burn" and move.category == "physical") else 1.0
+    weather_mult = weather_damage_multiplier(weather, move, attacker)
 
-    damage = math.floor(base * stab * eff * crit_mult * random_roll * burn_mult)
+    damage = math.floor(base * stab * eff * crit_mult * random_roll * burn_mult * weather_mult)
     return max(1, damage)
 
 
@@ -806,10 +1027,12 @@ def _action_priority(battle: BattleState, side_id: str, action: Action) -> int:
     return active.moves[action.move_index].move.priority
 
 
-def _effective_speed(mon: BattlerState) -> float:
+def _effective_speed(mon: BattlerState, weather: Optional[str] = None) -> float:
     spd = mon.stats["speed"] * stat_stage_multiplier(mon.stat_stages["speed"])
     if mon.status == "paralysis":
         spd *= 0.5
+    if weather and SPEED_DOUBLERS.get(ability_key(mon)) == weather:
+        spd *= 2
     return spd
 
 
@@ -819,14 +1042,15 @@ def _order_actions(battle: BattleState, action_a: Action, action_b: Action) -> l
     prio_b = _action_priority(battle, "B", action_b)
     if prio_a != prio_b:
         return entries if prio_a > prio_b else [entries[1], entries[0]]
-    spd_a = _effective_speed(battle.side_a.active)
-    spd_b = _effective_speed(battle.side_b.active)
+    weather = current_weather(battle)
+    spd_a = _effective_speed(battle.side_a.active, weather)
+    spd_b = _effective_speed(battle.side_b.active, weather)
     if spd_a != spd_b:
         return entries if spd_a > spd_b else [entries[1], entries[0]]
     return entries if battle.rng.random() < 0.5 else [entries[1], entries[0]]
 
 
-def do_switch(side: BattleSide, target_index: int) -> list:
+def do_switch(side: BattleSide, target_index: int, battle: Optional[BattleState] = None) -> list:
     events = []
     outgoing = side.active
     events.append({"type": "switch_out", "side": side.side_id, "dex_id": outgoing.dex_id, "name": outgoing.species_name})
@@ -836,12 +1060,14 @@ def do_switch(side: BattleSide, target_index: int) -> list:
     side.active_index = target_index
     incoming = side.active
     events.append({"type": "switch_in", "side": side.side_id, "dex_id": incoming.dex_id, "name": incoming.species_name})
+    if battle is not None:
+        trigger_entry_ability(battle, side.side_id, events)
     return events
 
 
 def apply_forced_switch(battle: BattleState, side_id: str, team_index: int) -> list:
     side = battle.side(side_id)
-    events = do_switch(side, team_index)
+    events = do_switch(side, team_index, battle)
     if side_id in battle.forced_switch_sides:
         battle.forced_switch_sides.remove(side_id)
     if not battle.forced_switch_sides:
@@ -895,6 +1121,9 @@ def _maybe_apply_ailment(battle: BattleState, move: MoveData, target: BattlerSta
         return
     if target.status is not None:
         return  # already has a major status; secondary status effects don't stack/overwrite
+    weather = current_weather(battle)
+    if weather == "sun" and (move.ailment == "freeze" or ability_key(target) == "leaf-guard"):
+        return
     if battle.rng.random() * 100 < move.ailment_chance:
         target.status = move.ailment
         if move.ailment == "sleep":
@@ -1036,7 +1265,7 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
             return events
 
         move_slot = active.moves[move_index]
-        move = move_slot.move
+        move = weather_adjusted_move(move_slot.move, current_weather(battle))
 
         if "charge" in move.flags:
             move_slot.current_pp = max(0, move_slot.current_pp - 1)
@@ -1056,10 +1285,15 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
     else:
         # Release turn of a charging move (Solar Beam etc.) — move_index was
         # already resolved above from volatile["charging_move"]; no new PP cost.
-        move = active.moves[move_index].move
+        move = weather_adjusted_move(active.moves[move_index].move, current_weather(battle))
 
     events.append({"type": "move_used", "side": side.side_id, "move_name": move.name,
                    "move_type": move.type, "category": move.category, "target": move.target})
+
+    if move.name in WEATHER_MOVES:
+        if not set_weather(battle, WEATHER_MOVES[move.name], events, side.side_id, "move", active):
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "weather_active"})
+        return events
 
     if move.target != "self" and defender.volatile.get("invulnerable_until_turn") == battle.turn_number:
         events.append({"type": "move_missed", "side": side.side_id, "move_name": move.name,
@@ -1072,7 +1306,7 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
         acc_mult = stat_stage_multiplier(
             active.stat_stages["accuracy"] - defender.stat_stages["evasion"], is_accuracy_or_evasion=True
         )
-        effective_acc = move.accuracy * acc_mult
+        effective_acc = move.accuracy * acc_mult * weather_evasion_multiplier(current_weather(battle), defender)
         if battle.rng.random() * 100 >= effective_acc:
             events.append({"type": "move_missed", "side": side.side_id, "move_name": move.name})
             if "recharge" in move.flags:
@@ -1088,7 +1322,7 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
         # own accuracy field (PokeAPI encodes OHKO moves' ~30% hit chance
         # there directly) — reaching here means it already hit, so the only
         # remaining condition is mainline's "fails if the target is faster."
-        if _effective_speed(defender) > _effective_speed(active):
+        if _effective_speed(defender, current_weather(battle)) > _effective_speed(active, current_weather(battle)):
             events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "outsped"})
         else:
             total_dealt = _apply_damage_and_emit(defender, defender.current_hp, events, opp.side_id, move.name, False, move.type)
@@ -1104,13 +1338,13 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
             if defender.is_fainted:
                 break
             hit_crit = battle.rng.random() < crit_chance(move)
-            hit_dmg = compute_damage(active, defender, move, hit_crit, battle.rng)
+            hit_dmg = compute_damage(active, defender, move, hit_crit, battle.rng, current_weather(battle))
             total_dealt += _apply_damage_and_emit(defender, hit_dmg, events, opp.side_id, move.name, hit_crit, move.type)
             hits += 1
         events.append({"type": "multi_hit_summary", "side": side.side_id, "hits": hits, "total_damage": total_dealt})
     else:
         is_crit = battle.rng.random() < crit_chance(move)
-        dmg = compute_damage(active, defender, move, is_crit, battle.rng)
+        dmg = compute_damage(active, defender, move, is_crit, battle.rng, current_weather(battle))
         total_dealt = _apply_damage_and_emit(defender, dmg, events, opp.side_id, move.name, is_crit, move.type)
 
     if move.drain_percent and total_dealt > 0:
@@ -1185,7 +1419,7 @@ def resolve_turn(battle: BattleState, action_a: Action, action_b: Action) -> Tur
             continue
 
         if action.kind == "switch" and action.switch_to_index is not None:
-            events.extend(do_switch(side, action.switch_to_index))
+            events.extend(do_switch(side, action.switch_to_index, battle))
             continue
 
         events.extend(_execute_move_action(battle, side, opp, action))
@@ -1196,11 +1430,22 @@ def resolve_turn(battle: BattleState, action_a: Action, action_b: Action) -> Tur
             break
 
     if not battle_over:
+        weather = current_weather(battle)
         for side_id, _ in order:
             side = battle.side(side_id)
+            if weather and not side.active.is_fainted:
+                events.extend(_apply_end_of_turn_weather(battle, side.active, side_id, weather))
             if side.active.is_fainted:
                 continue
             events.extend(_apply_end_of_turn_status(side.active, side_id))
+        if battle.weather:
+            battle.weather_turns -= 1
+            if battle.weather_turns <= 0:
+                events.append({"type": "weather_end", "weather": battle.weather})
+                battle.weather = None
+                battle.weather_turns = 0
+            else:
+                events.append({"type": "weather_tick", "weather": battle.weather, "turns_left": battle.weather_turns})
         winner = apply_faint_and_check_winner(battle)
         if winner:
             battle_over = True

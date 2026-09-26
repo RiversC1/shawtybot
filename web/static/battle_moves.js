@@ -979,5 +979,6 @@ window.BattleMoves = (function () {
     return new Promise((resolve) => setTimeout(resolve, Math.max(300, ms || 800)));
   }
 
-  return { play, hasAnimation: (name) => !!recipeFor(name), MOVES };
+  const WEATHER_KIND = { sun: "sun", rain: "rain", sand: "sand", hail: "hail" };
+  return { play, hasAnimation: (name) => !!recipeFor(name), MOVES, weather: (w) => weather(WEATHER_KIND[w] || w) };
 })();
