@@ -648,6 +648,15 @@
       }
       case "faint":
         return `💀 <strong>${owned(event.side, event.name)}</strong> fainted!`;
+      case "league_defeated": {
+        const isYou = truth.you && truth.you.side === event.side;
+        const region = event.region ? event.region.charAt(0).toUpperCase() + event.region.slice(1) : "";
+        const speech = event.quote ? `💬 <strong>${esc(event.name)}</strong>: “${esc(event.quote)}”<br>` : "";
+        if (event.role === "champion") {
+          return `${speech}👑 Congratulations! ${isYou ? "You are" : `${side} is`} the new <strong>${esc(region)} Champion</strong>!`;
+        }
+        return `${speech}🏆 ${isYou ? "You" : side} defeated Elite Four <strong>${esc(event.name)}</strong>!`;
+      }
       case "badge_awarded": {
         const recipient = truth.you && truth.you.side === event.side ? "you" : side;
         return `🏅 <strong>${esc(event.leader_name)}</strong> rewards ${recipient} with the <strong>${esc(event.badge_name)}</strong>! Congratulations!`;
@@ -780,7 +789,7 @@
 
   // Events that begin a new "beat" (someone acting) start a fresh caption;
   // their consequences (damage, status, stat changes) append beneath it.
-  const CAPTION_STARTERS = new Set(["move_used", "charge_start", "cannot_act", "switch_in", "status_damage", "badge_awarded"]);
+  const CAPTION_STARTERS = new Set(["move_used", "charge_start", "cannot_act", "switch_in", "status_damage", "badge_awarded", "league_defeated"]);
 
   function pctOf(amount, max) {
     if (!max) return "?";
@@ -859,6 +868,13 @@
       case "badge_awarded":
         if (event.badge_image) BattleFX.showBadge(event.badge_image, event.badge_name);
         return null;
+      case "league_defeated": {
+        // Hold long enough to actually read the speech (Champions say more).
+        const grand = event.role === "champion";
+        const readMs = Math.min(14000, 2600 + (event.quote || "").length * 32);
+        if (event.portrait) BattleFX.showBadge(event.portrait, event.name, { grand, duration: readMs });
+        return wait(readMs);
+      }
       case "stat_change_fizzled":
         BattleFX.floatText(slot, `${STAT_SHORT[event.stat] || event.stat} won't change`, "info");
         return null;

@@ -803,6 +803,22 @@ def _announce_badge(battle_row: sqlite3.Row, battle: "be.BattleState", leader_na
     }])
 
 
+def _announce_league_defeat(battle_row: sqlite3.Row, battle: "be.BattleState", league_key: str):
+    """The Elite Four member's / Champion's parting words after you beat
+    them (one of their defeat_quotes, chosen now and stored in the event so
+    it stays the same on reload), plus who was defeated."""
+    entry = LEAGUE.get(league_key)
+    if not entry:
+        return
+    quotes = entry.get("defeat_quotes") or []
+    append_battle_events(battle_row["battle_id"], battle.turn_number, [{
+        "type": "league_defeated", "side": battle.winner_side,
+        "role": entry["role"], "name": entry["name"], "region": entry["generation"],
+        "quote": random.choice(quotes) if quotes else "",
+        "portrait": entry.get("portrait"),
+    }])
+
+
 def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> str | None:
     """Only a human winner gets rewards; losing costs nothing."""
     if battle.winner_side not in ("A", "B"):
@@ -842,12 +858,14 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         add_xp_and_coins(winner_user_id, LEAGUE_BATTLE_XP, LEAGUE_BATTLE_COIN)
         award_league_progress(winner_user_id, league_key)
         member_name = LEAGUE.get(league_key, {}).get("name", "the Elite Four member")
+        _announce_league_defeat(battle_row, battle, league_key)
         summary = f"+{LEAGUE_BATTLE_XP} XP, +{LEAGUE_BATTLE_COIN} coins! {member_name} has been defeated."
     elif battle_type == "champion":
         league_key = battle_row["side_b_npc_key"]
         add_xp_and_coins(winner_user_id, CHAMPION_BATTLE_XP, CHAMPION_BATTLE_COIN)
         award_league_progress(winner_user_id, league_key)
         champ_name = LEAGUE.get(league_key, {}).get("name", "the Champion")
+        _announce_league_defeat(battle_row, battle, league_key)
         summary = f"+{CHAMPION_BATTLE_XP} XP, +{CHAMPION_BATTLE_COIN} coins! {champ_name} has fallen — Champion crowned!"
     else:
         tclass = TRAINER_CLASS_BY_KEY.get(battle_row["side_b_npc_key"])

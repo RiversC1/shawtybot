@@ -69,7 +69,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/lorelei.png"
+    "portrait": "/static/elite_four/lorelei.png",
+    "defeat_quotes": [
+      "My ice has never cracked like that. You kept your head perfectly cool. Impressive.",
+      "Cold, precise, relentless... I thought that described my team. It seems it describes you.",
+      "You thawed every strategy I had. Go on, the next challenge will test you in a different way."
+    ]
   },
   {
     "member_key": "bruno",
@@ -141,7 +146,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/bruno.png"
+    "portrait": "/static/elite_four/bruno.png",
+    "defeat_quotes": [
+      "Hah! My training was rock solid, but your bond with your Pokémon hit harder!",
+      "Muscles alone weren't enough today. I'll push my limits even further. Go on ahead!",
+      "A fine fight! That's the kind of power that only comes from trusting your partners."
+    ]
   },
   {
     "member_key": "agatha",
@@ -213,7 +223,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/agatha.png"
+    "portrait": "/static/elite_four/agatha.png",
+    "defeat_quotes": [
+      "Hmph! You've got more spirit than I gave you credit for, child.",
+      "Heh heh... my ghosts don't frighten you, do they? Fine. Go see how far that courage takes you.",
+      "In all my years I've seen few trainers like you. Don't let it go to your head!"
+    ]
   },
   {
     "member_key": "lance",
@@ -285,7 +300,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/lance.png"
+    "portrait": "/static/elite_four/lance.png",
+    "defeat_quotes": [
+      "Your Pokémon rose above my dragons... Only one trainer stands beyond this door now.",
+      "I've never seen dragons fall with such dignity. You earned every step past me.",
+      "Remarkable. Walk on, the final battle of Kanto is waiting for you."
+    ]
   },
   {
     "member_key": "blue",
@@ -357,7 +377,11 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/blue.png"
+    "portrait": "/static/elite_four/blue.png",
+    "defeat_quotes": [
+      "I trained for so long to stand at the top, and I really thought nobody could take it from me. But you and your Pokémon... you're on another level. I guess I forgot what it means to battle alongside your partners instead of just in front of them. Congratulations. Kanto's got a new Champion.",
+      "No way... I was the best in the world just a moment ago. Your team didn't just fight for you, they believed in you. I think I finally get it. The title's yours, Champion. Don't you dare get rusty."
+    ]
   },
   {
     "member_key": "will",
@@ -429,7 +453,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/will.png"
+    "portrait": "/static/elite_four/will.png",
+    "defeat_quotes": [
+      "I foresaw every outcome except this one. How... unexpected.",
+      "My mind was sharp, but yours proved sharper. Very well, continue on.",
+      "I trained my psychic Pokémon for years to predict moves like yours. I'll need more years."
+    ]
   },
   {
     "member_key": "koga",
@@ -501,7 +530,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/koga.png"
+    "portrait": "/static/elite_four/koga.png",
+    "defeat_quotes": [
+      "Fwahaha! A ninja knows when he is beaten. You slipped through every trap I set.",
+      "Poison and patience have always served me well... but not today. Proceed!",
+      "You fought with the precision of a shinobi. My daughter would be impressed."
+    ]
   },
   {
     "member_key": "bruno",
@@ -573,7 +607,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/bruno.png"
+    "portrait": "/static/elite_four/bruno.png",
+    "defeat_quotes": [
+      "Again I fall short! Your team is stronger than raw strength alone.",
+      "I came back stronger, and you still overpowered me. I respect that!",
+      "Hah! Johto has a new powerhouse. Keep going, don't stop now!"
+    ]
   },
   {
     "member_key": "karen",
@@ -645,7 +684,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/karen.png"
+    "portrait": "/static/elite_four/karen.png",
+    "defeat_quotes": [
+      "Strong Pokémon, weak Pokémon... what really matters is the trainer. You proved that.",
+      "Not bad at all. You chose your favorites and fought for them. That's how it should be.",
+      "You got me. Go on, the Champion's room is right through there."
+    ]
   },
   {
     "member_key": "lance",
@@ -717,7 +761,11 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/lance.png"
+    "portrait": "/static/elite_four/lance.png",
+    "defeat_quotes": [
+      "It's over... and I've never been happier to lose. Your dragons may not be my dragons, but the trust between you and your Pokémon burns hotter than any flame. From this day on, you are Johto's Champion. Carry that title with the same heart you showed here.",
+      "A Champion isn't the strongest trainer. It's the one whose Pokémon will follow them anywhere. I felt that with every move you made. Congratulations. Johto has found its new Champion."
+    ]
   },
   {
     "member_key": "sidney",
@@ -789,7 +837,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/sidney.png"
+    "portrait": "/static/elite_four/sidney.png",
+    "defeat_quotes": [
+      "Whoa, what a rush! You beat me fair and square. No hard feelings!",
+      "Hah! Now that's a battle worth losing. Go show the rest what you've got!",
+      "I love a fight like that, even when I'm the one on the floor!"
+    ]
   },
   {
     "member_key": "phoebe",
@@ -861,7 +914,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/phoebe.png"
+    "portrait": "/static/elite_four/phoebe.png",
+    "defeat_quotes": [
+      "The spirits of Mt. Pyre are whispering your name... they seem to like you.",
+      "Our bond is strong, but yours is stronger. My Ghost Pokémon approve!",
+      "Wow... you didn't even flinch. I'll train harder, I promise!"
+    ]
   },
   {
     "member_key": "glacia",
@@ -933,7 +991,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/glacia.png"
+    "portrait": "/static/elite_four/glacia.png",
+    "defeat_quotes": [
+      "Such heat in your battling... it melted everything I brought from the north.",
+      "I traveled far looking for a trainer who burns this brightly. I think I found one.",
+      "My ice has never been tested like this. Warm hearts win battles, it seems."
+    ]
   },
   {
     "member_key": "drake",
@@ -1005,7 +1068,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/drake.png"
+    "portrait": "/static/elite_four/drake.png",
+    "defeat_quotes": [
+      "You fly higher than my dragons! Captain's orders: head on through to the Champion.",
+      "What a flight! You have everything a trainer needs, most of all a good heart.",
+      "My dragons and I have weathered storms, but not a storm like you."
+    ]
   },
   {
     "member_key": "wallace",
@@ -1077,7 +1145,11 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/wallace.png"
+    "portrait": "/static/elite_four/wallace.png",
+    "defeat_quotes": [
+      "Magnificent. Every move you made flowed like water, graceful and true. I've spent my life chasing beauty in battle, and you have just shown me something more beautiful still. Hoenn welcomes its new Champion. It has been an honor.",
+      "Win or lose, a battle like this stays in the heart forever. You and your Pokémon moved as one, and that is the rarest elegance of all. Congratulations, Champion. Wear the title as brilliantly as you battled."
+    ]
   },
   {
     "member_key": "aaron",
@@ -1149,7 +1221,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/aaron.png"
+    "portrait": "/static/elite_four/aaron.png",
+    "defeat_quotes": [
+      "Bug Pokémon are strong, but you... you were stronger. I'll work even harder!",
+      "I wanted to be the best, and you showed me how far I still have to go.",
+      "Wow, you really are something. Go on, don't keep the others waiting!"
+    ]
   },
   {
     "member_key": "bertha",
@@ -1221,7 +1298,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/bertha.png"
+    "portrait": "/static/elite_four/bertha.png",
+    "defeat_quotes": [
+      "Ahaha, you youngsters are full of surprises! That was a lovely battle, dear.",
+      "My, my! You've got deep roots, just like the ground itself. Go on now.",
+      "I've battled a long time and you still managed to teach me something!"
+    ]
   },
   {
     "member_key": "flint",
@@ -1293,7 +1375,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/flint.png"
+    "portrait": "/static/elite_four/flint.png",
+    "defeat_quotes": [
+      "That was a blazing battle! My fire's out, but yours is burning brighter than ever!",
+      "Yeah! That's the kind of fight that gets your heart racing! Go on, you've earned it!",
+      "Whew! My afro's still smoking from that one. You're the real deal!"
+    ]
   },
   {
     "member_key": "lucian",
@@ -1365,7 +1452,12 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/lucian.png"
+    "portrait": "/static/elite_four/lucian.png",
+    "defeat_quotes": [
+      "I have read a great many books about battling. None described a trainer like you.",
+      "A fascinating conclusion. I'll be thinking about this battle for quite some time.",
+      "Your reasoning was flawless. Please, continue to the Champion."
+    ]
   },
   {
     "member_key": "cynthia",
@@ -1437,6 +1529,10 @@
         ]
       }
     ],
-    "portrait": "/static/elite_four/cynthia.png"
+    "portrait": "/static/elite_four/cynthia.png",
+    "defeat_quotes": [
+      "Ah... it's been such a long time since I felt like this. The joy of a battle where both sides give everything. You didn't just defeat me; you reminded me why I fell in love with Pokémon in the first place. Sinnoh has a new Champion, and I couldn't be happier that it's you.",
+      "People and Pokémon grow together, meeting and understanding one another along the way. Everything your team did today came from that bond. Thank you for this battle. I'll never forget it. Congratulations, Champion of Sinnoh."
+    ]
   }
 ]

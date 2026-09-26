@@ -445,13 +445,17 @@ window.BattleFX = (function () {
     }, delay ?? 2200);
   }
 
-  // The badge a gym leader hands over after a gym win: pops into the middle
-  // of the scene with a glow and sparkles, lingers, then fades.
-  function showBadge(src, name) {
+  // The badge a gym leader hands over after a gym win (or, with a portrait,
+  // a defeated Elite Four member / Champion): pops into the middle of the
+  // scene with a glow and sparkles, lingers, then fades. `grand` is the
+  // Champion version: bigger, a golden flash and extra waves of sparkles.
+  function showBadge(src, name, opts) {
     if (!layer) return;
+    const grand = !!(opts && opts.grand);
+    const duration = (opts && opts.duration) || 3400;
     const at = { x: scene.clientWidth / 2, y: scene.clientHeight * 0.42 };
     const holder = document.createElement("div");
-    holder.className = "fx-badge-award";
+    holder.className = `fx-badge-award${grand ? " is-grand" : ""}${opts && opts.duration ? " is-portrait" : ""}`;
     holder.style.left = `${at.x}px`;
     holder.style.top = `${at.y}px`;
     const img = document.createElement("img");
@@ -465,10 +469,21 @@ window.BattleFX = (function () {
       { transform: "translate(-50%,-50%) scale(1) rotate(0deg)", opacity: 1, offset: 0.22 },
       { transform: "translate(-50%,-50%) scale(1)", opacity: 1, offset: 0.85 },
       { transform: "translate(-50%,-50%) scale(0.9)", opacity: 0 },
-    ], { duration: 3400, easing: "ease-out" });
+    ], { duration, easing: "ease-out" });
     const gold = { color: "#ffcb05", glow: "#fff6c8" };
-    flash(at, gold, 200);
+    flash(at, gold, grand ? 320 : 200);
+    if (grand) {
+      const tint = document.createElement("div");
+      tint.className = "fx-grand-tint";
+      layer.appendChild(tint);
+      run(tint, [{ opacity: 0 }, { opacity: 0.85, offset: 0.08 }, { opacity: 0.35, offset: 0.3 }, { opacity: 0.35, offset: 0.85 }, { opacity: 0 }], { duration });
+    }
     if (reduceMotionNow()) return;
+    if (grand) {
+      for (let wave = 1; wave <= 3; wave++) {
+        setTimeout(() => burst({ x: at.x + rand(-120, 120), y: at.y + rand(-60, 40) }, { ...gold, shape: "star" }, 14), 900 * wave);
+      }
+    }
     setTimeout(() => {
       for (let i = 0; i < 3; i++) {
         const r = particle("ring", at.x, at.y, 60, gold);
