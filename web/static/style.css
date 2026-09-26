@@ -4862,3 +4862,20 @@ img[src$="/trainers/nowa.png"] {
         position: static;
     }
 }
+
+/* Gym badge handed over after a gym win (BattleFX.showBadge) */
+.fx-badge-award {
+    position: absolute;
+    width: 150px;
+    height: 150px;
+    z-index: 6;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 230, 140, 0.55) 0%, rgba(255, 203, 5, 0.18) 45%, transparent 70%);
+}
+
+.fx-badge-award img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 14px rgba(255, 215, 90, 0.9)) drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
+}

@@ -10,6 +10,7 @@
     move_used: 500, damage: 600, confusion_self_hit: 600, status_damage: 600, recoil: 600,
     drain: 500, heal: 500, faint: 750, status_applied: 550, stat_changed: 500,
     cannot_act: 550, move_missed: 550, move_failed: 500, charge_start: 500, multi_hit_summary: 450,
+    badge_awarded: 3200,
   };
   const DEFAULT_EVENT_DELAY = 250; // structural events with no on-screen effect (turn_start, switch_out, battle_end)
 
@@ -331,7 +332,14 @@
   // The trainer/gym-leader/elite-four panel: portrait + name + team roster.
   // This is per-side identity, independent of whichever Pokémon is currently
   // out — that's renderHpLabel below.
+  // Trainer names (and custom gym leaders, who are trainers) are user-chosen
+  // text; everything else in the log/HUD comes from the game's own data.
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+
   function renderTrainerPanel(panelEl, name, avatar, roster, isWinner) {
+    name = esc(name);
     const avatarHtml = avatar ? `<img class="battle-trainer-portrait" src="${avatar}" alt="${name}">` : "";
     const rosterStrip = (roster || [])
       .map(
@@ -563,7 +571,8 @@
   // the log is built, since the active Pokémon per side changes over the
   // battle). Mixing these up is exactly the bug where a damage line showed
   // the trainer's name instead of the Pokémon actually taking the hit.
-  function formatEvent(event, nameBySide, monBySide) {
+  function formatEvent(event, rawNameBySide, monBySide) {
+    const nameBySide = { A: esc(rawNameBySide.A), B: esc(rawNameBySide.B) };
     const t = event.type;
     const side = nameBySide[event.side] || "";
     // When both active Pokémon are the same species, a bare "Charizard" is
@@ -639,6 +648,10 @@
       }
       case "faint":
         return `💀 <strong>${owned(event.side, event.name)}</strong> fainted!`;
+      case "badge_awarded": {
+        const recipient = truth.you && truth.you.side === event.side ? "you" : side;
+        return `🏅 <strong>${esc(event.leader_name)}</strong> rewards ${recipient} with the <strong>${esc(event.badge_name)}</strong>! Congratulations!`;
+      }
       default:
         return null;
     }
@@ -767,7 +780,7 @@
 
   // Events that begin a new "beat" (someone acting) start a fresh caption;
   // their consequences (damage, status, stat changes) append beneath it.
-  const CAPTION_STARTERS = new Set(["move_used", "charge_start", "cannot_act", "switch_in", "status_damage"]);
+  const CAPTION_STARTERS = new Set(["move_used", "charge_start", "cannot_act", "switch_in", "status_damage", "badge_awarded"]);
 
   function pctOf(amount, max) {
     if (!max) return "?";
@@ -843,6 +856,9 @@
         BattleFX.floatText(slot, `${STAT_SHORT[event.stat] || event.stat} ${up ? "+" : "−"}${Math.abs(event.change)}`, up ? "stat-up" : "stat-down");
         return wait(250);
       }
+      case "badge_awarded":
+        if (event.badge_image) BattleFX.showBadge(event.badge_image, event.badge_name);
+        return null;
       case "stat_change_fizzled":
         BattleFX.floatText(slot, `${STAT_SHORT[event.stat] || event.stat} won't change`, "info");
         return null;

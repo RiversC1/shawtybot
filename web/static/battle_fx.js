@@ -445,6 +445,42 @@ window.BattleFX = (function () {
     }, delay ?? 2200);
   }
 
+  // The badge a gym leader hands over after a gym win: pops into the middle
+  // of the scene with a glow and sparkles, lingers, then fades.
+  function showBadge(src, name) {
+    if (!layer) return;
+    const at = { x: scene.clientWidth / 2, y: scene.clientHeight * 0.42 };
+    const holder = document.createElement("div");
+    holder.className = "fx-badge-award";
+    holder.style.left = `${at.x}px`;
+    holder.style.top = `${at.y}px`;
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = name || "Badge";
+    holder.appendChild(img);
+    layer.appendChild(holder);
+    run(holder, [
+      { transform: "translate(-50%,-50%) scale(0.1) rotate(-200deg)", opacity: 0 },
+      { transform: "translate(-50%,-50%) scale(1.15) rotate(10deg)", opacity: 1, offset: 0.14 },
+      { transform: "translate(-50%,-50%) scale(1) rotate(0deg)", opacity: 1, offset: 0.22 },
+      { transform: "translate(-50%,-50%) scale(1)", opacity: 1, offset: 0.85 },
+      { transform: "translate(-50%,-50%) scale(0.9)", opacity: 0 },
+    ], { duration: 3400, easing: "ease-out" });
+    const gold = { color: "#ffcb05", glow: "#fff6c8" };
+    flash(at, gold, 200);
+    if (reduceMotionNow()) return;
+    setTimeout(() => {
+      for (let i = 0; i < 3; i++) {
+        const r = particle("ring", at.x, at.y, 60, gold);
+        run(r, [
+          { transform: "translate(-50%,-50%) scale(0.5)", opacity: 0.9 },
+          { transform: "translate(-50%,-50%) scale(3.5)", opacity: 0 },
+        ], { duration: 900, delay: i * 180, easing: "ease-out" });
+      }
+      burst(at, { ...gold, shape: "star" }, 16);
+    }, 350);
+  }
+
   function colorForType(type) {
     return TYPE_FX[type] ? TYPE_FX[type].color : null;
   }
@@ -460,7 +496,7 @@ window.BattleFX = (function () {
 
   return {
     isMotionOn: () => motionOn, setMotion,
-    init, playMove, floatText, statusEffect, statArrows, healSparkles, glowSprite,
+    init, playMove, floatText, showBadge, statusEffect, statArrows, healSparkles, glowSprite,
     caption, fadeCaption, colorForType, STATUS_FX, kit,
   };
 })();

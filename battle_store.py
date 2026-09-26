@@ -22,6 +22,7 @@ import random
 import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 import battle_engine as be
 
@@ -791,6 +792,17 @@ def display_name_for_side(battle_row: sqlite3.Row, side: str) -> str:
     return tclass["display_name"] if tclass else "Wild Trainer"
 
 
+def _announce_badge(battle_row: sqlite3.Row, battle: "be.BattleState", leader_name: str, badge_name: str,
+                    badge_image: str | None):
+    """Adds the "<leader> rewards you with the <badge>!" moment to the battle
+    itself, so the battle page plays it right after the win like any other
+    event (and it's still there on reload)."""
+    append_battle_events(battle_row["battle_id"], battle.turn_number, [{
+        "type": "badge_awarded", "side": battle.winner_side,
+        "leader_name": leader_name, "badge_name": badge_name, "badge_image": badge_image,
+    }])
+
+
 def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> str | None:
     """Only a human winner gets rewards; losing costs nothing."""
     if battle.winner_side not in ("A", "B"):
@@ -807,8 +819,10 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         gym_key = battle_row["side_b_npc_key"]
         add_xp_and_coins(winner_user_id, GYM_BATTLE_XP, GYM_BATTLE_COIN)
         award_badge(winner_user_id, gym_key)
-        badge_name = GYMS.get(gym_key, {}).get("badge_name", "Badge")
+        gym = GYMS.get(gym_key, {})
+        badge_name = gym.get("badge_name", "Badge")
         summary = f"+{GYM_BATTLE_XP} XP, +{GYM_BATTLE_COIN} coins, and the {badge_name}!"
+        _announce_badge(battle_row, battle, gym.get("leader_name", "The Gym Leader"), badge_name, gym.get("badge_image"))
     elif battle_type == CUSTOM_GYM_BATTLE_TYPE:
         owner = _custom_gym_owner(battle_row)
         gym = get_custom_gym(owner) if owner else None
@@ -816,6 +830,11 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         summary = f"+{GYM_BATTLE_XP} XP, +{GYM_BATTLE_COIN} coins"
         if owner and award_custom_badge(winner_user_id, owner):
             summary += f", and the {gym['badge_name'] if gym else 'custom badge'}!"
+            if gym:
+                with db() as conn:
+                    leader = trainer_display_name(conn, owner)
+                version = quote(gym["updated_at"], safe="")
+                _announce_badge(battle_row, battle, leader, gym["badge_name"], f"/custom-badges/{owner}.svg?v={version}")
         if award_custom_gym_reward_if_new(winner_user_id):
             summary += " 🎁 Your first custom-gym victory earned you a Challenger Pokémon! Check your collection."
     elif battle_type == "elite_four":
