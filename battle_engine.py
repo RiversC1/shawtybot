@@ -497,47 +497,226 @@ def _matchup_score(candidate: BattlerState, opponent: BattlerState) -> float:
     return my_best / max(opponent.current_hp, 1) - their_best / max(candidate.current_hp, 1)
 
 
+# The League AI evaluates every option by simulating the current 1-on-1
+# "race" a few turns ahead: after this turn's action (an attack, a boost, a
+# heal, a status move, or a switch), both Pokémon keep using their best
+# attack until one faints. An action's value is how that race ends, from
+# +1 (win at full HP) to -1 (lose without denting the foe). It's an
+# estimate (no randomness is consumed; the real turn is resolved normally)
+# but it lets boosting, healing, crippling status and switching be weighed
+# on the same scale as simply attacking.
+
+_RACE_TURNS = 12
+
+
+def _hit_chance(move: MoveData) -> float:
+    return 1.0 if move.accuracy is None or "always_hit" in move.flags else move.accuracy / 100
+
+
+def _with_changes(mon: BattlerState, stages: dict | None = None, status: str | None = "__keep__"):
+    """Context-free snapshot of a battler with hypothetical stat stages /
+    status, used only for estimates (the real battler is untouched)."""
+    clone = BattlerState.__new__(BattlerState)
+    clone.__dict__.update(mon.__dict__)
+    clone.stat_stages = dict(mon.stat_stages)
+    if stages:
+        for stat, change in stages.items():
+            if stat in clone.stat_stages:
+                clone.stat_stages[stat] = max(-6, min(6, clone.stat_stages[stat] + change))
+    if status != "__keep__":
+        clone.status = status
+    return clone
+
+
+def _best_attack(attacker: BattlerState, defender: BattlerState) -> float:
+    """Expected per-turn damage of attacker's best usable damaging move
+    (accuracy-weighted; recharge/charge moves count at their real rate)."""
+    best = 0.0
+    for slot in attacker.moves:
+        if slot.current_pp <= 0:
+            continue
+        m = slot.move
+        dmg = estimate_damage(attacker, defender, m)
+        if dmg <= 0:
+            continue
+        if m.min_hits and m.max_hits:
+            dmg *= (m.min_hits + m.max_hits) / 2
+        dmg *= _hit_chance(m)
+        if "recharge" in m.flags or ("charge" in m.flags and "semi_invulnerable" not in m.flags):
+            dmg *= 0.5
+        best = max(best, dmg)
+    return best
+
+
+def _race(me: BattlerState, foe: BattlerState, my_hp: float, foe_hp: float, *,
+          my_first_hit: float | None = None, i_act_first: bool | None = None,
+          foe_skips: float = 0.0, foe_chip: float = 0.0, foe_dmg_mult: float = 1.0,
+          my_skips_after_first: int = 0) -> float:
+    """Plays out the 1v1 from now. my_first_hit: damage of my move this turn
+    (None = my action this turn deals no damage). Returns +(my HP left
+    fraction) if I win, -(foe HP left fraction) if I lose."""
+    my_dmg = _best_attack(me, foe)
+    foe_dmg = _best_attack(foe, me) * foe_dmg_mult
+    first = i_act_first if i_act_first is not None else _effective_speed(me) > _effective_speed(foe)
+    speed_first = _effective_speed(me) > _effective_speed(foe)
+    for turn in range(_RACE_TURNS):
+        mine = (my_first_hit or 0.0) if turn == 0 else (0.0 if turn <= my_skips_after_first else my_dmg)
+        theirs = 0.0 if turn < foe_skips else foe_dmg
+        order_first = first if turn == 0 else speed_first
+        if order_first:
+            foe_hp -= mine
+            if foe_hp <= 0:
+                return max(my_hp, 0) / max(me.max_hp, 1)
+            my_hp -= theirs
+            if my_hp <= 0:
+                return -max(foe_hp, 0) / max(foe.max_hp, 1)
+        else:
+            my_hp -= theirs
+            if my_hp <= 0:
+                return -max(foe_hp, 0) / max(foe.max_hp, 1)
+            foe_hp -= mine
+            if foe_hp <= 0:
+                return max(my_hp, 0) / max(me.max_hp, 1)
+        foe_hp -= foe_chip * foe.max_hp
+        if foe_hp <= 0:
+            return max(my_hp, 0) / max(me.max_hp, 1)
+    return (my_hp / max(me.max_hp, 1)) - (foe_hp / max(foe.max_hp, 1))
+
+
+def _value_move(battle: BattleState, side_id: str, move: MoveData) -> float:
+    me = battle.side(side_id).active
+    foe = battle.other(side_id).active
+    acc = _hit_chance(move)
+    if move.priority != 0:
+        first = move.priority > 0
+    else:
+        first = _effective_speed(me) > _effective_speed(foe)
+    wasted = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first)
+
+    if move.category != "status" and move.power:
+        dmg = estimate_damage(me, foe, move)
+        if dmg <= 0:
+            return wasted - 0.01
+        if move.min_hits and move.max_hits:
+            dmg *= (move.min_hits + move.max_hits) / 2
+        if "charge" in move.flags and "semi_invulnerable" not in move.flags:
+            # Nothing lands this turn; the hit comes next turn.
+            hit = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first)
+            return hit - 0.05
+        my_hp = me.current_hp
+        if move.recoil_percent:
+            my_hp -= min(dmg, foe.current_hp) * move.recoil_percent / 100
+        if move.drain_percent:
+            my_hp = min(me.max_hp, my_hp + min(dmg, foe.current_hp) * move.drain_percent / 100)
+        skips = 1 if "recharge" in move.flags and dmg < foe.current_hp else 0
+        hit = _race(me, foe, my_hp, foe.current_hp, my_first_hit=dmg, i_act_first=first, my_skips_after_first=skips)
+        if move.ailment and move.ailment_chance and foe.status is None:
+            hit += 0.03 * move.ailment_chance / 100
+        return acc * hit + (1 - acc) * wasted
+
+    # Healing myself.
+    if move.healing_percent and move.target == "self":
+        heal = me.max_hp * move.healing_percent / 100
+        if first:
+            healed_hp = min(me.max_hp, me.current_hp + heal)
+        else:
+            foe_hit = _best_attack(foe, me)
+            if foe_hit >= me.current_hp:
+                return wasted - 0.01
+            healed_hp = min(me.max_hp, me.current_hp - foe_hit + heal) + foe_hit  # race subtracts the hit
+        return _race(me, foe, healed_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first) - 0.01
+
+    # Boosting myself: stats change after my move, so the foe's hit this turn
+    # lands on the old stats; the race approximates both with the new ones
+    # except for this turn's order.
+    if move.target == "self" and move.stat_changes:
+        changes = {STAT_ALIASES.get(sc.get("stat"), sc.get("stat")): sc.get("change", 0) for sc in move.stat_changes}
+        if all(v <= 0 for v in changes.values()):
+            return wasted - 0.02
+        boosted = _with_changes(me, changes)
+        v = _race(boosted, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first)
+        # Boosts outlast this foe: a small bonus for the rest of the fight,
+        # but only if I'd survive to use it.
+        if v > 0:
+            v += 0.08 * sum(max(0, c) for c in changes.values())
+        return acc * v + (1 - acc) * wasted - 0.02
+
+    # Crippling the foe.
+    if move.target != "self" and move.ailment and move.ailment_chance >= 50:
+        if move.stat_changes and any(sc.get("change", 0) > 0 for sc in move.stat_changes):
+            return wasted - 0.05  # Swagger/Flatter boost the foe
+        p = acc * move.ailment_chance / 100
+        a = move.ailment
+        if a == "confusion":
+            if foe.confusion_counter > 0:
+                return wasted - 0.01
+            v = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first, foe_dmg_mult=0.62)
+        else:
+            if foe.status is not None:
+                return wasted - 0.01
+            if a == "sleep":
+                v = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first, foe_skips=3 if first else 2)
+            elif a == "paralysis":
+                crippled = _with_changes(foe, status="paralysis")
+                v = _race(me, crippled, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first, foe_dmg_mult=0.75)
+            elif a == "burn":
+                phys = foe.stats["attack"] >= foe.stats["sp_attack"]
+                v = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first,
+                          foe_dmg_mult=0.55 if phys else 1.0, foe_chip=1 / 16)
+            elif a == "toxic":
+                v = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first, foe_chip=3 / 16)
+            elif a == "poison":
+                v = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first, foe_chip=1 / 8)
+            elif a == "freeze":
+                v = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first, foe_skips=3)
+            else:
+                return wasted - 0.01
+        return p * v + (1 - p) * wasted - 0.01
+
+    # Lowering the foe's stats.
+    if move.target != "self" and move.stat_changes and all(sc.get("change", 0) < 0 for sc in move.stat_changes):
+        changes = {STAT_ALIASES.get(sc.get("stat"), sc.get("stat")): sc.get("change", 0) for sc in move.stat_changes}
+        weakened = _with_changes(foe, changes)
+        p = acc * (move.stat_chance or 100) / 100
+        v = _race(me, weakened, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first)
+        return p * v + (1 - p) * wasted - 0.02
+
+    return wasted - 0.05  # Protect, Heal Pulse, etc.: no effect here, or helps the foe
+
+
+def _value_switch(battle: BattleState, side_id: str, index: int) -> float:
+    """Switching in costs the new Pokémon a free hit from the foe."""
+    cand = battle.side(side_id).roster[index]
+    foe = battle.other(side_id).active
+    hit = _best_attack(foe, cand)
+    if hit >= cand.current_hp:
+        return -1.0
+    return _race(cand, foe, cand.current_hp - hit, foe.current_hp)
+
+
 def pick_npc_action_hard(battle: BattleState, side_id: str) -> Action:
     la = legal_actions(battle, side_id)
     side = battle.side(side_id)
-    opp = battle.other(side_id)
-    active = side.active
-    opp_active = opp.active
 
     if not la["usable_move_indices"]:
         if la["can_switch"]:
-            best_idx = max(la["switchable_indices"], key=lambda i: _matchup_score(side.roster[i], opp_active))
+            best_idx = max(la["switchable_indices"], key=lambda i: _value_switch(battle, side_id, i))
             return Action(kind="switch", side=side_id, switch_to_index=best_idx)
         return Action(kind="move", side=side_id, move_index=None)
 
-    if la["can_switch"]:
-        current_score = _matchup_score(active, opp_active)
-        can_ko_now = any(
-            estimate_damage(active, opp_active, active.moves[i].move) >= opp_active.current_hp
-            for i in la["usable_move_indices"]
-        )
-        if not can_ko_now and current_score < -0.15:
-            best_idx, best_score = None, current_score
-            for i in la["switchable_indices"]:
-                score = _matchup_score(side.roster[i], opp_active)
-                if score > best_score + 0.1:  # meaningful improvement, not a coin flip
-                    best_idx, best_score = i, score
-            if best_idx is not None:
-                return Action(kind="switch", side=side_id, switch_to_index=best_idx)
+    scored = [(i, _value_move(battle, side_id, side.active.moves[i].move)) for i in la["usable_move_indices"]]
+    best_i, best_v = max(scored, key=lambda s: s[1])
 
-    scored = [
-        (i, estimate_damage(active, opp_active, active.moves[i].move))
-        for i in la["usable_move_indices"]
-    ]
-    damaging = [(i, dmg) for i, dmg in scored if dmg > 0]
-    if damaging:
-        lethal = [s for s in damaging if s[1] >= opp_active.current_hp]
-        pool = lethal if lethal else damaging
-        best_score = max(s for _, s in pool)
-        top = [i for i, s in pool if s >= best_score - 1e-6]
-        return Action(kind="move", side=side_id, move_index=battle.rng.choice(top))
+    # Switch only when staying in loses and a teammate clearly does better,
+    # even after taking a hit on the way in.
+    if la["can_switch"] and best_v < 0:
+        sw_i, sw_v = max(((i, _value_switch(battle, side_id, i)) for i in la["switchable_indices"]), key=lambda s: s[1])
+        if sw_v > best_v + 0.25:
+            return Action(kind="switch", side=side_id, switch_to_index=sw_i)
 
-    return Action(kind="move", side=side_id, move_index=battle.rng.choice(la["usable_move_indices"]))
+    # Pick among the near-best options so the League isn't fully predictable.
+    top = [i for i, v in scored if v >= best_v - 0.03]
+    return Action(kind="move", side=side_id, move_index=battle.rng.choice(top))
 
 
 def pick_npc_forced_switch_hard(battle: BattleState, side_id: str) -> int:
@@ -545,8 +724,9 @@ def pick_npc_forced_switch_hard(battle: BattleState, side_id: str) -> int:
     if not la["switchable_indices"]:
         raise ValueError("No switchable Pokémon left")
     side = battle.side(side_id)
-    opp_active = battle.other(side_id).active
-    return max(la["switchable_indices"], key=lambda i: _matchup_score(side.roster[i], opp_active))
+    foe = battle.other(side_id).active
+    # A replacement after a faint comes in without taking a hit.
+    return max(la["switchable_indices"], key=lambda i: _race(side.roster[i], foe, side.roster[i].current_hp, foe.current_hp))
 
 
 # ---------------------------------------------------------------------------
