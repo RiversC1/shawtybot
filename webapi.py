@@ -2141,6 +2141,8 @@ def get_league(user_id: int = Depends(get_current_user_id)):
         "unlocked": unlocked,
         "generations": generations,
         "badges_earned": len(battle_store.get_badges(user_id) & set(battle_store.GYMS.keys())),
+        "max_legendaries": battle_store.LEAGUE_MAX_LEGENDARIES,
+        "team_legendaries": [POKEDEX[d]["name"] for d in battle_store.get_team(user_id) if battle_store.is_legendary_species(d)],
         "badges_total": len(battle_store.GYMS),
     }
 
@@ -2199,6 +2201,9 @@ async def start_elite_four_battle(generation: str, member_key: str, user_id: int
     roster_a = battle_store.build_roster_for_player(user_id)
     if not roster_a:
         raise HTTPException(400, "You need to set your team first — use the Team page.")
+    problem = battle_store.league_team_problem(user_id)
+    if problem:
+        raise HTTPException(400, problem)
     next_key = battle_store.next_elite_four_key(user_id, generation)
     if next_key is None:
         raise HTTPException(400, f"You've already defeated {generation.title()}'s entire Elite Four!")
@@ -2226,6 +2231,9 @@ async def start_champion_battle(generation: str, user_id: int = Depends(get_curr
     roster_a = battle_store.build_roster_for_player(user_id)
     if not roster_a:
         raise HTTPException(400, "You need to set your team first — use the Team page.")
+    problem = battle_store.league_team_problem(user_id)
+    if problem:
+        raise HTTPException(400, problem)
     if not battle_store.champion_unlocked(user_id, generation):
         raise HTTPException(400, f"Defeat all 4 of {generation.title()}'s Elite Four first.")
     earned = battle_store.get_league_progress(user_id)

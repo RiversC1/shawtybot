@@ -29,6 +29,23 @@
     <code>/poke elite4</code> / <code>/poke champion</code> in Discord.
 </p>
 
+{% set legends = league.team_legendaries or [] %}
+{% set max_leg = league.max_legendaries or 1 %}
+<div class="card league-rule{{ ' is-broken' if legends|length > max_leg else '' }}">
+    <span class="league-rule-icon" aria-hidden="true">{{ "⚠️" if legends|length > max_leg else "⭐" }}</span>
+    <div>
+        <strong>League rule: max {{ max_leg }} legendary Pokémon per team.</strong>
+        {% if legends|length > max_leg %}
+        <span>Your team has {{ legends|length }} ({{ legends|join(", ") }}), so you can't challenge anyone until you
+        <a href="/team">swap some out</a>.</span>
+        {% elif legends %}
+        <span class="muted">Your team's legendary: {{ legends[0] }}. You're good to go.</span>
+        {% else %}
+        <span class="muted">Your team has none. You're good to go.</span>
+        {% endif %}
+    </div>
+</div>
+
 {% for gen in league.generations %}
 <section class="league-generation">
     <h2 class="league-generation-title">{{ gen.generation|capitalize }} League</h2>

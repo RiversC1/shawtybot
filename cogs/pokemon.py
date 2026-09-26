@@ -2328,6 +2328,10 @@ class Pokemon(commands.Cog):
                 "You need to set your team first! Use `/poke team` or the Team page on the web app.", ephemeral=True
             )
             return
+        problem = battle_store.league_team_problem(interaction.user.id)
+        if problem:
+            await interaction.response.send_message(f"🔒 {problem}", ephemeral=True)
+            return
 
         generation = region.value
         league_key = battle_store.next_elite_four_key(interaction.user.id, generation)
@@ -2378,6 +2382,10 @@ class Pokemon(commands.Cog):
             await interaction.response.send_message(
                 "You need to set your team first! Use `/poke team` or the Team page on the web app.", ephemeral=True
             )
+            return
+        problem = battle_store.league_team_problem(interaction.user.id)
+        if problem:
+            await interaction.response.send_message(f"🔒 {problem}", ephemeral=True)
             return
 
         generation = region.value

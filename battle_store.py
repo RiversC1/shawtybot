@@ -539,6 +539,29 @@ def champion_unlocked(user_id: int, generation: str) -> bool:
 LEAGUE_REWARD_DEX_ID = 494
 
 
+# Poké League team rule: at most this many legendary/mythical Pokémon on
+# your team for Elite Four and Champion battles. The reward-only Mystery
+# Pokémon don't count (they're flagged mythical in the data only as
+# placeholders).
+LEAGUE_MAX_LEGENDARIES = 1
+
+
+def is_legendary_species(dex_id: int) -> bool:
+    if dex_id in (LEAGUE_REWARD_DEX_ID, CUSTOM_GYM_REWARD_DEX_ID):
+        return False
+    mon = POKEDEX.get(dex_id, {})
+    return bool(mon.get("is_legendary") or mon.get("is_mythical"))
+
+
+def league_team_problem(user_id: int) -> str | None:
+    """Why this trainer's current team can't enter a League battle, or None."""
+    legends = [POKEDEX[d]["name"] for d in get_team(user_id) if is_legendary_species(d)]
+    if len(legends) <= LEAGUE_MAX_LEGENDARIES:
+        return None
+    return (f"The Poké League allows only {LEAGUE_MAX_LEGENDARIES} legendary Pokémon per team — "
+            f"yours has {len(legends)} ({', '.join(legends)}). Swap some out on the Team page.")
+
+
 def league_completion(user_id: int) -> tuple[int, int]:
     """(earned, total) across every Elite Four member + Champion in the game."""
     earned = len(get_league_progress(user_id) & set(LEAGUE.keys()))
