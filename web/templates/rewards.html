@@ -2,46 +2,7 @@
 {% block title %}Rewards — ShawtyBot Pokémon{% endblock %}
 {% block content %}
 <h1>Rewards</h1>
-<p class="muted">Special one-off rewards for going above and beyond in the Poké League.</p>
-
-{% set pct = (rewards.league_earned / rewards.league_total * 100) if rewards.league_total else 0 %}
-{% set state = "claimed" if rewards.reward.obtained else ("ready" if rewards.league_complete else "locked") %}
-<div class="card reward-card is-{{ state }}">
-    <div class="reward-art">
-        <img src="{{ rewards.reward.artwork or '/static/mystery_pokemon.svg' }}" alt="{{ rewards.reward.name }}">
-        {% if state == "locked" %}<span class="reward-art-lock" aria-hidden="true">🔒</span>{% endif %}
-    </div>
-    <div class="reward-info">
-        <div class="gym-hero-eyebrow">Poké League Completionist</div>
-        <h2 class="gym-hero-title">{{ rewards.reward.name }}</h2>
-        <div class="reward-status">
-            {{ "Claimed" if state == "claimed" else ("Ready" if state == "ready" else "Locked") }}
-        </div>
-
-        <div class="reward-progress">
-            <div class="badge-summary-top">
-                <span class="badge-summary-label">League battles won</span>
-                <span class="badge-summary-count">{{ rewards.league_earned }} / {{ rewards.league_total }}</span>
-            </div>
-            <div class="badge-summary-bar">
-                <div class="badge-summary-fill" style="width: {{ pct | round(1) }}%"></div>
-            </div>
-        </div>
-
-        {% if state == "claimed" %}
-        <p>🎁 <strong>Claimed!</strong> You've defeated every Elite Four member and Champion across all 4 regions.</p>
-        <p class="muted">Its real identity is still being decided — check back later for the full reveal.</p>
-        {% elif state == "ready" %}
-        <p>🎁 You've completed the Poké League! Your reward will appear here shortly.</p>
-        {% else %}
-        <p class="muted">
-            Defeat every Elite Four member and Champion across Kanto, Johto, Hoenn and Sinnoh to unlock a
-            Mystery Pokémon.
-        </p>
-        <a href="/league" class="btn-secondary reward-cta">Go to the Poké League →</a>
-        {% endif %}
-    </div>
-</div>
+<p class="muted">Conquer the entire Poké League to earn a Mega Evolution of your choice.</p>
 
 {% set mega = rewards.mega or {} %}
 <section class="card mega-card{{ ' is-claimed' if mega.chosen else (' is-ready' if rewards.league_complete else ' is-locked') }}" id="mega-reward">

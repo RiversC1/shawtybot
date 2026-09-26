@@ -222,7 +222,7 @@ LEGENDARY_PENALTY = 0.08
 # The trainer who summoned the spawn (via /poke spawn-daily) gets a slight edge.
 SUMMONER_BONUS = 1.3
 # Species that only ever enter a collection through a specific reward path
-# (currently: the Poké League completionist Mystery Pokémon) — never a
+# (the retired League Mystery Pokémon, the custom-gym Challenger Pokémon) — never a
 # natural wild spawn, even a rare-weighted one.
 REWARD_ONLY_DEX_IDS = {battle_store.LEAGUE_REWARD_DEX_ID, battle_store.CUSTOM_GYM_REWARD_DEX_ID}
 # Odds that any given spawn is shiny — intentionally very rare.
@@ -893,7 +893,7 @@ class Pokemon(commands.Cog):
     def dex_total(self) -> int:
         """Species that count toward Pokédex completion (Megas are a reward
         form, not a species to register)."""
-        return sum(1 for m in self.pokedex.values() if not m.get("is_mega"))
+        return sum(1 for d in self.pokedex if battle_store.counts_toward_pokedex(d))
         for coffer_key, cfg in COFFERS.items():
             self.tasks.append(
                 self.bot.loop.create_task(self._coffer_loop(coffer_key, cfg["interval_seconds"]))
@@ -1433,11 +1433,15 @@ class Pokemon(commands.Cog):
                     continue
                 tier = cat["tiers"][tier_key]
                 if stat_value >= tier["threshold"]:
+                    # The web API may unlock the same tier concurrently; only
+                    # the insert that lands grants the rewards.
                     with sqlite3.connect(DB_PATH) as conn:
-                        conn.execute(
-                            "INSERT INTO poke_achievements (user_id, achievement_key, unlocked_at) VALUES (?, ?, ?)",
+                        cur = conn.execute(
+                            "INSERT OR IGNORE INTO poke_achievements (user_id, achievement_key, unlocked_at) VALUES (?, ?, ?)",
                             (user_id, achievement_key, datetime.now(timezone.utc).isoformat()),
                         )
+                    if cur.rowcount == 0:
+                        continue
                     for item, qty in tier["rewards"].items():
                         self.add_item(user_id, item, qty)
                     newly_unlocked.append({
@@ -2434,7 +2438,7 @@ class Pokemon(commands.Cog):
         )
         await interaction.response.send_message(embed=embed)
 
-    @poke.command(name="rewards", description="See your progress toward the Poké League completionist reward")
+    @poke.command(name="rewards", description="See your progress toward the Poké League reward (a Mega Evolution)")
     async def poke_rewards(self, interaction: discord.Interaction):
         if not self.get_trainer(interaction.user.id):
             await interaction.response.send_message(
@@ -2443,21 +2447,13 @@ class Pokemon(commands.Cog):
             return
 
         earned, total = battle_store.league_completion(interaction.user.id)
-        reward_mon = self.pokedex.get(battle_store.LEAGUE_REWARD_DEX_ID, {})
-        has_reward = battle_store.has_league_reward(interaction.user.id)
 
         embed = discord.Embed(title="Poké League Completionist Reward", color=discord.Color.purple())
+        embed.description = (
+            "Defeat every Elite Four member and Champion across all 4 regions "
+            "(`/poke elite4`, `/poke champion`) to choose one Mega Evolution."
+        )
         embed.add_field(name="Progress", value=f"{earned} / {total} League battles won", inline=False)
-        if has_reward:
-            embed.description = (
-                f"🎁 **Claimed!** You've defeated every Elite Four and Champion and received "
-                f"**{reward_mon.get('name', 'the Mystery Pokémon')}**! Check it out on the web Rewards page."
-            )
-        else:
-            embed.description = (
-                "Defeat every Elite Four member and Champion across all 4 regions "
-                "(`/poke elite4`, `/poke champion`) to unlock a special Mystery Pokémon."
-            )
         mega_id = battle_store.get_mega_choice(interaction.user.id)
         if mega_id:
             mega_text = f"✨ You chose **{self.pokedex.get(mega_id, {}).get('name', 'a Mega')}**."

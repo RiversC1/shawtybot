@@ -271,10 +271,15 @@ def check_and_unlock_achievements(conn: sqlite3.Connection, target_id: int) -> l
                 continue
             tier = cat["tiers"][tier_key]
             if stat_value >= tier["threshold"]:
-                conn.execute(
-                    "INSERT INTO poke_achievements (user_id, achievement_key, unlocked_at) VALUES (?, ?, ?)",
+                # Another request (e.g. the profile page's parallel calls, or
+                # the bot) may unlock the same tier at the same moment; only
+                # the one whose insert lands grants the rewards.
+                cur = conn.execute(
+                    "INSERT OR IGNORE INTO poke_achievements (user_id, achievement_key, unlocked_at) VALUES (?, ?, ?)",
                     (target_id, achievement_key, datetime.now(timezone.utc).isoformat()),
                 )
+                if cur.rowcount == 0:
+                    continue
                 for item, qty in tier["rewards"].items():
                     add_item_sql(conn, target_id, item, qty)
                 newly_unlocked.append({"category": cat_key, "tier": tier_key, "rewards": tier["rewards"]})
@@ -470,7 +475,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
                 "sprite": fav_mon.get("sprite"),
             }
 
-    dex_total = sum(1 for m in POKEDEX.values() if not m.get("is_mega"))
+    dex_total = sum(1 for d in POKEDEX if battle_store.counts_toward_pokedex(d))
 
     earned_badges = battle_store.get_badges(target_id)
     badges_by_region = [
@@ -651,7 +656,7 @@ def get_rankings(user_id: int = Depends(get_current_user_id)):
         "totals": {
             "badges": len(gym_keys),
             "league": len(battle_store.LEAGUE),
-            "pokedex": len([d for d, m in POKEDEX.items() if d not in (battle_store.LEAGUE_REWARD_DEX_ID, battle_store.CUSTOM_GYM_REWARD_DEX_ID) and not m.get("is_mega")]),
+            "pokedex": len([d for d in POKEDEX if battle_store.counts_toward_pokedex(d) and d != battle_store.CUSTOM_GYM_REWARD_DEX_ID]),
             "win_rate_min_battles": RANKING_MIN_BATTLES_FOR_WIN_RATE,
         },
     }
@@ -843,7 +848,7 @@ def get_pokedex_full(user_id: int = Depends(get_current_user_id)):
     held = {r["dex_id"]: {"count": r["count"], "has_shiny": bool(r["has_shiny"])} for r in held_rows}
 
     result = []
-    for dex_id in sorted(d for d, m in POKEDEX.items() if not m.get("is_mega")):
+    for dex_id in sorted(d for d in POKEDEX if battle_store.counts_toward_pokedex(d)):
         mon = POKEDEX[dex_id]
         h = held.get(dex_id)
         if mon.get("is_mythical"):
@@ -2255,18 +2260,10 @@ async def start_champion_battle(generation: str, user_id: int = Depends(get_curr
 @app.get("/api/rewards")
 def get_rewards(user_id: int = Depends(get_current_user_id)):
     earned, total = battle_store.league_completion(user_id)
-    reward_mon = POKEDEX.get(battle_store.LEAGUE_REWARD_DEX_ID, {})
     return {
         "league_earned": earned,
         "league_total": total,
         "league_complete": earned >= total,
-        "reward": {
-            "dex_id": battle_store.LEAGUE_REWARD_DEX_ID,
-            "name": reward_mon.get("name", "Mystery Pokémon"),
-            "artwork": reward_mon.get("artwork"),
-            "category": reward_mon.get("category"),
-            "obtained": battle_store.has_league_reward(user_id),
-        },
         "mega": {
             "chosen": _mega_card(battle_store.get_mega_choice(user_id)),
             "options": [_mega_card(d) for d in battle_store.MEGA_REWARD_DEX_IDS],

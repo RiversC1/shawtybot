@@ -539,12 +539,19 @@ def champion_unlocked(user_id: int, generation: str) -> bool:
     return next_elite_four_key(user_id, generation) is None
 
 
-# Poké League completionist reward: a one-off mystery Pokémon (real design
-# TBD — a "???" placeholder in data/pokemon.json for now) granted the moment
-# a user has defeated every Elite Four member and every Champion across all
-# 4 generations. Excluded from normal wild spawns (see cogs/pokemon.py's
-# roll_spawn_mon) so this is the only way to obtain it.
+# Retired: the League completionist's original "Mystery Pokémon" reward (a
+# placeholder, #494), replaced by the pick-one Mega Evolution. It's no
+# longer granted, but the data entry stays so anyone who already received one
+# keeps it; it's hidden from the Pokédex and completion totals (see
+# counts_toward_pokedex) since it can't be obtained anymore.
 LEAGUE_REWARD_DEX_ID = 494
+
+
+def counts_toward_pokedex(dex_id: int) -> bool:
+    """Species listed in the Pokédex and counted in completion totals: not
+    Mega forms, and not the retired Mystery Pokémon."""
+    mon = POKEDEX.get(dex_id)
+    return bool(mon) and not mon.get("is_mega") and dex_id != LEAGUE_REWARD_DEX_ID
 
 
 # Poké League team rule: at most this many legendary/mythical Pokémon on
@@ -623,37 +630,6 @@ def league_fully_completed(user_id: int) -> bool:
     return earned >= total
 
 
-def has_league_reward(user_id: int) -> bool:
-    with db() as conn:
-        row = conn.execute(
-            "SELECT 1 FROM poke_collection WHERE user_id = ? AND dex_id = ? LIMIT 1",
-            (user_id, LEAGUE_REWARD_DEX_ID),
-        ).fetchone()
-    return row is not None
-
-
-def award_league_reward_if_new(user_id: int) -> bool:
-    """Grants the League completionist's mystery Pokémon exactly once — safe
-    to call unconditionally any time (checks league_fully_completed() itself,
-    on top of never granting a duplicate). Returns True only the one time it
-    actually granted it."""
-    if not league_fully_completed(user_id) or has_league_reward(user_id):
-        return False
-    now = datetime.now(timezone.utc).isoformat()
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, "
-            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
-            "VALUES (?, ?, ?, 0, 31, 31, 31, 31, 31, 31)",
-            (user_id, LEAGUE_REWARD_DEX_ID, now),
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
-            (user_id, LEAGUE_REWARD_DEX_ID, now),
-        )
-    return True
-
-
 # ---------- Custom (player-run) gyms ----------
 # A trainer who has completed the whole Poké League can open their own gym:
 # a name, a type, a badge they design, and a team of 3-6 of their own
@@ -666,7 +642,7 @@ CUSTOM_GYM_BATTLE_TYPE = "custom_gym"
 CUSTOM_GYM_MIN_TEAM = 3
 CUSTOM_GYM_MAX_TEAM = 6
 # One-off reward Pokémon for a trainer's first custom-gym victory. Like the
-# League's Mystery Pokémon: a placeholder until its real design exists, and
+# League's old Mystery Pokémon: a placeholder until its real design exists, and
 # excluded from wild spawns (cogs/pokemon.py's REWARD_ONLY_DEX_IDS).
 CUSTOM_GYM_REWARD_DEX_ID = 495
 
@@ -946,8 +922,8 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         add_xp_and_coins(winner_user_id, rewards["xp"], rewards["coin"])
         summary = f"+{rewards['xp']} XP, +{rewards['coin']} coins"
 
-    if battle_type in ("elite_four", "champion") and award_league_reward_if_new(winner_user_id):
-        summary += " 🎁 You've conquered the entire Poké League and received a Mystery Pokémon! Check the Rewards page."
+    if battle_type in ("elite_four", "champion") and league_fully_completed(winner_user_id) and get_mega_choice(winner_user_id) is None:
+        summary += " 🎁 You've conquered the entire Poké League! Pick your Mega Evolution on the Rewards page."
 
     return summary
 
