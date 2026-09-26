@@ -129,6 +129,15 @@
     } else if (!victoryMusicOn) {
       BattleAudio.stopMusic();
     }
+    playResultSound();
+  }
+
+  // The victory theme (or win/lose jingle), played once. Normally triggered
+  // by playEventFx at the moment the win is shown on screen: the badge or
+  // Elite Four/Champion message if there is one, otherwise the battle_end
+  // event. syncMusicAndResult is the fallback for loading an already-
+  // finished battle.
+  function playResultSound() {
     if (truth.status === "finished" && !resultSoundPlayed) {
       resultSoundPlayed = true;
       const iWon = truth.you && truth.you.side && truth.winner_side === truth.you.side;
@@ -137,8 +146,10 @@
         BattleAudio.playVictoryMusic();
         updateMuteBtn();
       } else if (truth.you && truth.you.side) {
+        BattleAudio.stopMusic();
         BattleAudio.playSfx(iWon ? "victory" : "defeat");
       } else if (truth.winner_side) {
+        BattleAudio.stopMusic();
         BattleAudio.playSfx("victory");
       }
     }
@@ -865,10 +876,17 @@
         BattleFX.floatText(slot, `${STAT_SHORT[event.stat] || event.stat} ${up ? "+" : "−"}${Math.abs(event.change)}`, up ? "stat-up" : "stat-down");
         return wait(250);
       }
+      case "battle_end":
+        // Wait for the badge / defeat message if one follows, so the music
+        // lands together with it.
+        if (!pendingEvents.some((e) => e.type === "badge_awarded" || e.type === "league_defeated")) playResultSound();
+        return null;
       case "badge_awarded":
+        playResultSound();
         if (event.badge_image) BattleFX.showBadge(event.badge_image, event.badge_name);
         return null;
       case "league_defeated": {
+        playResultSound();
         // Hold long enough to actually read the speech (Champions say more).
         const grand = event.role === "champion";
         const readMs = Math.min(14000, 2600 + (event.quote || "").length * 32);
