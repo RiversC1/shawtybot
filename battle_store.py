@@ -37,6 +37,14 @@ def showdown_sprite_slug(name: str) -> str:
     'hooh'), except the gender symbols on Nidoran, which become a literal
     f/m ('Nidoran♀' -> 'nidoranf'). Verified against the live CDN for a
     sample including every one of these edge cases in our Gen 1-4 dataset."""
+    if name.startswith("Mega "):
+        # Showdown names Megas "<species>-mega[x|y]": "Mega Charizard X" ->
+        # "charizard-megax", "Mega Venusaur" -> "venusaur-mega".
+        rest = name[len("Mega "):]
+        form = ""
+        if rest.endswith((" X", " Y")):
+            rest, form = rest[:-2], rest[-1].lower()
+        return f"{showdown_sprite_slug(rest)}-mega{form}"
     name = name.replace("♀", "f").replace("♂", "m")
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
@@ -223,7 +231,7 @@ def build_roster_for_random_trainer(class_key: str) -> list["be.BattlerState"]:
     size = random.randint(lo, hi)
     candidates = [
         dex_id for dex_id, mon in POKEDEX.items()
-        if not mon.get("is_legendary") and not mon.get("is_mythical")
+        if not mon.get("is_legendary") and not mon.get("is_mythical") and not mon.get("is_mega")
         and any(t in tclass["preferred_types"] for t in mon.get("types", []))
     ]
     chosen = random.sample(candidates, min(size, len(candidates)))
@@ -560,6 +568,48 @@ def league_team_problem(user_id: int) -> str | None:
         return None
     return (f"The Poké League allows only {LEAGUE_MAX_LEGENDARIES} legendary Pokémon per team — "
             f"yours has {len(legends)} ({', '.join(legends)}). Swap some out on the Team page.")
+
+
+# Poké League completionist's second reward: the trainer picks ONE Mega
+# Evolution (non-legendary, Gen 1-4 bases; see scripts/fetch_mega_data.py)
+# and receives it as a Pokémon in their collection. The pick is permanent,
+# and Megas can't be traded, so each trainer only ever has the one they chose.
+MEGA_REWARD_DEX_IDS: list[int] = sorted(d for d, m in POKEDEX.items() if m.get("is_mega"))
+
+
+def is_mega(dex_id: int) -> bool:
+    return bool(POKEDEX.get(dex_id, {}).get("is_mega"))
+
+
+def get_mega_choice(user_id: int) -> int | None:
+    with db() as conn:
+        row = conn.execute("SELECT dex_id FROM poke_mega_choice WHERE user_id = ?", (user_id,)).fetchone()
+    return row["dex_id"] if row else None
+
+
+def claim_mega_reward(user_id: int, dex_id: int) -> str | None:
+    """Grants the chosen Mega. Returns an error message, or None on success."""
+    if dex_id not in MEGA_REWARD_DEX_IDS:
+        return "That isn't one of the available Mega Evolutions."
+    if not league_fully_completed(user_id):
+        return "Complete the entire Poké League to claim a Mega Evolution."
+    now = datetime.now(timezone.utc).isoformat()
+    with db() as conn:
+        # The primary key makes this the one and only pick, even if two
+        # requests race.
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO poke_mega_choice (user_id, dex_id, chosen_at) VALUES (?, ?, ?)",
+            (user_id, dex_id, now),
+        )
+        if cur.rowcount == 0:
+            return "You've already chosen your Mega Evolution."
+        conn.execute(
+            "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, "
+            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
+            "VALUES (?, ?, ?, 0, 31, 31, 31, 31, 31, 31)",
+            (user_id, dex_id, now),
+        )
+    return None
 
 
 def league_completion(user_id: int) -> tuple[int, int]:

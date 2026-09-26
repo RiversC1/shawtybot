@@ -42,4 +42,51 @@
         {% endif %}
     </div>
 </div>
+
+{% set mega = rewards.mega or {} %}
+<section class="card mega-card{{ ' is-claimed' if mega.chosen else (' is-ready' if rewards.league_complete else ' is-locked') }}" id="mega-reward">
+    <div class="mega-head">
+        <div>
+            <div class="gym-hero-eyebrow">Poké League Completionist</div>
+            <h2 class="gym-hero-title">Mega Evolution</h2>
+        </div>
+        <div class="reward-status">{{ "Claimed" if mega.chosen else ("Ready" if rewards.league_complete else "Locked") }}</div>
+    </div>
+
+    {% if mega.chosen %}
+    {% set m = mega.chosen %}
+    <div class="mega-chosen">
+        <img src="{{ m.artwork }}" alt="{{ m.name }}">
+        <div>
+            <h3>{{ m.name }}</h3>
+            <div class="favorite-types">{% for t in m.types %}<span class="type-badge type-{{ t }}">{{ t|capitalize }}</span>{% endfor %}</div>
+            <p class="muted">Ability: {{ m.ability }} · Base stat total {{ m.stat_total }}</p>
+            <p>It's in your collection. Add it to your team on the <a href="/team">Team page</a>.</p>
+        </div>
+    </div>
+    {% elif rewards.league_complete %}
+    <p>Choose <strong>one</strong> Mega Evolution to add to your collection. <strong>This choice is permanent</strong>, and Megas can't be traded.</p>
+    <input type="text" id="mega-search" class="search-input mega-search" placeholder="Search by name or type...">
+    <div class="mega-grid" id="mega-grid"></div>
+    <div class="mega-confirm" id="mega-confirm" hidden>
+        <img id="mega-confirm-img" alt="">
+        <div class="mega-confirm-text">
+            <strong id="mega-confirm-name"></strong>
+            <span class="muted">You can only ever pick one. Are you sure?</span>
+        </div>
+        <div class="mega-confirm-actions">
+            <button type="button" class="btn-secondary" id="mega-cancel">Keep looking</button>
+            <button type="button" class="btn-primary" id="mega-claim">Claim this Mega</button>
+        </div>
+        <p class="error" id="mega-error" hidden></p>
+    </div>
+    <script type="application/json" id="mega-data">{{ mega.options|tojson }}</script>
+    <script src="/static/rewards_mega.js"></script>
+    {% else %}
+    <p class="muted">Complete the Poké League ({{ rewards.league_earned }} / {{ rewards.league_total }} battles won) to choose one of {{ (mega.options or [])|length }} Mega Evolutions, such as Mega Charizard X, Mega Gengar or Mega Garchomp.</p>
+    <div class="mega-teaser">
+        {% for m in (mega.options or [])[:8] %}<img src="{{ m.artwork }}" alt="" loading="lazy">{% endfor %}
+    </div>
+    {% endif %}
+</section>
 {% endblock %}

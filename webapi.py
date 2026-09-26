@@ -470,7 +470,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
                 "sprite": fav_mon.get("sprite"),
             }
 
-    dex_total = len(POKEDEX)
+    dex_total = sum(1 for m in POKEDEX.values() if not m.get("is_mega"))
 
     earned_badges = battle_store.get_badges(target_id)
     badges_by_region = [
@@ -651,7 +651,7 @@ def get_rankings(user_id: int = Depends(get_current_user_id)):
         "totals": {
             "badges": len(gym_keys),
             "league": len(battle_store.LEAGUE),
-            "pokedex": len([d for d in POKEDEX if d not in (battle_store.LEAGUE_REWARD_DEX_ID, battle_store.CUSTOM_GYM_REWARD_DEX_ID)]),
+            "pokedex": len([d for d, m in POKEDEX.items() if d not in (battle_store.LEAGUE_REWARD_DEX_ID, battle_store.CUSTOM_GYM_REWARD_DEX_ID) and not m.get("is_mega")]),
             "win_rate_min_battles": RANKING_MIN_BATTLES_FOR_WIN_RATE,
         },
     }
@@ -843,7 +843,7 @@ def get_pokedex_full(user_id: int = Depends(get_current_user_id)):
     held = {r["dex_id"]: {"count": r["count"], "has_shiny": bool(r["has_shiny"])} for r in held_rows}
 
     result = []
-    for dex_id in sorted(POKEDEX.keys()):
+    for dex_id in sorted(d for d, m in POKEDEX.items() if not m.get("is_mega")):
         mon = POKEDEX[dex_id]
         h = held.get(dex_id)
         if mon.get("is_mythical"):
@@ -2267,4 +2267,37 @@ def get_rewards(user_id: int = Depends(get_current_user_id)):
             "category": reward_mon.get("category"),
             "obtained": battle_store.has_league_reward(user_id),
         },
+        "mega": {
+            "chosen": _mega_card(battle_store.get_mega_choice(user_id)),
+            "options": [_mega_card(d) for d in battle_store.MEGA_REWARD_DEX_IDS],
+        },
     }
+
+
+def _mega_card(dex_id: int | None) -> dict | None:
+    if dex_id is None or dex_id not in POKEDEX:
+        return None
+    mon = POKEDEX[dex_id]
+    base = POKEDEX.get(mon.get("mega_of"), {})
+    return {
+        "dex_id": dex_id,
+        "name": mon["name"],
+        "base_name": base.get("name"),
+        "types": mon["types"],
+        "artwork": mon["artwork"],
+        "ability": format_ability_name(mon["abilities"][0]["name"]) if mon.get("abilities") else None,
+        "base_stats": mon["base_stats"],
+        "stat_total": sum(mon["base_stats"].values()),
+    }
+
+
+class MegaChoiceRequest(BaseModel):
+    dex_id: int
+
+
+@app.post("/api/rewards/mega")
+def claim_mega(body: MegaChoiceRequest, user_id: int = Depends(get_current_user_id)):
+    error = battle_store.claim_mega_reward(user_id, body.dex_id)
+    if error:
+        raise HTTPException(400, error)
+    return {"ok": True, "chosen": _mega_card(body.dex_id)}

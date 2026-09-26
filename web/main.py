@@ -628,6 +628,16 @@ async def proxy_get_league(request: Request):
     return JSONResponse(data, status_code=status)
 
 
+@app.post("/api/proxy/rewards/mega")
+async def proxy_claim_mega(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, "/api/rewards/mega", body)
+    return JSONResponse(data, status_code=status)
+
+
 @app.get("/api/proxy/rewards")
 async def proxy_get_rewards(request: Request):
     session = request.cookies.get(SESSION_COOKIE)

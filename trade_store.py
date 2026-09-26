@@ -143,10 +143,12 @@ def set_offer(trade_id: int, side: str, catch_id: int) -> tuple[bool, str | None
     catch_col = "side_a_catch_id" if side == "A" else "side_b_catch_id"
     with db() as conn:
         owned = conn.execute(
-            "SELECT 1 FROM poke_collection WHERE id = ? AND user_id = ?", (catch_id, user_id)
+            "SELECT dex_id FROM poke_collection WHERE id = ? AND user_id = ?", (catch_id, user_id)
         ).fetchone()
         if not owned:
             return False, "You don't own that Pokémon."
+        if battle_store.is_mega(owned["dex_id"]):
+            return False, "Mega Evolutions are a personal Poké League reward and can't be traded."
         conn.execute(
             f"UPDATE poke_trades SET {catch_col} = ?, side_a_confirmed = 0, side_b_confirmed = 0, "
             "updated_at = ? WHERE trade_id = ?",

@@ -322,7 +322,7 @@ def roll_spawn_mon(pokedex: dict[int, dict]) -> dict:
     """Pick a random species (legendaries/mythicals are much rarer) and roll
     whether this particular spawn is shiny. Returns a shallow copy so the
     shared pokedex entries are never mutated."""
-    population = [p for p in pokedex.values() if p["id"] not in REWARD_ONLY_DEX_IDS]
+    population = [p for p in pokedex.values() if p["id"] not in REWARD_ONLY_DEX_IDS and not p.get("is_mega")]
     weights = [LEGENDARY_SPAWN_WEIGHT if is_rare(p) else 1.0 for p in population]
     base = random.choices(population, weights=weights, k=1)[0]
     mon = dict(base)
@@ -888,6 +888,12 @@ class Pokemon(commands.Cog):
             self.bot.loop.create_task(self._startup()),
             self.bot.loop.create_task(self._sweep_loop()),
         ]
+
+    @property
+    def dex_total(self) -> int:
+        """Species that count toward Pokédex completion (Megas are a reward
+        form, not a species to register)."""
+        return sum(1 for m in self.pokedex.values() if not m.get("is_mega"))
         for coffer_key, cfg in COFFERS.items():
             self.tasks.append(
                 self.bot.loop.create_task(self._coffer_loop(coffer_key, cfg["interval_seconds"]))
@@ -1174,6 +1180,13 @@ class Pokemon(commands.Cog):
                 )
             """)
             conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_mega_choice (
+                    user_id INTEGER PRIMARY KEY,
+                    dex_id INTEGER NOT NULL,
+                    chosen_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS poke_custom_badges (
                     user_id INTEGER NOT NULL,
                     owner_user_id INTEGER NOT NULL,
@@ -1363,8 +1376,8 @@ class Pokemon(commands.Cog):
         return {
             "total_caught": total,
             "unique_species": unique,
-            "dex_total": len(self.pokedex),
-            "dex_percent": round(unique / len(self.pokedex) * 100, 1) if self.pokedex else 0,
+            "dex_total": self.dex_total,
+            "dex_percent": round(unique / self.dex_total * 100, 1) if self.dex_total else 0,
         }
 
     def get_shiny_count(self, user_id: int) -> int:
@@ -1767,6 +1780,8 @@ class Pokemon(commands.Cog):
         current = (current or "").lower()
         choices = []
         for mon in self.pokedex.values():
+            if mon.get("is_mega"):
+                continue
             if current and current not in mon["name"].lower():
                 continue
             choices.append(app_commands.Choice(name=mon["name"], value=mon["name"]))
@@ -2443,6 +2458,14 @@ class Pokemon(commands.Cog):
                 "Defeat every Elite Four member and Champion across all 4 regions "
                 "(`/poke elite4`, `/poke champion`) to unlock a special Mystery Pokémon."
             )
+        mega_id = battle_store.get_mega_choice(interaction.user.id)
+        if mega_id:
+            mega_text = f"✨ You chose **{self.pokedex.get(mega_id, {}).get('name', 'a Mega')}**."
+        elif earned >= total:
+            mega_text = "✨ **Ready to claim!** Pick your one Mega Evolution on the web Rewards page (`/poke web`)."
+        else:
+            mega_text = "🔒 Complete the Poké League to pick one Mega Evolution (e.g. Mega Charizard X) as a reward."
+        embed.add_field(name="Mega Evolution", value=mega_text, inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 

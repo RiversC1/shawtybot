@@ -4924,3 +4924,182 @@ img[src$="/trainers/nowa.png"] {
     margin-top: 2px;
     font-size: 0.9em;
 }
+
+/* ---------- Mega Evolution reward (Rewards page) ---------- */
+
+.mega-card {
+    margin-top: 20px;
+    padding: 24px;
+    border-color: rgba(126, 200, 255, 0.35);
+    background:
+        radial-gradient(ellipse at 100% 0%, rgba(126, 200, 255, 0.10), transparent 55%),
+        radial-gradient(ellipse at 0% 100%, rgba(255, 110, 200, 0.08), transparent 55%),
+        var(--surface);
+}
+
+.mega-card.is-locked {
+    border-color: var(--border);
+}
+
+.mega-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.mega-head .gym-hero-title {
+    margin: 2px 0 0;
+}
+
+.mega-search {
+    width: 100%;
+    margin: 6px 0 14px;
+}
+
+.mega-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    max-height: 560px;
+    overflow-y: auto;
+    padding: 2px;
+}
+
+.mega-option {
+    --t: #a8a878;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 8px;
+    border-radius: 12px;
+    border: 2px solid color-mix(in srgb, var(--t) 30%, transparent);
+    background: radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--t) 28%, transparent), transparent 62%), #0c0c14;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.mega-option:hover {
+    border-color: var(--t);
+    transform: translateY(-3px);
+}
+
+.mega-option.is-selected {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px var(--t), 0 10px 26px color-mix(in srgb, var(--t) 40%, transparent);
+}
+
+.mega-option img {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.45));
+}
+
+.mega-option-name {
+    font-weight: bold;
+    font-size: 0.92em;
+    text-align: center;
+}
+
+.mega-option-meta {
+    font-size: 0.72em;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.mega-option.tint-normal { --t: #A8A878; } .mega-option.tint-fire { --t: #F08030; }
+.mega-option.tint-water { --t: #6890F0; } .mega-option.tint-grass { --t: #78C850; }
+.mega-option.tint-electric { --t: #F8D030; } .mega-option.tint-ice { --t: #98D8D8; }
+.mega-option.tint-fighting { --t: #C03028; } .mega-option.tint-poison { --t: #A040A0; }
+.mega-option.tint-ground { --t: #E0C068; } .mega-option.tint-flying { --t: #A890F0; }
+.mega-option.tint-psychic { --t: #F85888; } .mega-option.tint-bug { --t: #A8B820; }
+.mega-option.tint-rock { --t: #B8A038; } .mega-option.tint-ghost { --t: #705898; }
+.mega-option.tint-dragon { --t: #7038F8; } .mega-option.tint-dark { --t: #705848; }
+.mega-option.tint-steel { --t: #B8B8D0; } .mega-option.tint-fairy { --t: #EE99AC; }
+
+.mega-confirm {
+    position: sticky;
+    bottom: 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--surface-alt);
+    border: 1px solid var(--yellow);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.mega-confirm img {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+}
+
+.mega-confirm-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 160px;
+}
+
+.mega-confirm-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.mega-confirm .error {
+    flex-basis: 100%;
+    margin: 0;
+}
+
+.mega-chosen {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.mega-chosen img {
+    width: 200px;
+    height: 200px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 22px rgba(126, 200, 255, 0.45)) drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
+}
+
+.mega-chosen h3 {
+    margin: 0 0 6px;
+    font-size: 1.5em;
+}
+
+.mega-teaser {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.mega-teaser img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    filter: brightness(0) opacity(0.35);
+}
+
+.mega-card.is-claimed .reward-status,
+.mega-card.is-ready .reward-status {
+    color: #1a1a26;
+    background: var(--yellow);
+}
+
+.mega-chosen .favorite-types {
+    justify-content: flex-start;
+}
