@@ -888,16 +888,16 @@ class Pokemon(commands.Cog):
             self.bot.loop.create_task(self._startup()),
             self.bot.loop.create_task(self._sweep_loop()),
         ]
+        for coffer_key, cfg in COFFERS.items():
+            self.tasks.append(
+                self.bot.loop.create_task(self._coffer_loop(coffer_key, cfg["interval_seconds"]))
+            )
 
     @property
     def dex_total(self) -> int:
         """Species that count toward Pokédex completion (Megas are a reward
         form, not a species to register)."""
         return sum(1 for d in self.pokedex if battle_store.counts_toward_pokedex(d))
-        for coffer_key, cfg in COFFERS.items():
-            self.tasks.append(
-                self.bot.loop.create_task(self._coffer_loop(coffer_key, cfg["interval_seconds"]))
-            )
 
     def cog_unload(self):
         for task in self.tasks:
