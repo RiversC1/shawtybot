@@ -67,6 +67,7 @@
   weatherChip.className = "battle-weather-chip";
   weatherChip.hidden = true;
   sceneEl.append(weatherLayer, weatherChip);
+  const weatherFx = window.BattleWeather ? window.BattleWeather.attach(sceneEl) : null;
   // What the scene currently shows; follows weather events during playback
   // and resyncs to the server's state afterward.
   let visibleWeather = null; // { weather, turns, suppressed }
@@ -80,6 +81,7 @@
   function renderWeather() {
     const w = visibleWeather;
     for (const k of Object.keys(WEATHER_INFO)) sceneEl.classList.toggle(`weather-${k}`, !!w && w.weather === k && !w.suppressed);
+    if (weatherFx) weatherFx.set(w && !w.suppressed ? w.weather : null);
     if (!w) {
       weatherChip.hidden = true;
       return;
@@ -252,7 +254,11 @@
     const motionToggle = document.getElementById("br-motion-toggle");
     if (motionToggle) {
       motionToggle.checked = BattleFX.isMotionOn();
-      motionToggle.addEventListener("change", () => BattleFX.setMotion(motionToggle.checked));
+      sceneEl.classList.toggle("motion-off", !motionToggle.checked);
+      motionToggle.addEventListener("change", () => {
+        BattleFX.setMotion(motionToggle.checked);
+        sceneEl.classList.toggle("motion-off", !motionToggle.checked);
+      });
     }
 
     function setOpen(open) {
@@ -447,6 +453,27 @@
     if (mon.confused) chips.push(`<span class="cond-chip is-confused">Confused</span>`);
     return chips.length ? `<div class="cond-chips">${chips.join("")}</div>` : "";
   }
+
+  // Battle GIFs are small pixel art (roughly 40-110px), so scale each one up
+  // from its own natural size (crisp, keeps relative sizes between species)
+  // by the slot's --sprite-zoom, capped to fit the slot. Big static artwork
+  // (the fallback) and trainer avatars just get capped.
+  function sizeSprite(img) {
+    if (!img.naturalWidth) return;
+    const cs = getComputedStyle(img);
+    const zoom = parseFloat(cs.getPropertyValue("--sprite-zoom")) || 1;
+    const maxW = parseFloat(cs.getPropertyValue("--sprite-max-w")) || 200;
+    const maxH = parseFloat(cs.getPropertyValue("--sprite-max-h")) || 200;
+    const w = img.naturalWidth * zoom;
+    const h = img.naturalHeight * zoom;
+    const k = Math.min(1, maxW / w, maxH / h);
+    img.style.width = `${Math.round(w * k)}px`;
+    img.style.height = `${Math.round(h * k)}px`;
+  }
+  for (const img of [spriteA, spriteB]) {
+    img.addEventListener("load", () => sizeSprite(img));
+  }
+  window.addEventListener("resize", () => { sizeSprite(spriteA); sizeSprite(spriteB); });
 
   function renderSprite(spriteEl, activeMon, animClass) {
     if (!activeMon) {
