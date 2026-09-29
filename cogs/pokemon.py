@@ -54,7 +54,7 @@ XP_SHINY_BONUS = 50
 XP_LEGENDARY_BONUS = 30
 XP_PER_EVOLUTION = 20
 XP_PER_STARTER = 10
-XP_PER_COFFER = {"silver": 5, "golden": 10, "diamond": 15}
+XP_PER_COFFER = {"silver": 5, "golden": 10, "diamond": 15, "master": 40}
 
 
 def xp_for_level(level: int) -> int:
@@ -180,7 +180,7 @@ STORE_ITEMS = {
     "pokeball": {"label": "Poké Ball", "price": 5},
     "greatball": {"label": "Great Ball", "price": 15},
     "ultraball": {"label": "Ultra Ball", "price": 35},
-    "masterball": {"label": "Master Ball", "price": 1500},
+    "masterball": {"label": "Master Ball", "price": 10000},
     "fire-stone": {"label": "Fire Stone", "price": 80},
     "water-stone": {"label": "Water Stone", "price": 80},
     "thunder-stone": {"label": "Thunder Stone", "price": 80},
@@ -266,6 +266,14 @@ COFFERS = {
         "interval_seconds": 60 * 60,
         "rewards": {"pokeball": (8, 15), "ultraball": (2, 4), "candy": (3, 6), "coin": (30, 50)},
         "masterball_chance": 0.15,
+    },
+    "master": {
+        "label": "Master Coffer",
+        "color": discord.Color.purple(),
+        "image": "https://archives.bulbagarden.net/media/upload/2/21/SugimoriMasterBall.png",
+        "interval_seconds": 8 * 60 * 60,
+        "rewards": {"ultraball": (5, 10), "candy": (6, 10), "coin": (150, 300)},
+        "masterball_chance": 0.5,
     },
 }
 
@@ -964,6 +972,12 @@ class Pokemon(commands.Cog):
                 )
             """)
             conn.execute("""
+                CREATE TABLE IF NOT EXISTS poke_coffer_schedule (
+                    coffer_key TEXT PRIMARY KEY,
+                    next_spawn_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS poke_active_coffers (
                     message_id INTEGER PRIMARY KEY,
                     channel_id INTEGER NOT NULL,
@@ -1623,13 +1637,40 @@ class Pokemon(commands.Cog):
                 log.error(f"Random Pokémon spawn failed: {e}", exc_info=True)
 
     async def _coffer_loop(self, coffer_key: str, interval_seconds: int):
+        """Spawns the coffer every interval_seconds. The next spawn time is
+        kept in the DB, so a bot restart (every deploy) doesn't reset the
+        timer — otherwise long ones like the 8-hour Master Coffer would
+        rarely ever get to spawn."""
         await self.bot.wait_until_ready()
         while not self.bot.is_closed():
-            await asyncio.sleep(interval_seconds)
+            wait = self._coffer_wait_seconds(coffer_key, interval_seconds)
+            if wait > 0:
+                await asyncio.sleep(wait)
             try:
                 await self._spawn_coffer(coffer_key)
             except Exception as e:
                 log.error(f"Coffer spawn failed ({coffer_key}): {e}", exc_info=True)
+            self._set_next_coffer_spawn(coffer_key, datetime.now(timezone.utc) + timedelta(seconds=interval_seconds))
+
+    def _coffer_wait_seconds(self, coffer_key: str, interval_seconds: int) -> float:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT next_spawn_at FROM poke_coffer_schedule WHERE coffer_key = ?", (coffer_key,)
+            ).fetchone()
+        now = datetime.now(timezone.utc)
+        if not row:
+            next_at = now + timedelta(seconds=interval_seconds)
+            self._set_next_coffer_spawn(coffer_key, next_at)
+        else:
+            next_at = datetime.fromisoformat(row[0])
+        return max(0.0, (next_at - now).total_seconds())
+
+    def _set_next_coffer_spawn(self, coffer_key: str, next_at: datetime):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO poke_coffer_schedule (coffer_key, next_spawn_at) VALUES (?, ?)",
+                (coffer_key, next_at.isoformat()),
+            )
 
     async def _sweep_loop(self):
         await self.bot.wait_until_ready()

@@ -154,7 +154,7 @@ STORE_ITEMS = {
     "pokeball": {"label": "Poké Ball", "price": 5},
     "greatball": {"label": "Great Ball", "price": 15},
     "ultraball": {"label": "Ultra Ball", "price": 35},
-    "masterball": {"label": "Master Ball", "price": 1500},
+    "masterball": {"label": "Master Ball", "price": 10000},
     "fire-stone": {"label": "Fire Stone", "price": 80},
     "water-stone": {"label": "Water Stone", "price": 80},
     "thunder-stone": {"label": "Thunder Stone", "price": 80},
