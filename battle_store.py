@@ -221,16 +221,20 @@ def build_roster_for_player(user_id: int) -> list["be.BattlerState"] | None:
 
 def build_roster_for_gym(gym_key: str) -> list["be.BattlerState"]:
     gym = GYMS[gym_key]
+    # Held items: the leader's ace in the first four gyms of a region; the
+    # ace plus their next-strongest Pokémon in gyms 5-8.
+    items = npc_held_items(gym["roster"], 1 if gym["order"] <= 4 else 2)
     return [
-        be.build_battler_state(POKEDEX[entry["dex_id"]], entry["moves"], entry.get("ability"))
-        for entry in gym["roster"]
+        be.build_battler_state(POKEDEX[entry["dex_id"]], entry["moves"], entry.get("ability"), item=items[i])
+        for i, entry in enumerate(gym["roster"])
     ]
 
 
 # League difficulty: Elite Four Pokémon roll IVs of 25-31 per stat each
-# battle (strong, not flawless); Champions field perfect IVs and every
-# Pokémon holds an item picked for it (see champion_held_items).
+# battle (strong, not flawless) and half the team holds an item; Champions
+# field perfect IVs and every Pokémon holds an item picked for it.
 ELITE_FOUR_IV_RANGE = (25, 31)
+ELITE_FOUR_ITEM_HOLDERS = 3
 
 
 def build_roster_for_league(league_key: str) -> list["be.BattlerState"]:
@@ -242,11 +246,27 @@ def build_roster_for_league(league_key: str) -> list["be.BattlerState"]:
             for i, m in enumerate(entry["roster"])
         ]
     lo, hi = ELITE_FOUR_IV_RANGE
+    items = npc_held_items(entry["roster"], ELITE_FOUR_ITEM_HOLDERS)
     return [
         be.build_battler_state(POKEDEX[m["dex_id"]], m["moves"], m.get("ability"),
-                               ivs={k: random.randint(lo, hi) for k in be.IV_STAT_KEYS})
-        for m in entry["roster"]
+                               ivs={k: random.randint(lo, hi) for k in be.IV_STAT_KEYS}, item=items[i])
+        for i, m in enumerate(entry["roster"])
     ]
+
+
+def npc_held_items(roster: list[dict], holders: int) -> list[str | None]:
+    """Items for only some of an NPC's team: the ace (last slot) first, then
+    the strongest of the rest by base stat total. Each gets the item that
+    fits it best (champion_held_items' rules), still no duplicates."""
+    bst = lambda m: sum(POKEDEX[m["dex_id"]]["base_stats"].values())  # noqa: E731
+    ace = len(roster) - 1
+    rest = sorted(range(ace), key=lambda i: bst(roster[i]), reverse=True)
+    chosen = ([ace] + rest)[:max(0, holders)]
+    picks = champion_held_items([roster[i] for i in chosen])
+    out: list[str | None] = [None] * len(roster)
+    for i, item in zip(chosen, picks):
+        out[i] = item
+    return out
 
 
 def champion_held_items(roster: list[dict]) -> list[str | None]:
@@ -1173,10 +1193,11 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
     return summary
 
 
-# NPC difficulty tiers. Random trainers: the loose weighted-random AI. Gym
-# leaders: "medium" (the League AI most turns, the loose pick the rest, and
-# smart replacements after a faint). Elite Four / Champions: the full League
-# AI (Champions also get perfect IVs and held items; see build_roster_for_league).
+# NPC difficulty tiers. Random trainers: the loose weighted-random AI, no
+# items. Gym leaders: "medium" (the League AI most turns, the loose pick the
+# rest, and smart replacements after a faint) with 1-2 held items. Elite Four
+# / Champions: the full League AI (items on half the team / the whole team;
+# see build_roster_for_gym and build_roster_for_league).
 HARD_AI_BATTLE_TYPES = {"elite_four", "champion"}
 MEDIUM_AI_BATTLE_TYPES = {"gym", "custom_gym"}
 
