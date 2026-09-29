@@ -191,7 +191,7 @@
     for (const mon of pageItems) {
       const item = document.createElement("div");
       item.className = "picker-item";
-      item.innerHTML = `<img src="${mon.artwork}" alt="${mon.name}">
+      item.innerHTML = `<img src="${artThumb(mon.artwork)}" alt="${mon.name}">
         <div>${mon.name}${mon.is_shiny ? " ✨" : ""}</div>
         <div class="muted">${mon.count > 1 ? `${mon.count} owned &middot; ` : ""}best IV ${mon.best_iv_percent}%</div>`;
       item.addEventListener("click", () => {
@@ -224,7 +224,7 @@
     for (const mon of individuals) {
       const item = document.createElement("div");
       item.className = "picker-item";
-      item.innerHTML = `<img src="${mon.artwork}" alt="${mon.name}">
+      item.innerHTML = `<img src="${artThumb(mon.artwork)}" alt="${mon.name}">
         <div>${mon.nickname || mon.name}${mon.is_shiny ? " ✨" : ""}</div>
         <div class="muted">IV ${mon.iv_percent}%</div>`;
       item.addEventListener("click", () => choosePick(mon));
@@ -268,13 +268,13 @@
         <div class="trade-review-columns">
             <div class="trade-review-col">
                 <div class="trade-propose-label">You Give</div>
-                <img src="${myPick.artwork}" alt="${myPick.name}">
+                <img src="${artThumb(myPick.artwork)}" alt="${myPick.name}">
                 <div>${myPick.nickname || myPick.name}${myPick.is_shiny ? " ✨" : ""}</div>
             </div>
             <div class="trade-swap-icon">⇄</div>
             <div class="trade-review-col">
                 <div class="trade-propose-label">You Receive</div>
-                <img src="${theirPick.artwork}" alt="${theirPick.name}">
+                <img src="${artThumb(theirPick.artwork)}" alt="${theirPick.name}">
                 <div>${theirPick.nickname || theirPick.name}${theirPick.is_shiny ? " ✨" : ""}</div>
             </div>
         </div>
@@ -397,7 +397,7 @@
       return `
         <div class="trade-review-col trade-card-mon" data-mon='${JSON.stringify(mon).replace(/'/g, "&apos;")}'>
             <div class="trade-propose-label">${label}</div>
-            <img src="${mon.artwork}" alt="${mon.name}">
+            <img src="${artThumb(mon.artwork)}" alt="${mon.name}">
             <div>${mon.nickname || mon.name}${mon.is_shiny ? " ✨" : ""}</div>
             <div class="muted">IV ${mon.iv_percent}%</div>
         </div>`;

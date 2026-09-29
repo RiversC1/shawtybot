@@ -74,7 +74,7 @@
         <button class="btn-secondary config-btn" data-index="${index}">Configure →</button>
       </div>
       <div class="team-card-mon">
-        <img src="${mon.artwork}" alt="${mon.name}">
+        <img src="${artThumb(mon.artwork)}" alt="${mon.name}">
         <h3>${mon.name}</h3>
         ${mon.forms && mon.forms.length ? `<div class="team-card-forme">${mon.form_label}</div>` : ""}
         <div class="favorite-types" style="justify-content:center;">${typeBadges(mon.types)}</div>
@@ -132,7 +132,7 @@
       tile.dataset.index = i;
       tile.innerHTML = mon
         ? `<span class="lineup-slot-num">${i + 1}</span>
-           <img src="${mon.artwork}" alt="" draggable="false">
+           <img src="${artThumb(mon.artwork)}" alt="" draggable="false">
            <span class="lineup-slot-name">${mon.name}</span>`
         : `<span class="lineup-slot-num">${i + 1}</span><span class="lineup-slot-plus">+</span><span class="lineup-slot-name muted">Empty</span>`;
       if (mon) {
@@ -276,7 +276,7 @@
       const onTeam = taken.has(mon.dex_id);
       item.className = `picker-item team-picker-item tint-${mainType}${onTeam ? " is-on-team" : ""}`;
       item.innerHTML = `
-        <img src="${mon.artwork}" alt="${mon.name}" loading="lazy">
+        <img src="${artThumb(mon.artwork)}" alt="${mon.name}" loading="lazy">
         <div class="team-picker-name">${mon.name}${mon.has_shiny ? " ✨" : ""}</div>
         <div class="team-picker-types">${typeBadges(mon.types)}</div>
         ${onTeam ? '<div class="team-picker-onteam">On team</div>' : ""}`;
@@ -387,7 +387,7 @@
       card.classList.toggle("selected", f.key === configSelectedForm);
       card.disabled = !item.owned && f.key !== configSelectedForm;
       card.innerHTML = `
-        <img src="${f.artwork}" alt="" loading="lazy">
+        <img src="${artThumb(f.artwork)}" alt="" loading="lazy">
         <span class="config-forme-name">${f.label}</span>
         <span class="config-forme-stats">${statLabels.map(([k, l]) => `${l} ${f.base_stats[k]}`).join(" · ")}</span>`;
       card.addEventListener("click", () => {

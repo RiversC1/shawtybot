@@ -13,6 +13,7 @@
     badge_awarded: 3200,
     weather_start: 1100, weather_end: 700, weather_damage: 650,
     item_used: 750, item_damage: 600, item_activated: 650, self_ko: 400,
+    bide: 600, stockpile: 500, magnitude: 550,
   };
   const DEFAULT_EVENT_DELAY = 250; // structural events with no on-screen effect (turn_start, switch_out, battle_end)
 
@@ -430,7 +431,7 @@
     const rosterStrip = (roster || [])
       .map(
         (m) =>
-          `<img class="battle-roster-mon${m.is_fainted ? " is-fainted" : ""}${m.is_active ? " is-active" : ""}" src="${m.artwork}" alt="${m.name}" title="${m.name}">`
+          `<img class="battle-roster-mon${m.is_fainted ? " is-fainted" : ""}${m.is_active ? " is-active" : ""}" src="${artThumb(m.artwork)}" alt="${m.name}" title="${m.name}">`
       )
       .join("");
     panelEl.classList.toggle("is-winner", !!isWinner);
@@ -719,8 +720,28 @@
           return `${mon}'s attack missed! <strong>${owned(otherSide, event.target_name)}</strong> was out of reach!`;
         }
         return `${mon}'s attack missed!`;
-      case "move_failed":
-        return `${mon}'s move failed!`;
+      case "move_failed": {
+        const why = {
+          nothing_to_return: "But there was nothing to hit back!",
+          nothing_stored: "But it had no energy stored!",
+          nothing_stockpiled: "But it had nothing stockpiled!",
+          stockpile_full: "It can't stockpile any more!",
+          no_item: "But it has no item to use!",
+          immune: "It doesn't affect the target...",
+          no_effect: "But it had no effect!",
+        }[event.reason];
+        return why ? `${mon}'s move failed! ${why}` : `${mon}'s move failed!`;
+      }
+      case "bide":
+        return {
+          start: `${mon} is storing energy!`,
+          storing: `${mon} is storing energy!`,
+          release: `${mon} unleashed its energy!`,
+        }[event.stage] || null;
+      case "stockpile":
+        return `${mon} stockpiled ${event.count}!`;
+      case "magnitude":
+        return `Magnitude ${event.level}!`;
       case "cannot_act": {
         const reasons = {
           recharge: "must recharge!", asleep: "is fast asleep.", frozen: "is frozen solid!",
@@ -770,6 +791,8 @@
           ? `${mon} restored <strong>${event.amount}</strong> HP with ${esc(event.reason)}!`
           : `${mon} restored <strong>${event.amount}</strong> HP!`;
       case "item_used": {
+        if (event.reason === "Fling") return `${mon} flung its <strong>${esc(event.label)}</strong>!`;
+        if (event.reason === "Natural Gift") return `${mon} drew power from its <strong>${esc(event.label)}</strong>!`;
         if (event.item === "focus-sash") return `${mon} hung on using its <strong>Focus Sash</strong>!`;
         if (event.item === "sitrus-berry") return `${mon} restored <strong>${event.amount}</strong> HP with its <strong>Sitrus Berry</strong>!`;
         if (event.item === "lum-berry") {

@@ -14,6 +14,9 @@ import json
 import logging
 from contextlib import asynccontextmanager
 
+import hashlib
+import re
+import io
 import httpx
 
 # Production runs "uvicorn web.main:app" from the repo root; local runs from
@@ -25,7 +28,7 @@ except ImportError:
 import websockets
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import RedirectResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -67,16 +70,94 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 templates.env.globals["AUDIO_BASE_URL"] = AUDIO_BASE_URL
 
 
+# Templates load CSS/JS through static_url(), which appends a fingerprint of
+# the file's contents (/static/style.css?v=3f9a...). A deploy that changes a
+# file changes its URL, so browsers can cache these for a year and still pick
+# up every update immediately — no revalidation round trip per file per page
+# (which was the old "no-cache" behavior) and no hard refresh needed.
+_static_versions: dict[str, str] = {}
+
+
+def static_url(path: str) -> str:
+    version = _static_versions.get(path)
+    if version is None:
+        try:
+            with open(os.path.join(BASE_DIR, "static", path), "rb") as f:
+                version = hashlib.md5(f.read()).hexdigest()[:10]
+        except OSError:
+            version = ""
+        _static_versions[path] = version
+    return f"/static/{path}?v={version}" if version else f"/static/{path}"
+
+
+templates.env.globals["static_url"] = static_url
+
+
+# ---------- Artwork thumbnails ----------
+# The official artwork is a ~120-150 KB, 475px PNG per Pokémon, hotlinked from
+# GitHub — and grids (collection, Pokédex, pickers, battle roster icons) show
+# it at ~100px, so a long collection page pulled tens of MB. /img/art/{id}.webp
+# fetches it once, shrinks it to a small WebP (~5-10 KB), keeps it on disk
+# and serves it with a year-long cache. Detail views keep the full art.
+ART_SOURCE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/"
+ART_URL_RE = re.compile(r"^" + re.escape(ART_SOURCE) + r"((?:shiny/)?\d{1,5})\.png$")
+THUMB_DIR = os.path.join(BASE_DIR, ".thumbs")
+THUMB_SIZE = 200
+_thumb_locks: dict[str, asyncio.Lock] = {}
+
+
+def art_thumb(url: str | None) -> str | None:
+    """The thumbnail URL for an official-artwork URL; anything else as is."""
+    m = ART_URL_RE.match(url or "")
+    return f"/img/art/{m.group(1)}.webp" if m else url
+
+
+templates.env.filters["thumb"] = art_thumb
+
+
+def _make_thumb(png: bytes, dest: str):
+    from PIL import Image  # imported lazily: the app still runs without Pillow
+    im = Image.open(io.BytesIO(png)).convert("RGBA")
+    im.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
+    tmp = dest + ".tmp"
+    im.save(tmp, "WEBP", quality=82, method=4)
+    os.replace(tmp, dest)
+
+
+@app.get("/img/art/{name:path}")
+async def artwork_thumbnail(name: str):
+    m = re.fullmatch(r"((?:shiny/)?)(\d{1,5})\.webp", name)
+    if not m:
+        return Response(status_code=404)
+    source = f"{ART_SOURCE}{m.group(1)}{m.group(2)}.png"
+    dest = os.path.join(THUMB_DIR, f"{'shiny_' if m.group(1) else ''}{m.group(2)}.webp")
+    if not os.path.exists(dest):
+        lock = _thumb_locks.setdefault(dest, asyncio.Lock())
+        async with lock:
+            if not os.path.exists(dest):
+                try:
+                    resp = await http_client.get(source)
+                    if resp.status_code != 200:
+                        return Response(status_code=404)
+                    os.makedirs(THUMB_DIR, exist_ok=True)
+                    await asyncio.to_thread(_make_thumb, resp.content, dest)
+                except Exception as e:  # noqa: BLE001 - never break an image
+                    log.warning(f"Thumbnail for {name} failed ({e}); serving the original")
+                    return RedirectResponse(source)
+    return FileResponse(dest, media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
 @app.middleware("http")
-async def no_cache_static(request: Request, call_next):
-    # Without this, browsers may keep serving an old cached copy of a JS/CSS
-    # file after a deploy (no Cache-Control was ever set) — force revalidation
-    # on every request so a redeploy is picked up immediately. The server's
-    # existing ETag/Last-Modified support still turns an unchanged file into a
-    # cheap 304 instead of a full re-download.
+async def static_cache_headers(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/static/"):
-        response.headers["Cache-Control"] = "no-cache"
+        if request.query_params.get("v"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            # Unversioned references (images loaded from JS/CSS): revalidate so
+            # a redeploy is picked up; ETag makes that a cheap 304.
+            response.headers["Cache-Control"] = "no-cache"
     return response
 
 

@@ -105,7 +105,7 @@
             if (!m) return "";
             return `<button type="button" class="cg-selected-mon" data-dex="${id}" title="Remove ${esc(m.name)}">
                 <span class="cg-slot-num">${i + 1}</span>
-                <img src="${esc(m.artwork)}" alt="">
+                <img src="${esc(artThumb(m.artwork))}" alt="">
                 <span>${esc(m.name)}</span><span class="cg-remove" aria-hidden="true">×</span>
               </button>`;
           })
@@ -121,7 +121,7 @@
             const on = state.team.includes(m.dex_id);
             const full = !on && state.team.length >= max;
             return `<button type="button" class="picker-item cg-pick${on ? " selected" : ""}${full ? " is-full" : ""}" data-dex="${m.dex_id}">
-                <img src="${esc(m.artwork)}" alt="" loading="lazy">
+                <img src="${esc(artThumb(m.artwork))}" alt="" loading="lazy">
                 <div>${esc(m.name)}</div>
                 <div class="team-picker-types">${(m.types || []).map((t) => `<span class="type-badge type-${t}">${cap(t)}</span>`).join("")}</div>
               </button>`;

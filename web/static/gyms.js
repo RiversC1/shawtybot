@@ -32,7 +32,7 @@
       .map(
         (mon) => `
         <div class="gym-roster-mon">
-            <img src="${esc(mon.artwork)}" alt="${esc(mon.name)}">
+            <img src="${esc(artThumb(mon.artwork))}" alt="${esc(mon.name)}">
             <div class="gym-roster-mon-name">${esc(mon.name)}</div>
             <div class="favorite-types" style="justify-content:center;margin-top:2px;">${typeBadges(mon.types)}</div>
         </div>`

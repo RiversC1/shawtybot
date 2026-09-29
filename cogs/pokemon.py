@@ -972,6 +972,9 @@ class Pokemon(commands.Cog):
             # user_id — this table has no other index, so those were full
             # table scans.
             conn.execute("CREATE INDEX IF NOT EXISTS idx_collection_user ON poke_collection (user_id)")
+            # Most collection lookups are "this trainer's copies of this species"
+            # (team rosters, best IVs, transfers, evolutions).
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_collection_user_dex ON poke_collection (user_id, dex_id)")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS poke_spawn_usage (
                     user_id INTEGER PRIMARY KEY,
@@ -1123,6 +1126,9 @@ class Pokemon(commands.Cog):
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_battles_side_a ON poke_battles (side_a_user_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_battles_side_b ON poke_battles (side_b_user_id)")
+            # The 20-second sweeps only look at live battles/trades; without
+            # these they scan the whole (ever-growing) history each time.
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_battles_status ON poke_battles (status)")
             # One row per team slot per side, snapshotted at battle start and
             # mutated turn to turn. Stats are never stored — recomputed fresh
             # from base_stats each load, since they're a pure function of it.
@@ -1260,6 +1266,7 @@ class Pokemon(commands.Cog):
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_side_a ON poke_trades (side_a_user_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_side_b ON poke_trades (side_b_user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_status ON poke_trades (status)")
 
     # ---------- DB helpers ----------
 

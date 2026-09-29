@@ -11,7 +11,7 @@
     {% for mon in collection %}
     <div class="dex-card collection-card" data-id="{{ mon.id }}"
          data-name="{{ (mon.nickname or mon.name)|lower }} {{ mon.name|lower }} {{ mon.types|join(' ') }}">
-        <img src="{{ mon.artwork }}" alt="{{ mon.name }}" loading="lazy">
+        <img src="{{ mon.artwork|thumb }}" alt="{{ mon.name }}" loading="lazy">
         <div class="dex-name">
             {{ mon.nickname or mon.name }}{% if mon.is_shiny %} ✨{% endif %}
         </div>
@@ -52,6 +52,6 @@
     </div>
 </div>
 
-<script src="/static/move-tooltip.js"></script>
-<script src="/static/collection.js"></script>
+<script src="{{ static_url('move-tooltip.js') }}"></script>
+<script src="{{ static_url('collection.js') }}"></script>
 {% endblock %}

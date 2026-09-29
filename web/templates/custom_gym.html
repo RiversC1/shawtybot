@@ -94,6 +94,6 @@
 </div>
 
 <script type="application/json" id="my-gym-data">{{ my_gym|tojson }}</script>
-<script src="/static/custom_gym.js"></script>
+<script src="{{ static_url('custom_gym.js') }}"></script>
 {% endif %}
 {% endblock %}

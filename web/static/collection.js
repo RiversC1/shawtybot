@@ -327,7 +327,7 @@
         return `
           <div class="card" style="margin-top: 12px;">
               <div style="display:flex; align-items:center; gap:16px; flex-wrap: wrap;">
-                  <img src="${c.artwork}" alt="${c.name}" style="width:80px; height:80px; object-fit:contain; image-rendering:pixelated;">
+                  <img src="${artThumb(c.artwork)}" alt="${c.name}" style="width:80px; height:80px; object-fit:contain; image-rendering:pixelated;">
                   <div style="flex:1; min-width: 160px;">
                       <h3 style="margin: 0 0 4px;">${c.name}</h3>
                       <div class="muted">${EVOLUTION_CANDY_COST_LABEL(evo)}</div>

@@ -20,5 +20,5 @@
 </div>
 
 <script type="application/json" id="rankings-data">{{ rankings|tojson }}</script>
-<script src="/static/rankings.js"></script>
+<script src="{{ static_url('rankings.js') }}"></script>
 {% endblock %}

@@ -237,6 +237,7 @@ class BattlerState:
     volatile: dict = field(default_factory=default_volatile)
     is_fainted: bool = False
     item: Optional[str] = None  # held item key (HELD_ITEMS); None once consumed
+    weight: float = 100.0  # kg, for weight-based moves (Low Kick, Heavy Slam)
 
 
 @dataclass
@@ -323,6 +324,7 @@ def build_battler_state(mon: dict, moves: list[str] | None, ability: str | None,
         dex_id=mon["id"], species_name=mon["name"], types=list(mon.get("types", [])),
         stats=stats, max_hp=stats["hp"], current_hp=stats["hp"], ability=ability,
         ivs=dict(ivs), moves=move_slots, item=item if item in HELD_ITEMS else None,
+        weight=float(mon.get("weight") or 100.0),
     )
 
 
@@ -396,6 +398,7 @@ def battler_state_from_row(mon: dict, row: dict, ability: str | None = None) -> 
         status=row.get("status"), status_counter=row.get("status_counter", 0) or 0,
         confusion_counter=row.get("confusion_counter", 0) or 0, volatile=volatile,
         is_fainted=bool(row.get("is_fainted")), item=row.get("item"),
+        weight=float(mon.get("weight") or 100.0),
     )
 
 
@@ -481,6 +484,16 @@ def estimate_damage(attacker: BattlerState, defender: BattlerState, move: MoveDa
     only for NPC decision-making, never for real turn resolution, so it
     never perturbs the battle's own RNG stream."""
     move = weather_adjusted_move(move, weather)
+    if move.category != "status" and not move.power:
+        immune = type_effectiveness(move.type, defender.types) == 0
+        if "fixed_damage" in move.flags:
+            return 0.0 if immune else float(move.fixed_damage_amount or 100)
+        if move.name == "Super Fang":
+            return 0.0 if immune else defender.current_hp / 2
+        if move.name == "Endeavor":
+            return 0.0 if immune else float(max(0, defender.current_hp - attacker.current_hp))
+        if move.name in VARIABLE_POWER_MOVES and move.name != "Present":
+            move = variable_power(attacker, defender, move, weather=weather) or move
     if move.category == "status" or not move.power:
         return 0.0
     a_key, d_key = ("attack", "defense") if move.category == "physical" else ("sp_attack", "sp_defense")
@@ -1110,6 +1123,99 @@ def _apply_end_of_turn_item(mon: BattlerState, side_id: str) -> list:
 
 
 # ---------------------------------------------------------------------------
+# Moves with no fixed power
+# ---------------------------------------------------------------------------
+# Their damage depends on the situation: HP (Flail, Eruption, Wring Out),
+# weight (Low Kick, Heavy Slam), speed (Gyro Ball, Electro Ball), the held
+# item (Fling, Natural Gift), Stockpile (Spit Up), the damage just taken
+# (Counter, Mirror Coat, Metal Burst, Bide) or a fraction of HP (Super Fang,
+# Endeavor). Without this they all dealt 0 damage.
+
+VARIABLE_POWER_MOVES = {
+    "Flail", "Reversal", "Wring Out", "Crush Grip", "Eruption", "Water Spout", "Low Kick", "Grass Knot",
+    "Heavy Slam", "Heat Crash", "Gyro Ball", "Electro Ball", "Punishment", "Trump Card", "Spit Up",
+    "Natural Gift", "Fling", "Magnitude", "Present",
+}
+# name -> (category it answers, or None for either; damage multiplier)
+COUNTER_MOVES = {"Counter": ("physical", 2.0), "Mirror Coat": ("special", 2.0), "Metal Burst": (None, 1.5)}
+NATURAL_GIFT = {"sitrus-berry": ("psychic", 80), "lum-berry": ("flying", 80)}
+FLING_POWER = {
+    "quick-claw": 80, "heat-rock": 60, "damp-rock": 60, "icy-rock": 40, "life-orb": 30, "scope-lens": 30,
+}  # every other held item flings for 10
+MAGNITUDES = [(4, 10, 5), (5, 30, 10), (6, 50, 20), (7, 70, 30), (8, 90, 20), (9, 110, 10), (10, 150, 5)]
+TRUMP_CARD_POWER = {0: 200, 1: 80, 2: 60, 3: 50}  # by PP left after use; 4+ -> 40
+STOCKPILE_MAX = 3
+
+
+def _hp_ratio(mon: BattlerState) -> float:
+    return mon.current_hp / max(mon.max_hp, 1)
+
+
+def variable_power(attacker: BattlerState, defender: BattlerState, move: MoveData, *,
+                   rng: Optional[random.Random] = None, pp_left: Optional[int] = None,
+                   weather: Optional[str] = None) -> Optional[MoveData]:
+    """The move with its power (and, for Natural Gift, type) worked out for
+    this use; None if it can't be used (no item to fling, nothing
+    stockpiled). rng=None gives the average, for AI estimates."""
+    name = move.name
+    changes: dict = {}
+    if name in ("Flail", "Reversal"):
+        r = 48 * attacker.current_hp // max(attacker.max_hp, 1)
+        power = 200 if r < 2 else 150 if r < 5 else 100 if r < 10 else 80 if r < 17 else 40 if r < 33 else 20
+    elif name in ("Wring Out", "Crush Grip"):
+        power = max(1, int(120 * _hp_ratio(defender)))
+    elif name in ("Eruption", "Water Spout"):
+        power = max(1, int(150 * _hp_ratio(attacker)))
+    elif name in ("Low Kick", "Grass Knot"):
+        w = defender.weight
+        power = 20 if w < 10 else 40 if w < 25 else 60 if w < 50 else 80 if w < 100 else 100 if w < 200 else 120
+    elif name in ("Heavy Slam", "Heat Crash"):
+        ratio = attacker.weight / max(defender.weight, 0.1)
+        power = 120 if ratio >= 5 else 100 if ratio >= 4 else 80 if ratio >= 3 else 60 if ratio >= 2 else 40
+    elif name == "Gyro Ball":
+        power = min(150, int(25 * _effective_speed(defender, weather) / max(_effective_speed(attacker, weather), 1)) + 1)
+    elif name == "Electro Ball":
+        ratio = _effective_speed(attacker, weather) / max(_effective_speed(defender, weather), 1)
+        power = 150 if ratio >= 4 else 120 if ratio >= 3 else 80 if ratio >= 2 else 60 if ratio >= 1 else 40
+    elif name == "Punishment":
+        power = min(200, 60 + 20 * sum(v for v in defender.stat_stages.values() if v > 0))
+    elif name == "Trump Card":
+        power = TRUMP_CARD_POWER.get(pp_left, 40) if pp_left is not None else 50
+    elif name == "Spit Up":
+        stock = attacker.volatile.get("stockpile", 0)
+        if not stock:
+            return None
+        power = 100 * stock
+    elif name == "Natural Gift":
+        if attacker.item not in NATURAL_GIFT:
+            return None
+        changes["type"], power = NATURAL_GIFT[attacker.item]
+    elif name == "Fling":
+        if not attacker.item:
+            return None
+        power = FLING_POWER.get(attacker.item, 10)
+    elif name == "Magnitude":
+        if rng is None:
+            power = 71
+        else:
+            roll, upto, power = rng.uniform(0, 100), 0, 70
+            for _, p, chance in MAGNITUDES:
+                upto += chance
+                if roll <= upto:
+                    power = p
+                    break
+    elif name == "Present":
+        power = 52 if rng is None else rng.choice([40, 40, 40, 40, 80, 80, 80, 120])
+    else:
+        return move
+    return dataclasses.replace(move, power=power, **changes)
+
+
+def _stockpile_stat_changes(count: int) -> list:
+    return [{"stat": "defense", "change": -count}, {"stat": "special_defense", "change": -count}]
+
+
+# ---------------------------------------------------------------------------
 # Damage
 # ---------------------------------------------------------------------------
 
@@ -1507,6 +1613,64 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
             events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "weather_active"})
         return events
 
+    # Bide: stores the damage it takes for two turns, then hits back double.
+    if move.name == "Bide":
+        bide = v.get("bide")
+        if not bide:
+            v["bide"] = {"turns": 2, "stored": 0}
+            v["locked_move"] = "Bide"
+            events.append({"type": "bide", "side": side.side_id, "stage": "start"})
+            return events
+        bide["turns"] -= 1
+        if bide["turns"] > 0:
+            events.append({"type": "bide", "side": side.side_id, "stage": "storing"})
+            return events
+        v["bide"] = None
+        v["locked_move"] = None
+        events.append({"type": "bide", "side": side.side_id, "stage": "release"})
+        if bide["stored"] <= 0 or type_effectiveness(move.type, defender.types) == 0:
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "nothing_stored"})
+            return events
+        _apply_damage_and_emit(defender, bide["stored"] * 2, events, opp.side_id, move.name, False, None)
+        return events
+
+    if move.name == "Stockpile":
+        if v.get("stockpile", 0) >= STOCKPILE_MAX:
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "stockpile_full"})
+            return events
+        v["stockpile"] = v.get("stockpile", 0) + 1
+        events.append({"type": "stockpile", "side": side.side_id, "count": v["stockpile"]})
+    if move.name == "Swallow":
+        stock = v.get("stockpile", 0)
+        if not stock:
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "nothing_stockpiled"})
+            return events
+        move = dataclasses.replace(move, healing_percent={1: 25, 2: 50}.get(stock, 100),
+                                   stat_changes=tuple(_stockpile_stat_changes(stock)), stat_chance=100)
+        v["stockpile"] = 0
+
+    if move.name == "Present" and battle.rng.random() < 0.2:
+        # Present sometimes heals the target instead.
+        heal = min(defender.max_hp // 4, defender.max_hp - defender.current_hp)
+        defender.current_hp += heal
+        events.append({"type": "heal", "side": opp.side_id, "amount": heal, "reason": "Present",
+                       "new_hp": defender.current_hp, "max_hp": defender.max_hp})
+        return events
+
+    if move.name in VARIABLE_POWER_MOVES:
+        pp_left = active.moves[move_index].current_pp if move_index is not None and move_index < len(active.moves) else None
+        resolved = variable_power(active, defender, move, rng=battle.rng, pp_left=pp_left, weather=current_weather(battle))
+        if resolved is None:
+            reason = "nothing_stockpiled" if move.name == "Spit Up" else "no_item"
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": reason})
+            return events
+        if move.name in ("Fling", "Natural Gift"):
+            _consume_item(active, side.side_id, events, reason=move.name)
+        if move.name == "Magnitude":
+            level = next((lv for lv, p, _ in MAGNITUDES if p == resolved.power), 7)
+            events.append({"type": "magnitude", "side": side.side_id, "level": level})
+        move = resolved
+
     if move.name in ("Healing Wish", "Lunar Dance"):
         if not any(not b.is_fainted for i, b in enumerate(side.roster) if i != side.active_index):
             events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "no_teammates"})
@@ -1536,11 +1700,32 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
     total_dealt = 0
     is_crit = False
 
+    immune = type_effectiveness(move.type, defender.types) == 0
     if move.name == "Final Gambit":
-        if type_effectiveness(move.type, defender.types) == 0:
+        if immune:
             events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "immune"})
             return events
         total_dealt = _apply_damage_and_emit(defender, active.current_hp, events, opp.side_id, move.name, False, move.type)
+    elif move.name in COUNTER_MOVES:
+        # Hits back for a multiple of the damage the user took from an attack
+        # this turn (so Counter/Mirror Coat move last, Metal Burst must be slower).
+        answers, mult = COUNTER_MOVES[move.name]
+        hit = v.get("last_hit")
+        if (not hit or hit.get("turn") != battle.turn_number or (answers and hit.get("category") != answers)
+                or immune):
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "nothing_to_return"})
+            return events
+        total_dealt = _apply_damage_and_emit(defender, int(hit["amount"] * mult), events, opp.side_id, move.name, False, None)
+    elif move.name == "Super Fang":
+        if immune:
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "immune"})
+            return events
+        total_dealt = _apply_damage_and_emit(defender, max(1, defender.current_hp // 2), events, opp.side_id, move.name, False, None)
+    elif move.name == "Endeavor":
+        if immune or defender.current_hp <= active.current_hp:
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "immune" if immune else "no_effect"})
+            return events
+        total_dealt = _apply_damage_and_emit(defender, defender.current_hp - active.current_hp, events, opp.side_id, move.name, False, None)
     elif "ohko" in move.flags:
         # The generic accuracy check above already gated this on the move's
         # own accuracy field (PokeAPI encodes OHKO moves' ~30% hit chance
@@ -1552,17 +1737,24 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
             total_dealt = _apply_damage_and_emit(defender, defender.current_hp, events, opp.side_id, move.name, False, move.type)
     elif "fixed_damage" in move.flags:
         amount = move.fixed_damage_amount if move.fixed_damage_amount is not None else 100
-        total_dealt = _apply_damage_and_emit(defender, amount, events, opp.side_id, move.name, False, move.type)
+        total_dealt = _apply_damage_and_emit(defender, 0 if immune else amount, events, opp.side_id, move.name, False, move.type)
     elif move.category == "status":
         pass
     elif "multi_hit" in move.flags:
-        n = sample_multi_hit_count(move, battle.rng)
+        if move.name == "Beat Up":
+            # One hit per healthy party member: power 5 + base Attack / 10
+            # (base Attack recovered from the level-100 stat, ~2 x base + 36).
+            powers = [5 + max(1, (b.stats["attack"] - 36) // 2) // 10
+                      for b in side.roster if not b.is_fainted and b.status is None] or [10]
+        else:
+            powers = [move.power] * sample_multi_hit_count(move, battle.rng)
         hits = 0
-        for _ in range(n):
+        for hit_power in powers:
             if defender.is_fainted:
                 break
+            hit_move = move if hit_power == move.power else dataclasses.replace(move, power=hit_power)
             hit_crit = battle.rng.random() < crit_chance(move, active)
-            hit_dmg = compute_damage(active, defender, move, hit_crit, battle.rng, current_weather(battle))
+            hit_dmg = compute_damage(active, defender, hit_move, hit_crit, battle.rng, current_weather(battle))
             total_dealt += _apply_damage_and_emit(defender, hit_dmg, events, opp.side_id, move.name, hit_crit, move.type)
             hits += 1
         events.append({"type": "multi_hit_summary", "side": side.side_id, "hits": hits, "total_damage": total_dealt})
@@ -1570,6 +1762,17 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
         is_crit = battle.rng.random() < crit_chance(move, active)
         dmg = compute_damage(active, defender, move, is_crit, battle.rng, current_weather(battle))
         total_dealt = _apply_damage_and_emit(defender, dmg, events, opp.side_id, move.name, is_crit, move.type)
+
+    if total_dealt > 0 and move.category in ("physical", "special"):
+        defender.volatile["last_hit"] = {"turn": battle.turn_number, "amount": total_dealt, "category": move.category}
+        if defender.volatile.get("bide"):
+            defender.volatile["bide"]["stored"] += total_dealt
+    if move.name == "Spit Up":
+        stock = v.get("stockpile", 0)
+        v["stockpile"] = 0
+        if stock and not active.is_fainted:
+            move = dataclasses.replace(move, stat_changes=tuple(_stockpile_stat_changes(stock)), stat_chance=100,
+                                       stat_self=True)
 
     if move.drain_percent and total_dealt > 0:
         heal = max(1, math.floor(total_dealt * move.drain_percent / 100))

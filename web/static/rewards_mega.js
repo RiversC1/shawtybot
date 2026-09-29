@@ -23,7 +23,7 @@
       ? shown
           .map((m) => `
           <button type="button" class="mega-option tint-${esc(m.types[0])}${selected && selected.dex_id === m.dex_id ? " is-selected" : ""}" data-dex="${m.dex_id}">
-            <img src="${esc(m.artwork)}" alt="" loading="lazy">
+            <img src="${esc(artThumb(m.artwork))}" alt="" loading="lazy">
             <span class="mega-option-name">${esc(m.name)}</span>
             <span class="team-picker-types">${m.types.map((t) => `<span class="type-badge type-${esc(t)}">${esc(cap(t))}</span>`).join("")}</span>
             <span class="mega-option-meta">${esc(m.ability || "")} · BST ${m.stat_total}</span>

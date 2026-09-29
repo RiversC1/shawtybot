@@ -80,10 +80,10 @@
 
 <script type="application/json" id="battle-data">{{ battle_json|safe }}</script>
 <script>window.BATTLE_ID = {{ battle_id }}; window.BATTLE_TYPE = {{ battle.battle_type|tojson }}; window.AUDIO_BASE_URL = {{ AUDIO_BASE_URL|tojson }};</script>
-<script src="/static/battle_audio.js"></script>
-<script src="/static/move-tooltip.js"></script>
-<script src="/static/battle_fx.js"></script>
-<script src="/static/battle_moves.js"></script>
-<script src="/static/battle_weather.js"></script>
-<script src="/static/battle_room.js"></script>
+<script src="{{ static_url('battle_audio.js') }}"></script>
+<script src="{{ static_url('move-tooltip.js') }}"></script>
+<script src="{{ static_url('battle_fx.js') }}"></script>
+<script src="{{ static_url('battle_moves.js') }}"></script>
+<script src="{{ static_url('battle_weather.js') }}"></script>
+<script src="{{ static_url('battle_room.js') }}"></script>
 {% endblock %}

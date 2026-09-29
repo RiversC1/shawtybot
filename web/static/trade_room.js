@@ -134,7 +134,7 @@
     for (const mon of species) {
       const item = document.createElement("div");
       item.className = "picker-item";
-      item.innerHTML = `<img src="${mon.artwork}" alt="${mon.name}">
+      item.innerHTML = `<img src="${artThumb(mon.artwork)}" alt="${mon.name}">
         <div>${mon.name}${mon.is_shiny ? " ✨" : ""}</div>
         <div class="muted">${mon.count > 1 ? `${mon.count} owned &middot; ` : ""}best IV ${mon.best_iv_percent}%</div>`;
       item.addEventListener("click", async () => {
@@ -162,7 +162,7 @@
     for (const mon of individuals) {
       const item = document.createElement("div");
       item.className = "picker-item";
-      item.innerHTML = `<img src="${mon.artwork}" alt="${mon.name}">
+      item.innerHTML = `<img src="${artThumb(mon.artwork)}" alt="${mon.name}">
         <div>${mon.nickname || mon.name}${mon.is_shiny ? " ✨" : ""}</div>
         <div class="muted">IV ${mon.iv_percent}%</div>`;
       item.addEventListener("click", () => submitOffer(mon.id));
@@ -190,7 +190,7 @@
     }
     slotEl.innerHTML = `
         <div class="trade-offer-card">
-            <img src="${mon.artwork}" alt="${mon.name}">
+            <img src="${artThumb(mon.artwork)}" alt="${mon.name}">
             <div class="trade-offer-name">${mon.nickname || mon.name}${mon.is_shiny ? " ✨" : ""}</div>
             <div class="muted">IV Quality ${mon.iv_percent}%</div>
             ${isYourSide && tradeStatus === "active" ? `<button class="btn-secondary trade-change-btn">Change</button>` : ""}

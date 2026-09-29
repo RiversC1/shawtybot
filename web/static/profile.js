@@ -94,7 +94,7 @@
     for (const mon of species) {
       const item = document.createElement("div");
       item.className = "picker-item" + (mon.dex_id === currentFavoriteDexId ? " selected" : "");
-      item.innerHTML = `<img src="${mon.artwork}" alt="${mon.name}"><div>${mon.name}${mon.has_shiny ? " ✨" : ""}</div>`;
+      item.innerHTML = `<img src="${artThumb(mon.artwork)}" alt="${mon.name}"><div>${mon.name}${mon.has_shiny ? " ✨" : ""}</div>`;
       item.addEventListener("click", () => selectFavorite(mon, item));
       favoriteGrid.appendChild(item);
     }

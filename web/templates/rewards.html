@@ -42,11 +42,11 @@
         <p class="error" id="mega-error" hidden></p>
     </div>
     <script type="application/json" id="mega-data">{{ mega.options|tojson }}</script>
-    <script src="/static/rewards_mega.js"></script>
+    <script src="{{ static_url('rewards_mega.js') }}"></script>
     {% else %}
     <p class="muted">Complete the Poké League ({{ rewards.league_earned }} / {{ rewards.league_total }} battles won) to choose one of {{ (mega.options or [])|length }} Mega Evolutions, such as Mega Charizard X, Mega Gengar or Mega Garchomp.</p>
     <div class="mega-teaser">
-        {% for m in (mega.options or [])[:8] %}<img src="{{ m.artwork }}" alt="" loading="lazy">{% endfor %}
+        {% for m in (mega.options or [])[:8] %}<img src="{{ m.artwork|thumb }}" alt="" loading="lazy">{% endfor %}
     </div>
     {% endif %}
 </section>
