@@ -5711,3 +5711,9 @@ img[src$="/trainers/nowa.png"] {
     from { opacity: 0; transform: translate(-50%, 10px); }
     to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* Lite weather (Firefox, or slow frames): battle_weather.js draws the tint,
+   sun rays and dust into its canvas, so the CSS layers step aside. */
+.battle-scene.wx-lite .battle-weather-layer {
+    display: none;
+}

@@ -5,11 +5,16 @@
 // across the field; hail pelts down and bounces or shatters on the floor.
 //
 // Built to stay smooth on modest machines: the big slow shapes (sun rays,
-// dust clouds) are CSS layers the GPU moves without repainting; the canvas
-// only draws small particles, batched (one path per depth layer, not one per
-// particle), with glows pre-rendered once and stamped. It renders at 1x,
-// pauses while the scene is off-screen or the tab hidden, and if frames still
-// run long it quietly thins the particles out.
+// dust clouds) and the colour tint are CSS layers the GPU moves without
+// repainting; the canvas only draws small particles, batched (one path per
+// depth layer, not one per particle), with glows pre-rendered once and
+// stamped. It pauses while the scene is off-screen or the tab hidden.
+//
+// "Lite" mode, for Firefox (which often composites on the CPU, where every
+// extra full-scene layer over a moving canvas costs a full blend per frame)
+// and for any browser whose frames keep running long: the tint, rays and dust
+// are drawn into the one canvas instead, at 60% resolution and 30 fps. If
+// frames are still slow after that, it thins the particles out.
 //
 // Honors the battle page's "Motion effects" switch (BattleFX.kit), not the
 // OS reduce-motion setting: with motion off it paints one still frame.
@@ -59,6 +64,7 @@ window.BattleWeather = (function () {
     const sprites = {
       mote: glowSprite("255, 226, 150"),
       flare: glowSprite("255, 230, 160"),
+      dust: glowSprite("205, 165, 100", 128),
     };
     // Sun rays and dust clouds: CSS, animated on the compositor (style.css),
     // inside the tint layer so they fade in and out with it.
@@ -86,13 +92,33 @@ window.BattleWeather = (function () {
     // Adaptive quality: the share of particles simulated and drawn.
     let quality = 1;
     let slowTime = 0;
+    // Render scale (canvas pixels per CSS pixel) and frame-rate cap; lite
+    // mode lowers both (window.__wxOpts overrides are for testing).
+    const opts = window.__wxOpts || {};
+    let lite = false;
+    let scale = 1;
+    let minFrameMs = 0;
+    let sunFan = null; // lite mode's pre-rendered sun rays
+    let tintCache = null;
+    let clouds = [];
+
+    function setLite(on) {
+      lite = on;
+      scene.classList.toggle("wx-lite", on);
+      scale = opts.scale || (on ? 0.6 : 1);
+      minFrameMs = opts.fps ? 1000 / opts.fps : on ? 1000 / 30 : 0;
+      slowTime = 0;
+    }
+    setLite(opts.lite !== undefined ? !!opts.lite : /Firefox\//.test(navigator.userAgent));
 
     function resize() {
       const r = scene.getBoundingClientRect();
       W = Math.max(1, Math.round(r.width));
       H = Math.max(1, Math.round(r.height));
-      canvas.width = W;
-      canvas.height = H;
+      canvas.width = Math.max(1, Math.round(W * scale));
+      canvas.height = Math.max(1, Math.round(H * scale));
+      sunFan = null;
+      tintCache = null;
       if (current) seed(current);
       stillDirty = true;
       if (current && motionOff()) paintStill();
@@ -132,6 +158,7 @@ window.BattleWeather = (function () {
         for (let i = 0; i < n(40); i++) parts.push(newMote(true));
       } else if (kind === "sand") {
         for (let i = 0; i < n(240); i++) parts.push(newGrain(true));
+        clouds = Array.from({ length: 6 }, () => ({ x: rand(0, W), y: rand(H * 0.1, H), rx: rand(130, 260), ry: rand(40, 90), sp: rand(50, 110), a: rand(0.35, 0.6) }));
       } else if (kind === "hail") {
         for (let i = 0; i < n(26); i++) parts.push(newFlake(true));
         for (let i = 0; i < n(60); i++) parts.push(newStone(true));
@@ -195,6 +222,12 @@ window.BattleWeather = (function () {
         }
       } else if (current === "sand") {
         const g = gust();
+        if (lite) {
+          for (const c of clouds) {
+            c.x -= c.sp * g * dt;
+            if (c.x < -c.rx * 1.2) { c.x = W + c.rx; c.y = rand(H * 0.1, H); }
+          }
+        }
         for (let i = 0; i < n; i++) {
           const p = parts[i];
           p.x -= p.sp * g * dt;
@@ -242,10 +275,11 @@ window.BattleWeather = (function () {
     // ---------- Drawing ----------
 
     function draw() {
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
       ctx.globalAlpha = 1;
       ctx.clearRect(0, 0, W, H);
       if (!current || intensity <= 0) return;
+      if (lite) drawLiteBackdrop();
       if (current === "rain") drawRain();
       else if (current === "sun") drawSun();
       else if (current === "sand") drawSand();
@@ -296,6 +330,88 @@ window.BattleWeather = (function () {
         ctx.fillStyle = "rgb(225, 235, 255)";
         ctx.fillRect(0, 0, W, H);
       }
+    }
+
+    // Lite mode: what the CSS layers normally show (tint, rays, dust clouds).
+    function tintFor(kind) {
+      if (tintCache && tintCache.kind === kind) return tintCache.fills;
+      const lin = (stops) => {
+        const g = ctx.createLinearGradient(0, 0, 0, H);
+        for (const [at, c] of stops) g.addColorStop(at, c);
+        return g;
+      };
+      const fills = {
+        sun: [lin([[0, "rgba(255, 190, 80, 0.13)"], [1, "rgba(255, 140, 40, 0.06)"]])],
+        rain: [lin([[0, "rgba(10, 25, 55, 0.5)"], [0.6, "rgba(25, 50, 95, 0.28)"], [1, "rgba(40, 70, 120, 0.3)"]])],
+        sand: [lin([[0, "rgba(175, 130, 60, 0.42)"], [1, "rgba(200, 155, 85, 0.3)"]])],
+        hail: [lin([[0, "rgba(150, 195, 235, 0.24)"], [1, "rgba(190, 220, 245, 0.14)"]])],
+      }[kind] || [];
+      if (kind === "hail") {
+        const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.65);
+        v.addColorStop(0, "rgba(200, 235, 255, 0)");
+        v.addColorStop(1, "rgba(200, 235, 255, 0.28)");
+        fills.push(v);
+      }
+      tintCache = { kind, fills };
+      return fills;
+    }
+
+    function buildSunFan() {
+      const ox = W * 0.9, oy = -H * 0.12;
+      const len = Math.hypot(W, H) * 1.2;
+      return offscreen(W * scale, H * scale, (g) => {
+        g.scale(scale, scale);
+        g.globalCompositeOperation = "lighter";
+        const core = g.createRadialGradient(ox, oy, 0, ox, oy, W * 0.42);
+        core.addColorStop(0, "rgba(255, 244, 190, 0.55)");
+        core.addColorStop(0.35, "rgba(255, 200, 90, 0.22)");
+        core.addColorStop(1, "rgba(255, 170, 60, 0)");
+        g.fillStyle = core;
+        g.fillRect(0, 0, W, H);
+        for (let i = 0; i < 7; i++) {
+          const a = 1.72 + i * 0.2 + rand(-0.05, 0.05);
+          const w = rand(0.05, 0.1);
+          const alpha = rand(0.1, 0.18);
+          const grad = g.createLinearGradient(ox, oy, ox + Math.cos(a) * len, oy + Math.sin(a) * len);
+          grad.addColorStop(0, `rgba(255, 236, 170, ${alpha + 0.1})`);
+          grad.addColorStop(0.6, `rgba(255, 215, 120, ${alpha * 0.5})`);
+          grad.addColorStop(1, "rgba(255, 200, 100, 0)");
+          g.fillStyle = grad;
+          g.beginPath();
+          g.moveTo(ox, oy);
+          g.lineTo(ox + Math.cos(a - w) * len, oy + Math.sin(a - w) * len);
+          g.lineTo(ox + Math.cos(a + w) * len, oy + Math.sin(a + w) * len);
+          g.closePath();
+          g.fill();
+        }
+      });
+    }
+
+    function drawLiteBackdrop() {
+      ctx.globalAlpha = intensity;
+      for (const f of tintFor(current)) {
+        ctx.fillStyle = f;
+        ctx.fillRect(0, 0, W, H);
+      }
+      if (current === "sun") {
+        if (!sunFan) sunFan = buildSunFan();
+        const ox = W * 0.9, oy = -H * 0.12;
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = intensity * (0.8 + 0.2 * Math.sin(t * 1.3));
+        ctx.translate(ox, oy);
+        ctx.rotate(Math.sin(t * 0.35) * 0.035);
+        ctx.translate(-ox, -oy);
+        ctx.drawImage(sunFan, 0, 0, W, H);
+        ctx.restore();
+      } else if (current === "sand") {
+        const g = gust();
+        for (const c of clouds) {
+          ctx.globalAlpha = intensity * c.a * (0.7 + 0.5 * g) * 0.45;
+          ctx.drawImage(sprites.dust, c.x - c.rx, c.y - c.ry, c.rx * 2, c.ry * 2);
+        }
+      }
+      ctx.globalAlpha = 1;
     }
 
     function drawSun() {
@@ -379,13 +495,20 @@ window.BattleWeather = (function () {
 
     function frame(now) {
       raf = 0;
+      if (minFrameMs && last && now - last < minFrameMs - 2) {
+        schedule();
+        return;
+      }
       const raw = last ? (now - last) / 1000 : 0.016;
       const dt = Math.min(0.05, raw);
       last = now;
       // Frames running long (under ~40fps) for a while: thin the particles.
       if (raw > 0.025 && raw < 0.5) {
         slowTime += raw;
-        if (slowTime > 1.2 && quality > 0.4) {
+        if (slowTime > 1.2 && !lite && opts.lite === undefined) {
+          setLite(true);
+          resize();
+        } else if (slowTime > 1.2 && quality > 0.4) {
           quality = Math.max(0.4, quality - 0.2);
           slowTime = 0;
         }
