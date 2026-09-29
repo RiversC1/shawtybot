@@ -1357,6 +1357,7 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             "dex_id": r["dex_id"], "name": name, "artwork": mon.get("artwork"),
             "sprite": sprite_back if side == back_side else sprite_front,
             "types": mon.get("types", []), "current_hp": r["current_hp"], "max_hp": r["max_hp"],
+            "height": mon.get("height"),
             "status": r["status"], "is_active": bool(r["is_active"]), "is_fainted": bool(r["is_fainted"]),
             "stat_stages": {k: v for k, v in json.loads(r["stat_stages"] or "{}").items() if v},
             "confused": bool(r["confusion_counter"]),

@@ -454,21 +454,34 @@
     return chips.length ? `<div class="cond-chips">${chips.join("")}</div>` : "";
   }
 
-  // Battle GIFs are small pixel art (roughly 40-110px), so scale each one up
-  // from its own natural size (crisp, keeps relative sizes between species)
-  // by the slot's --sprite-zoom, capped to fit the slot. Big static artwork
-  // (the fallback) and trainer avatars just get capped.
+  // Pokémon are drawn at a height that follows their real height (Charizard
+  // 1.7 m stands taller than Weavile 1.1 m), compressed (height^0.7) so tiny
+  // ones stay visible, and capped to fit the slot so giants like Onix don't
+  // overflow. Your side's slot has a bigger scale (it's nearer the camera).
+  // Trainer avatars (no height) scale from their natural size by
+  // --sprite-zoom instead.
   function sizeSprite(img) {
     if (!img.naturalWidth) return;
     const cs = getComputedStyle(img);
-    const zoom = parseFloat(cs.getPropertyValue("--sprite-zoom")) || 1;
     const maxW = parseFloat(cs.getPropertyValue("--sprite-max-w")) || 200;
     const maxH = parseFloat(cs.getPropertyValue("--sprite-max-h")) || 200;
-    const w = img.naturalWidth * zoom;
-    const h = img.naturalHeight * zoom;
+    const metres = parseFloat(img.dataset.height);
+    let scale;
+    if (metres > 0) {
+      const perM = parseFloat(cs.getPropertyValue("--sprite-px-per-m")) || 100;
+      const minH = parseFloat(cs.getPropertyValue("--sprite-min-h")) || 40;
+      const targetH = Math.max(minH, perM * Math.pow(metres, 0.7));
+      scale = targetH / img.naturalHeight;
+    } else {
+      scale = parseFloat(cs.getPropertyValue("--sprite-zoom")) || 1;
+    }
+    const w = img.naturalWidth * scale;
+    const h = img.naturalHeight * scale;
     const k = Math.min(1, maxW / w, maxH / h);
     img.style.width = `${Math.round(w * k)}px`;
     img.style.height = `${Math.round(h * k)}px`;
+    // Pixel art stays crisp when enlarged; shrinking it looks better smoothed.
+    img.style.imageRendering = scale * k >= 1 ? "pixelated" : "auto";
   }
   for (const img of [spriteA, spriteB]) {
     img.addEventListener("load", () => sizeSprite(img));
@@ -483,6 +496,7 @@
     spriteEl.style.visibility = "visible";
     const desiredSrc = activeMon.is_fainted && animClass !== "anim-faint" ? "" : activeMon.sprite;
     if (desiredSrc && spriteEl.dataset.mon !== `${activeMon.dex_id}:${activeMon.sprite}`) {
+      spriteEl.dataset.height = activeMon.height || 1;
       spriteEl.src = activeMon.sprite;
       spriteEl.onerror = () => {
         spriteEl.onerror = null;
@@ -508,6 +522,7 @@
   function showTrainerStanding(spriteEl, ballEl, avatarUrl, name, isA) {
     spriteEl.style.visibility = "visible";
     spriteEl.style.opacity = "1";
+    spriteEl.dataset.height = "";
     spriteEl.src = avatarUrl || "";
     spriteEl.alt = name;
     spriteEl.dataset.mon = "";

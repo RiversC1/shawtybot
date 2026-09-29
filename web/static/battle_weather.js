@@ -4,11 +4,22 @@
 // light rays and drifting motes; a sandstorm gusts grains and dust clouds
 // across the field; hail pelts down and bounces or shatters on the floor.
 //
+// Built to stay smooth on modest machines: the big slow shapes (sun rays,
+// dust clouds) are CSS layers the GPU moves without repainting; the canvas
+// only draws small particles, batched (one path per depth layer, not one per
+// particle), with glows pre-rendered once and stamped. It renders at 1x,
+// pauses while the scene is off-screen or the tab hidden, and if frames still
+// run long it quietly thins the particles out.
+//
 // Honors the battle page's "Motion effects" switch (BattleFX.kit), not the
 // OS reduce-motion setting: with motion off it paints one still frame.
 window.BattleWeather = (function () {
   const FLOOR = 0.44; // where the arena floor starts, as a fraction of height
+  const LAYERS = [0.35, 0.65, 1]; // particle depth layers (far -> near)
+  const RAIN_WIND = 210 / 1300; // horizontal drift per unit of fall
   const rand = (a, b) => a + Math.random() * (b - a);
+  const STONE_R = [2, 3, 4.5]; // hailstone radius per depth layer
+  const pickLayer = () => (Math.random() < 0.45 ? 0 : Math.random() < 0.6 ? 1 : 2);
 
   function motionOff() {
     try {
@@ -18,6 +29,26 @@ window.BattleWeather = (function () {
     }
   }
 
+  function offscreen(w, h, paint) {
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w));
+    c.height = Math.max(1, Math.round(h));
+    paint(c.getContext("2d"), c.width, c.height);
+    return c;
+  }
+
+  // Soft round glow, reused for sun motes, lens flares and dust clouds.
+  function glowSprite(rgb, size = 64) {
+    return offscreen(size, size, (g, w) => {
+      const grad = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+      grad.addColorStop(0, `rgba(${rgb}, 1)`);
+      grad.addColorStop(0.35, `rgba(${rgb}, 0.45)`);
+      grad.addColorStop(1, `rgba(${rgb}, 0)`);
+      g.fillStyle = grad;
+      g.fillRect(0, 0, w, w);
+    });
+  }
+
   function attach(scene) {
     const canvas = document.createElement("canvas");
     canvas.className = "battle-weather-canvas";
@@ -25,7 +56,20 @@ window.BattleWeather = (function () {
     scene.appendChild(canvas);
     const ctx = canvas.getContext("2d");
 
-    let W = 0, H = 0, dpr = 1;
+    const sprites = {
+      mote: glowSprite("255, 226, 150"),
+      flare: glowSprite("255, 230, 160"),
+    };
+    // Sun rays and dust clouds: CSS, animated on the compositor (style.css),
+    // inside the tint layer so they fade in and out with it.
+    const tint = scene.querySelector(".battle-weather-layer") || scene;
+    for (const cls of ["battle-weather-rays", "battle-weather-dust"]) {
+      const el = document.createElement("div");
+      el.className = cls;
+      tint.appendChild(el);
+    }
+
+    let W = 0, H = 0;
     let target = null; // weather the scene should show
     let current = null; // weather currently drawn (fades out before switching)
     let intensity = 0;
@@ -38,14 +82,17 @@ window.BattleWeather = (function () {
     let last = 0;
     let stillTimer = 0;
     let stillDirty = true; // the still frame (motion off) needs repainting
+    let onScreen = true;
+    // Adaptive quality: the share of particles simulated and drawn.
+    let quality = 1;
+    let slowTime = 0;
 
     function resize() {
       const r = scene.getBoundingClientRect();
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-      W = Math.max(1, r.width);
-      H = Math.max(1, r.height);
-      canvas.width = Math.round(W * dpr);
-      canvas.height = Math.round(H * dpr);
+      W = Math.max(1, Math.round(r.width));
+      H = Math.max(1, Math.round(r.height));
+      canvas.width = W;
+      canvas.height = H;
       if (current) seed(current);
       stillDirty = true;
       if (current && motionOff()) paintStill();
@@ -73,43 +120,39 @@ window.BattleWeather = (function () {
     // Particle counts scale with scene area so phones aren't overcrowded.
     const density = () => Math.max(0.35, (W * H) / (1000 * 480));
     const groundY = () => H * FLOOR + Math.random() * H * (1 - FLOOR) * 0.96;
+    const live = () => Math.ceil(parts.length * quality);
 
     function seed(kind) {
       parts = [];
       fx = [];
       const n = (base) => Math.round(base * density());
       if (kind === "rain") {
-        for (let i = 0; i < n(230); i++) parts.push(newDrop(true));
+        for (let i = 0; i < n(200); i++) parts.push(newDrop(true));
       } else if (kind === "sun") {
-        for (let i = 0; i < 7; i++) {
-          parts.push({ ray: true, a: 1.72 + i * 0.2 + rand(-0.05, 0.05), w: rand(0.05, 0.11), ph: rand(0, 6.28), sp: rand(0.25, 0.6) });
-        }
-        for (let i = 0; i < n(46); i++) parts.push(newMote(true));
+        for (let i = 0; i < n(40); i++) parts.push(newMote(true));
       } else if (kind === "sand") {
-        for (let i = 0; i < 7; i++) {
-          parts.push({ cloud: true, x: rand(0, W), y: rand(H * 0.1, H), rx: rand(120, 260), ry: rand(40, 90), sp: rand(50, 110), a: rand(0.1, 0.2) });
-        }
-        for (let i = 0; i < n(300); i++) parts.push(newGrain(true));
+        for (let i = 0; i < n(240); i++) parts.push(newGrain(true));
       } else if (kind === "hail") {
-        for (let i = 0; i < n(70); i++) parts.push(newStone(true));
-        for (let i = 0; i < n(60); i++) parts.push(newFlake(true));
+        for (let i = 0; i < n(26); i++) parts.push(newFlake(true));
+        for (let i = 0; i < n(60); i++) parts.push(newStone(true));
       }
     }
 
     function newDrop(anywhere) {
-      const z = rand(0.25, 1);
-      return { z, x: rand(-40, W + 160), y: anywhere ? rand(-H, H) : rand(-120, -10), gy: groundY(), sp: 820 + 700 * z, len: 10 + 24 * z };
+      const l = pickLayer();
+      const z = LAYERS[l];
+      return { l, z, x: rand(-40, W + 160), y: anywhere ? rand(-H, H) : rand(-120, -10), gy: groundY(), sp: 820 + 700 * z, len: 10 + 24 * z };
     }
     function newMote(anywhere) {
-      return { mote: true, x: rand(0, W), y: anywhere ? rand(0, H) : H + 10, r: rand(0.8, 2.6), sp: rand(8, 26), ph: rand(0, 6.28), dx: rand(-10, 6) };
+      return { x: rand(0, W), y: anywhere ? rand(0, H) : H + 10, s: rand(6, 16), sp: rand(8, 26), ph: rand(0, 6.28), dx: rand(-10, 6) };
     }
     function newGrain(anywhere) {
-      const z = rand(0.2, 1);
-      return { z, x: anywhere ? rand(0, W) : W + rand(0, 80), y: rand(-10, H + 10), ph: rand(0, 6.28), sp: 260 + 560 * z };
+      const l = pickLayer();
+      return { l, z: LAYERS[l], x: anywhere ? rand(0, W) : W + rand(0, 80), y: rand(-10, H + 10), ph: rand(0, 6.28), sp: 260 + 560 * LAYERS[l] };
     }
     function newStone(anywhere) {
-      const z = rand(0.35, 1);
-      return { stone: true, z, x: rand(0, W + 120), y: anywhere ? rand(-H, H) : rand(-80, -10), gy: groundY(), sp: 480 + 420 * z, r: 1.6 + 3.2 * z };
+      const l = pickLayer();
+      return { stone: true, l, z: LAYERS[l], x: rand(0, W + 120), y: anywhere ? rand(-H, H) : rand(-80, -10), gy: groundY(), sp: 480 + 420 * LAYERS[l] };
     }
     function newFlake(anywhere) {
       return { flake: true, x: rand(0, W), y: anywhere ? rand(0, H) : -5, r: rand(0.8, 2), sp: rand(50, 110), ph: rand(0, 6.28) };
@@ -123,18 +166,18 @@ window.BattleWeather = (function () {
 
     function step(dt) {
       t += dt;
+      const n = live();
       if (current === "rain") {
-        const vx = -210;
-        for (const p of parts) {
+        for (let i = 0; i < n; i++) {
+          const p = parts[i];
+          const prevY = p.y;
           p.y += p.sp * dt;
-          p.x += vx * dt * (p.sp / 1300);
-          if (p.y >= p.gy && p.z > 0.5 && p.y - p.sp * dt < p.gy) {
-            fx.push({ ripple: true, x: p.x, y: p.gy, age: 0, life: 0.4, s: p.z });
-            if (Math.random() < 0.5) {
-              for (let k = 0; k < 2; k++) fx.push({ drop: true, x: p.x, y: p.gy, vx: rand(-60, 60), vy: rand(-140, -70), age: 0, life: 0.35 });
-            }
+          p.x -= RAIN_WIND * p.sp * dt;
+          if (p.l === 2 && prevY < p.gy && p.y >= p.gy && fx.length < 60) {
+            fx.push({ ripple: true, x: p.x, y: p.gy, age: 0, life: 0.4 });
+            if (Math.random() < 0.4) fx.push({ drop: true, x: p.x, y: p.gy, vx: rand(-60, 60), vy: rand(-140, -70), age: 0, life: 0.35 });
           }
-          if (p.y > p.gy + (p.z > 0.5 ? 0 : 40) || p.x < -60) Object.assign(p, newDrop(false));
+          if (p.y > p.gy + (p.l === 2 ? 0 : 40) || p.x < -60) Object.assign(p, newDrop(false));
         }
         nextFlash -= dt;
         if (nextFlash <= 0) {
@@ -144,26 +187,23 @@ window.BattleWeather = (function () {
         }
         flash = Math.max(0, flash - dt * 3.2);
       } else if (current === "sun") {
-        for (const p of parts) {
-          if (!p.mote) continue;
+        for (let i = 0; i < n; i++) {
+          const p = parts[i];
           p.y -= p.sp * dt;
           p.x += (p.dx + Math.sin(t + p.ph) * 8) * dt;
           if (p.y < -10) Object.assign(p, newMote(false));
         }
       } else if (current === "sand") {
         const g = gust();
-        for (const p of parts) {
-          if (p.cloud) {
-            p.x -= p.sp * g * dt;
-            if (p.x < -p.rx * 1.2) { p.x = W + p.rx; p.y = rand(H * 0.1, H); }
-            continue;
-          }
+        for (let i = 0; i < n; i++) {
+          const p = parts[i];
           p.x -= p.sp * g * dt;
           p.y += Math.sin(t * 3 + p.ph) * 40 * dt + 18 * dt;
           if (p.x < -20 || p.y > H + 20) Object.assign(p, newGrain(false));
         }
       } else if (current === "hail") {
-        for (const p of parts) {
+        for (let i = 0; i < n; i++) {
+          const p = parts[i];
           if (p.flake) {
             p.y += p.sp * dt;
             p.x += (Math.sin(t * 1.5 + p.ph) * 22 - 30) * dt;
@@ -173,10 +213,12 @@ window.BattleWeather = (function () {
           p.y += p.sp * dt;
           p.x -= 110 * dt;
           if (p.y >= p.gy) {
-            if (p.z > 0.55 && Math.random() < 0.55) {
-              for (let k = 0; k < 3; k++) fx.push({ shard: true, x: p.x, y: p.gy, vx: rand(-90, 90), vy: rand(-120, -40), age: 0, life: 0.35 });
-            } else {
-              fx.push({ bounce: true, x: p.x, y: p.gy, vx: rand(-50, 30), vy: -p.sp * rand(0.18, 0.3), r: p.r, gy: p.gy, age: 0, life: 0.6 });
+            if (fx.length < 50) {
+              if (p.l === 2 && Math.random() < 0.55) {
+                for (let k = 0; k < 3; k++) fx.push({ shard: true, x: p.x, y: p.gy, vx: rand(-90, 90), vy: rand(-120, -40), age: 0, life: 0.35 });
+              } else {
+                fx.push({ bounce: true, x: p.x, y: p.gy, vx: rand(-50, 30), vy: -p.sp * rand(0.18, 0.3), l: p.l, gy: p.gy, age: 0, life: 0.6 });
+              }
             }
             Object.assign(p, newStone(false));
           }
@@ -200,171 +242,136 @@ window.BattleWeather = (function () {
     // ---------- Drawing ----------
 
     function draw() {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
       ctx.clearRect(0, 0, W, H);
       if (!current || intensity <= 0) return;
-      ctx.globalAlpha = intensity;
       if (current === "rain") drawRain();
       else if (current === "sun") drawSun();
       else if (current === "sand") drawSand();
       else if (current === "hail") drawHail();
       ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    // One stroke per depth layer instead of one per particle.
+    function strokeLayers(n, color, width, segment) {
+      for (let l = 0; l < LAYERS.length; l++) {
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+          const p = parts[i];
+          if (p.l === l) segment(p);
+        }
+        ctx.globalAlpha = intensity * color(LAYERS[l]);
+        ctx.lineWidth = width(LAYERS[l]);
+        ctx.stroke();
+      }
     }
 
     function drawRain() {
+      const n = live();
       ctx.lineCap = "round";
-      for (const p of parts) {
-        // Streak trails back along the drop's velocity (wind slants it).
-        ctx.strokeStyle = `rgba(195, 220, 255, ${0.18 + 0.5 * p.z})`;
-        ctx.lineWidth = 0.7 + p.z * 1.1;
-        ctx.beginPath();
+      ctx.strokeStyle = "rgb(195, 220, 255)";
+      strokeLayers(n, (z) => 0.18 + 0.5 * z, (z) => 0.7 + z * 1.1, (p) => {
         ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x + (210 / 1300) * p.len, p.y - p.len);
-        ctx.stroke();
-      }
+        ctx.lineTo(p.x + RAIN_WIND * p.len, p.y - p.len);
+      });
+      ctx.strokeStyle = "rgb(200, 225, 255)";
+      ctx.fillStyle = "rgb(210, 230, 255)";
+      ctx.lineWidth = 1;
       for (const e of fx) {
         const k = e.age / e.life;
+        ctx.globalAlpha = intensity * 0.6 * (1 - k);
         if (e.ripple) {
-          ctx.strokeStyle = `rgba(200, 225, 255, ${0.55 * (1 - k)})`;
-          ctx.lineWidth = 1;
+          const r = 3 + 13 * k;
           ctx.beginPath();
-          ctx.ellipse(e.x, e.y, 3 + 13 * k * e.s, (3 + 13 * k * e.s) * 0.32, 0, 0, Math.PI * 2);
+          ctx.ellipse(e.x, e.y, r, r * 0.32, 0, 0, Math.PI * 2);
           ctx.stroke();
         } else {
-          ctx.fillStyle = `rgba(210, 230, 255, ${0.7 * (1 - k)})`;
           ctx.fillRect(e.x, e.y, 1.6, 1.6);
         }
       }
       if (flash > 0) {
-        ctx.fillStyle = `rgba(225, 235, 255, ${0.32 * flash})`;
+        ctx.globalAlpha = intensity * 0.32 * flash;
+        ctx.fillStyle = "rgb(225, 235, 255)";
         ctx.fillRect(0, 0, W, H);
       }
     }
 
     function drawSun() {
+      // Rays and glow are the CSS layer; here: lens flare + drifting motes.
       const ox = W * 0.9, oy = -H * 0.12;
-      const len = Math.hypot(W, H) * 1.15;
       ctx.globalCompositeOperation = "lighter";
-      const pulse = 0.85 + 0.15 * Math.sin(t * 1.3);
-      const core = ctx.createRadialGradient(ox, oy, 0, ox, oy, W * 0.42 * pulse);
-      core.addColorStop(0, "rgba(255, 244, 190, 0.55)");
-      core.addColorStop(0.35, "rgba(255, 200, 90, 0.22)");
-      core.addColorStop(1, "rgba(255, 170, 60, 0)");
-      ctx.fillStyle = core;
-      ctx.fillRect(0, 0, W, H);
-      for (const p of parts) {
-        if (!p.ray) continue;
-        const a = p.a + Math.sin(t * p.sp + p.ph) * 0.05;
-        const w = p.w * (0.8 + 0.3 * Math.sin(t * p.sp * 1.7 + p.ph));
-        const alpha = 0.11 + 0.08 * Math.sin(t * p.sp * 1.3 + p.ph * 2);
-        const g = ctx.createLinearGradient(ox, oy, ox + Math.cos(a) * len, oy + Math.sin(a) * len);
-        g.addColorStop(0, `rgba(255, 236, 170, ${alpha + 0.1})`);
-        g.addColorStop(0.6, `rgba(255, 215, 120, ${alpha * 0.5})`);
-        g.addColorStop(1, "rgba(255, 200, 100, 0)");
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.moveTo(ox, oy);
-        ctx.lineTo(ox + Math.cos(a - w) * len, oy + Math.sin(a - w) * len);
-        ctx.lineTo(ox + Math.cos(a + w) * len, oy + Math.sin(a + w) * len);
-        ctx.closePath();
-        ctx.fill();
-      }
-      // Lens flare: a few soft discs on the line from the sun through the middle.
       const cx = W * 0.5, cy = H * 0.55;
-      [[0.55, 26, 0.12], [0.85, 12, 0.18], [1.25, 40, 0.07]].forEach(([k, r, a]) => {
+      [[0.55, 52, 0.12], [0.85, 24, 0.18], [1.25, 80, 0.07]].forEach(([k, d, a]) => {
         const x = ox + (cx - ox) * k + Math.sin(t * 0.5) * 6, y = oy + (cy - oy) * k;
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, `rgba(255, 230, 160, ${a})`);
-        g.addColorStop(1, "rgba(255, 230, 160, 0)");
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.globalAlpha = intensity * a;
+        ctx.drawImage(sprites.flare, x - d / 2, y - d / 2, d, d);
       });
-      for (const p of parts) {
-        if (!p.mote) continue;
-        const tw = 0.45 + 0.55 * Math.abs(Math.sin(t * 2 + p.ph));
-        ctx.fillStyle = `rgba(255, 225, 140, ${0.55 * tw})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * 2.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = `rgba(255, 250, 220, ${0.8 * tw})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * 0.8, 0, Math.PI * 2);
-        ctx.fill();
+      const n = live();
+      for (let i = 0; i < n; i++) {
+        const p = parts[i];
+        ctx.globalAlpha = intensity * (0.35 + 0.65 * Math.abs(Math.sin(t * 2 + p.ph)));
+        ctx.drawImage(sprites.mote, p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
       }
-      ctx.globalCompositeOperation = "source-over";
     }
 
     function drawSand() {
       const g = gust();
-      for (const p of parts) {
-        if (!p.cloud) continue;
-        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.rx);
-        grad.addColorStop(0, `rgba(205, 165, 100, ${p.a * (0.7 + 0.5 * g)})`);
-        grad.addColorStop(1, "rgba(205, 165, 100, 0)");
-        ctx.fillStyle = grad;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.scale(1, p.ry / p.rx);
-        ctx.translate(-p.x, -p.y);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.rx, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
+      const n = live();
       ctx.lineCap = "round";
-      for (const p of parts) {
-        if (p.cloud) continue;
+      ctx.strokeStyle = "rgb(236, 206, 150)";
+      strokeLayers(n, (z) => 0.3 + 0.55 * z, (z) => 0.8 + 1.8 * z, (p) => {
         const streak = p.sp * g * 0.018;
-        ctx.strokeStyle = `rgba(236, 206, 150, ${0.3 + 0.55 * p.z})`;
-        ctx.lineWidth = 0.8 + 1.8 * p.z;
-        ctx.beginPath();
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(p.x + streak, p.y - streak * 0.08);
-        ctx.stroke();
-      }
+      });
     }
 
     function drawHail() {
-      for (const p of parts) {
+      const n = live();
+      ctx.fillStyle = "rgb(235, 245, 255)";
+      ctx.globalAlpha = intensity * 0.7;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const p = parts[i];
         if (!p.flake) continue;
-        ctx.fillStyle = "rgba(235, 245, 255, 0.7)";
-        ctx.beginPath();
+        ctx.moveTo(p.x + p.r, p.y);
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
       }
-      for (const p of parts) {
-        if (!p.stone) continue;
-        drawStone(p.x, p.y, p.r, 0.55 + 0.45 * p.z);
-        ctx.strokeStyle = `rgba(220, 240, 255, ${0.25 * p.z})`;
-        ctx.lineWidth = p.r * 0.9;
-        ctx.beginPath();
+      ctx.fill();
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgb(220, 240, 255)";
+      strokeLayers(n, (z) => 0.25 * z, (z) => 1.5 + 3 * z, (p) => {
+        if (!p.stone) return;
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(p.x + 110 * 0.035, p.y - p.sp * 0.035);
+      });
+      // Stones: one fill + one outline + one highlight pass per depth layer.
+      const bounces = fx.filter((e) => e.bounce);
+      for (let l = 0; l < LAYERS.length; l++) {
+        const r = STONE_R[l];
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+          const p = parts[i];
+          if (p.stone && p.l === l) { ctx.moveTo(p.x + r, p.y); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); }
+        }
+        for (const e of bounces) {
+          if (e.l === l) { ctx.moveTo(e.x + r, e.y); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); }
+        }
+        ctx.globalAlpha = intensity * (0.55 + 0.45 * LAYERS[l]);
+        ctx.fillStyle = "rgb(228, 242, 255)";
+        ctx.fill();
+        ctx.strokeStyle = "rgb(140, 190, 235)";
+        ctx.lineWidth = 1;
         ctx.stroke();
       }
+      ctx.globalAlpha = intensity * 0.8;
+      ctx.fillStyle = "rgb(230, 245, 255)";
+      ctx.beginPath();
       for (const e of fx) {
-        const k = e.age / e.life;
-        if (e.bounce) drawStone(e.x, e.y, e.r, 1 - k);
-        else {
-          ctx.fillStyle = `rgba(230, 245, 255, ${0.9 * (1 - k)})`;
-          ctx.fillRect(e.x, e.y, 2, 2);
-        }
+        if (e.shard) ctx.rect(e.x, e.y, 2, 2);
       }
-    }
-
-    function drawStone(x, y, r, a) {
-      ctx.fillStyle = `rgba(225, 240, 255, ${a})`;
-      ctx.strokeStyle = `rgba(140, 190, 235, ${a})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = `rgba(255, 255, 255, ${a})`;
-      ctx.beginPath();
-      ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.35, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -372,8 +379,19 @@ window.BattleWeather = (function () {
 
     function frame(now) {
       raf = 0;
-      const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016);
+      const raw = last ? (now - last) / 1000 : 0.016;
+      const dt = Math.min(0.05, raw);
       last = now;
+      // Frames running long (under ~40fps) for a while: thin the particles.
+      if (raw > 0.025 && raw < 0.5) {
+        slowTime += raw;
+        if (slowTime > 1.2 && quality > 0.4) {
+          quality = Math.max(0.4, quality - 0.2);
+          slowTime = 0;
+        }
+      } else {
+        slowTime = Math.max(0, slowTime - raw * 0.5);
+      }
       if (current !== target) {
         intensity -= dt * 2.5;
         if (intensity <= 0 || !current) {
@@ -403,7 +421,7 @@ window.BattleWeather = (function () {
         return;
       }
       stillDirty = true;
-      if (document.hidden) {
+      if (document.hidden || !onScreen) {
         last = 0;
         return;
       }
@@ -411,6 +429,12 @@ window.BattleWeather = (function () {
     }
 
     document.addEventListener("visibilitychange", schedule);
+    if (window.IntersectionObserver) {
+      new IntersectionObserver((entries) => {
+        onScreen = entries[entries.length - 1].isIntersecting;
+        schedule();
+      }).observe(scene);
+    }
     if (window.ResizeObserver) new ResizeObserver(resize).observe(scene);
     else window.addEventListener("resize", resize);
     resize();

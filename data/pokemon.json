@@ -252,7 +252,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 2,
@@ -507,7 +508,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 3,
@@ -757,7 +759,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 4,
@@ -1010,7 +1013,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 5,
@@ -1263,7 +1267,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 6,
@@ -1507,7 +1512,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 7,
@@ -1760,7 +1766,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 8,
@@ -2029,7 +2036,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 9,
@@ -2293,7 +2301,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 10,
@@ -2469,7 +2478,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 11,
@@ -2651,7 +2661,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 12,
@@ -2932,7 +2943,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 13,
@@ -3084,7 +3096,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 14,
@@ -3267,7 +3280,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 15,
@@ -3513,7 +3527,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 16,
@@ -3768,7 +3783,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 17,
@@ -4025,7 +4041,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 18,
@@ -4277,7 +4294,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 19,
@@ -4529,7 +4547,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 20,
@@ -4771,7 +4790,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 21,
@@ -5020,7 +5040,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 22,
@@ -5262,7 +5283,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 23,
@@ -5534,7 +5556,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 24,
@@ -5803,7 +5826,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 3.5
   },
   {
     "id": 25,
@@ -6056,7 +6080,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 26,
@@ -6299,7 +6324,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 27,
@@ -6552,7 +6578,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 28,
@@ -6800,7 +6827,8 @@
           "semi_invulnerable"
         ]
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 29,
@@ -7071,7 +7099,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 30,
@@ -7340,7 +7369,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 31,
@@ -7597,7 +7627,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 32,
@@ -7863,7 +7894,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 33,
@@ -8129,7 +8161,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 34,
@@ -8381,7 +8414,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 35,
@@ -8638,7 +8672,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 36,
@@ -8906,7 +8941,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 37,
@@ -9154,7 +9190,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 38,
@@ -9397,7 +9434,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 39,
@@ -9652,7 +9690,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 40,
@@ -9902,7 +9941,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 41,
@@ -10146,7 +10186,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 42,
@@ -10390,7 +10431,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 43,
@@ -10645,7 +10687,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 44,
@@ -10902,7 +10945,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 45,
@@ -11150,7 +11194,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 46,
@@ -11412,7 +11457,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 47,
@@ -11669,7 +11715,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 48,
@@ -11926,7 +11973,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 49,
@@ -12194,7 +12242,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 50,
@@ -12459,7 +12508,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.2
   },
   {
     "id": 51,
@@ -12716,7 +12766,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 52,
@@ -12978,7 +13029,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 53,
@@ -13233,7 +13285,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 54,
@@ -13487,7 +13540,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 55,
@@ -13736,7 +13790,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 56,
@@ -13999,7 +14054,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 57,
@@ -14257,7 +14313,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 58,
@@ -14514,7 +14571,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 59,
@@ -14763,7 +14821,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.9
   },
   {
     "id": 60,
@@ -15025,7 +15084,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 61,
@@ -15291,7 +15351,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 62,
@@ -15545,7 +15606,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 63,
@@ -15790,7 +15852,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 64,
@@ -16049,7 +16112,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 65,
@@ -16303,7 +16367,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 66,
@@ -16579,7 +16644,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 67,
@@ -16855,7 +16921,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 68,
@@ -17126,7 +17193,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 69,
@@ -17373,7 +17441,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 70,
@@ -17625,7 +17694,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 71,
@@ -17879,7 +17949,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 72,
@@ -18135,7 +18206,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 73,
@@ -18386,7 +18458,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 74,
@@ -18639,7 +18712,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 75,
@@ -18894,7 +18968,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 76,
@@ -19139,7 +19214,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 77,
@@ -19400,7 +19476,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 78,
@@ -19656,7 +19733,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 79,
@@ -19916,7 +19994,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 80,
@@ -20172,7 +20251,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 81,
@@ -20428,7 +20508,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 82,
@@ -20679,7 +20760,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 83,
@@ -20932,7 +21014,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 84,
@@ -21192,7 +21275,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 85,
@@ -21447,7 +21531,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 86,
@@ -21699,7 +21784,8 @@
           "semi_invulnerable"
         ]
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 87,
@@ -21947,7 +22033,8 @@
           "semi_invulnerable"
         ]
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 88,
@@ -22216,7 +22303,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 89,
@@ -22480,7 +22568,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 90,
@@ -22760,7 +22849,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 91,
@@ -23015,7 +23105,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 92,
@@ -23260,7 +23351,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 93,
@@ -23505,7 +23597,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 94,
@@ -23745,7 +23838,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 95,
@@ -24008,7 +24102,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 8.8
   },
   {
     "id": 96,
@@ -24270,7 +24365,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 97,
@@ -24527,7 +24623,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 98,
@@ -24784,7 +24881,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 99,
@@ -25036,7 +25134,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 100,
@@ -25283,7 +25382,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 101,
@@ -25525,7 +25625,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 102,
@@ -25776,7 +25877,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 103,
@@ -26024,7 +26126,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 104,
@@ -26277,7 +26380,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 105,
@@ -26525,7 +26629,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 106,
@@ -26774,7 +26879,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 107,
@@ -27023,7 +27129,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 108,
@@ -27275,7 +27382,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 109,
@@ -27534,7 +27642,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 110,
@@ -27788,7 +27897,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 111,
@@ -28045,7 +28155,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 112,
@@ -28302,7 +28413,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.9
   },
   {
     "id": 113,
@@ -28554,7 +28666,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 114,
@@ -28822,7 +28935,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 115,
@@ -29073,7 +29187,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.2
   },
   {
     "id": 116,
@@ -29334,7 +29449,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 117,
@@ -29595,7 +29711,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 118,
@@ -29849,7 +29966,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 119,
@@ -30098,7 +30216,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 120,
@@ -30357,7 +30476,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 121,
@@ -30610,7 +30730,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 122,
@@ -30865,7 +30986,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 123,
@@ -31123,7 +31245,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 124,
@@ -31376,7 +31499,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 125,
@@ -31624,7 +31748,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 126,
@@ -31872,7 +31997,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 127,
@@ -32137,7 +32263,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 128,
@@ -32392,7 +32519,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 129,
@@ -32561,7 +32689,8 @@
           "semi_invulnerable"
         ]
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 130,
@@ -32820,7 +32949,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 6.5
   },
   {
     "id": 131,
@@ -33063,7 +33193,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.5
   },
   {
     "id": 132,
@@ -33124,7 +33255,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 133,
@@ -33404,7 +33536,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 134,
@@ -33652,7 +33785,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 135,
@@ -33897,7 +34031,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 136,
@@ -34140,7 +34275,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 137,
@@ -34389,7 +34525,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 138,
@@ -34690,7 +34827,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 139,
@@ -34986,7 +35124,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 140,
@@ -35267,7 +35406,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 141,
@@ -35546,7 +35686,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 142,
@@ -35801,7 +35942,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 143,
@@ -36059,7 +36201,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.1
   },
   {
     "id": 144,
@@ -36302,7 +36445,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 145,
@@ -36550,7 +36694,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 146,
@@ -36798,7 +36943,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 147,
@@ -37060,7 +37206,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 148,
@@ -37317,7 +37464,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 4.0
   },
   {
     "id": 149,
@@ -37569,7 +37717,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.2
   },
   {
     "id": 150,
@@ -37826,7 +37975,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 151,
@@ -38070,7 +38220,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 152,
@@ -38320,7 +38471,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 153,
@@ -38570,7 +38722,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 154,
@@ -38815,7 +38968,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 155,
@@ -39063,7 +39217,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 156,
@@ -39313,7 +39468,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 157,
@@ -39558,7 +39714,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 158,
@@ -39815,7 +39972,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 159,
@@ -40072,7 +40230,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 160,
@@ -40324,7 +40483,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.3
   },
   {
     "id": 161,
@@ -40576,7 +40736,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 162,
@@ -40823,7 +40984,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 163,
@@ -41076,7 +41238,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 164,
@@ -41324,7 +41487,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 165,
@@ -41607,7 +41771,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 166,
@@ -41885,7 +42050,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 167,
@@ -42151,7 +42317,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 168,
@@ -42412,7 +42579,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 169,
@@ -42651,7 +42819,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 170,
@@ -42906,7 +43075,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 171,
@@ -43156,7 +43326,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 172,
@@ -43414,7 +43585,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 173,
@@ -43689,7 +43861,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 174,
@@ -43947,7 +44120,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 175,
@@ -44199,7 +44373,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 176,
@@ -44452,7 +44627,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 177,
@@ -44724,7 +44900,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.2
   },
   {
     "id": 178,
@@ -44991,7 +45168,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 179,
@@ -45244,7 +45422,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 180,
@@ -45497,7 +45676,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 181,
@@ -45740,7 +45920,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 182,
@@ -46007,7 +46188,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 183,
@@ -46274,7 +46456,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 184,
@@ -46536,7 +46719,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 185,
@@ -46789,7 +46973,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 186,
@@ -47041,7 +47226,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 187,
@@ -47308,7 +47494,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 188,
@@ -47575,7 +47762,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 189,
@@ -47837,7 +48025,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 190,
@@ -48106,7 +48295,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 191,
@@ -48357,7 +48547,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 192,
@@ -48608,7 +48799,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 193,
@@ -48866,7 +49058,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 194,
@@ -49124,7 +49317,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 195,
@@ -49377,7 +49571,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 196,
@@ -49622,7 +49817,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 197,
@@ -49865,7 +50061,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 198,
@@ -50111,7 +50308,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 199,
@@ -50369,7 +50567,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 200,
@@ -50613,7 +50812,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 201,
@@ -50670,7 +50870,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 202,
@@ -50916,7 +51117,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 203,
@@ -51176,7 +51378,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 204,
@@ -51426,7 +51629,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 205,
@@ -51670,7 +51874,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 206,
@@ -51949,7 +52154,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 207,
@@ -52207,7 +52413,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 208,
@@ -52463,7 +52670,8 @@
           "semi_invulnerable"
         ]
       }
-    ]
+    ],
+    "height": 9.2
   },
   {
     "id": 209,
@@ -52720,7 +52928,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 210,
@@ -52974,7 +53183,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 211,
@@ -53219,7 +53429,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 212,
@@ -53472,7 +53683,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 213,
@@ -53734,7 +53946,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 214,
@@ -53995,7 +54208,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 215,
@@ -54258,7 +54472,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 216,
@@ -54512,7 +54727,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 217,
@@ -54766,7 +54982,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 218,
@@ -55042,7 +55259,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 219,
@@ -55314,7 +55532,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 220,
@@ -55590,7 +55809,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 221,
@@ -55868,7 +56088,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 222,
@@ -56137,7 +56358,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 223,
@@ -56390,7 +56612,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 224,
@@ -56636,7 +56859,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 225,
@@ -56880,7 +57104,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 226,
@@ -57130,7 +57355,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.1
   },
   {
     "id": 227,
@@ -57393,7 +57619,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 228,
@@ -57656,7 +57883,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 229,
@@ -57914,7 +58142,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 230,
@@ -58171,7 +58400,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 231,
@@ -58421,7 +58651,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 232,
@@ -58674,7 +58905,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 233,
@@ -58921,7 +59153,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 234,
@@ -59177,7 +59410,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 235,
@@ -59242,7 +59476,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 236,
@@ -59420,7 +59655,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 237,
@@ -59671,7 +59907,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 238,
@@ -59927,7 +60164,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 239,
@@ -60173,7 +60411,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 240,
@@ -60414,7 +60653,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 241,
@@ -60664,7 +60904,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 242,
@@ -60906,7 +61147,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 243,
@@ -61156,7 +61398,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.9
   },
   {
     "id": 244,
@@ -61406,7 +61649,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.1
   },
   {
     "id": 245,
@@ -61651,7 +61895,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 246,
@@ -61907,7 +62152,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 247,
@@ -62159,7 +62405,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 248,
@@ -62407,7 +62654,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 249,
@@ -62676,7 +62924,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 5.2
   },
   {
     "id": 250,
@@ -62950,7 +63199,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 3.8
   },
   {
     "id": 251,
@@ -63188,7 +63438,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 252,
@@ -63446,7 +63697,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 253,
@@ -63697,7 +63949,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 254,
@@ -63943,7 +64196,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 255,
@@ -64191,7 +64445,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 256,
@@ -64444,7 +64699,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 257,
@@ -64694,7 +64950,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.9
   },
   {
     "id": 258,
@@ -64949,7 +65206,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 259,
@@ -65208,7 +65466,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 260,
@@ -65462,7 +65721,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 261,
@@ -65719,7 +65979,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 262,
@@ -65971,7 +66232,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 263,
@@ -66220,7 +66482,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 264,
@@ -66462,7 +66725,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 265,
@@ -66612,7 +66876,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 266,
@@ -66759,7 +67024,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 267,
@@ -67037,7 +67303,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 268,
@@ -67184,7 +67451,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 269,
@@ -67462,7 +67730,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 270,
@@ -67722,7 +67991,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 271,
@@ -67977,7 +68247,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 272,
@@ -68234,7 +68505,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 273,
@@ -68481,7 +68753,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 274,
@@ -68736,7 +69009,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 275,
@@ -68993,7 +69267,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 276,
@@ -69249,7 +69524,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 277,
@@ -69500,7 +69776,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 278,
@@ -69755,7 +70032,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 279,
@@ -70007,7 +70285,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 280,
@@ -70265,7 +70544,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 281,
@@ -70527,7 +70807,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 282,
@@ -70780,7 +71061,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 283,
@@ -71032,7 +71314,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 284,
@@ -71315,7 +71598,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 285,
@@ -71573,7 +71857,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 286,
@@ -71818,7 +72103,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 287,
@@ -72067,7 +72353,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 288,
@@ -72306,7 +72593,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 289,
@@ -72543,7 +72831,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 290,
@@ -72808,7 +73097,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 291,
@@ -73057,7 +73347,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 292,
@@ -73297,7 +73588,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 293,
@@ -73545,7 +73837,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 294,
@@ -73793,7 +74086,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 295,
@@ -74036,7 +74330,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 296,
@@ -74292,7 +74587,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 297,
@@ -74543,7 +74839,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.3
   },
   {
     "id": 298,
@@ -74812,7 +75109,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.2
   },
   {
     "id": 299,
@@ -75062,7 +75360,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 300,
@@ -75324,7 +75623,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 301,
@@ -75585,7 +75885,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 302,
@@ -75831,7 +76132,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 303,
@@ -76096,7 +76398,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 304,
@@ -76366,7 +76669,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 305,
@@ -76636,7 +76940,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 306,
@@ -76901,7 +77206,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 2.1
   },
   {
     "id": 307,
@@ -77143,7 +77449,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 308,
@@ -77380,7 +77687,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 309,
@@ -77632,7 +77940,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 310,
@@ -77879,7 +78188,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 311,
@@ -78135,7 +78445,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 312,
@@ -78388,7 +78699,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 313,
@@ -78642,7 +78954,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 314,
@@ -78899,7 +79212,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 315,
@@ -79159,7 +79473,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 316,
@@ -79413,7 +79728,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 317,
@@ -79662,7 +79978,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 318,
@@ -79931,7 +80248,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 319,
@@ -80192,7 +80510,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 320,
@@ -80448,7 +80767,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 321,
@@ -80699,7 +81019,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 14.5
   },
   {
     "id": 322,
@@ -80959,7 +81280,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 323,
@@ -81209,7 +81531,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 1.9
   },
   {
     "id": 324,
@@ -81480,7 +81803,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 325,
@@ -81733,7 +82057,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 326,
@@ -81981,7 +82306,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 327,
@@ -82229,7 +82555,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 328,
@@ -82495,7 +82822,8 @@
           "semi_invulnerable"
         ]
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 329,
@@ -82747,7 +83075,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 330,
@@ -82984,7 +83313,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 331,
@@ -83237,7 +83567,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 332,
@@ -83486,7 +83817,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 333,
@@ -83740,7 +84072,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 334,
@@ -84000,7 +84333,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 335,
@@ -84250,7 +84584,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 336,
@@ -84504,7 +84839,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.7
   },
   {
     "id": 337,
@@ -84756,7 +85092,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 338,
@@ -85005,7 +85342,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 339,
@@ -85263,7 +85601,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 340,
@@ -85516,7 +85855,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 341,
@@ -85778,7 +86118,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 342,
@@ -86036,7 +86377,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 343,
@@ -86288,7 +86630,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 344,
@@ -86535,7 +86878,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 345,
@@ -86819,7 +87163,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 346,
@@ -87096,7 +87441,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 347,
@@ -87366,7 +87712,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 348,
@@ -87631,7 +87978,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 349,
@@ -87878,7 +88226,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 350,
@@ -88131,7 +88480,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 6.2
   },
   {
     "id": 351,
@@ -88365,7 +88715,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 352,
@@ -88627,7 +88978,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 353,
@@ -88877,7 +89229,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 354,
@@ -89122,7 +89475,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 355,
@@ -89373,7 +89727,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 356,
@@ -89626,7 +89981,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 357,
@@ -89881,7 +90237,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 358,
@@ -90120,7 +90477,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 359,
@@ -90362,7 +90720,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 360,
@@ -90613,7 +90972,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 361,
@@ -90867,7 +91227,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 362,
@@ -91114,7 +91475,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 363,
@@ -91362,7 +91724,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 364,
@@ -91610,7 +91973,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 365,
@@ -91853,7 +92217,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 366,
@@ -92053,7 +92418,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 367,
@@ -92315,7 +92681,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 368,
@@ -92582,7 +92949,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 369,
@@ -92851,7 +93219,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 370,
@@ -93094,7 +93463,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 371,
@@ -93349,7 +93719,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 372,
@@ -93604,7 +93975,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 373,
@@ -93858,7 +94230,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 374,
@@ -94116,7 +94489,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 375,
@@ -94385,7 +94759,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 376,
@@ -94654,7 +95029,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 377,
@@ -94911,7 +95287,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 378,
@@ -95168,7 +95545,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 379,
@@ -95425,7 +95803,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.9
   },
   {
     "id": 380,
@@ -95668,7 +96047,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 381,
@@ -95924,7 +96304,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 382,
@@ -96174,7 +96555,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 4.5
   },
   {
     "id": 383,
@@ -96429,7 +96811,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 3.5
   },
   {
     "id": 384,
@@ -96680,7 +97063,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 7.0
   },
   {
     "id": 385,
@@ -96929,7 +97313,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 386,
@@ -97177,7 +97562,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 387,
@@ -97434,7 +97820,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 388,
@@ -97691,7 +98078,8 @@
           "drain"
         ]
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 389,
@@ -97944,7 +98332,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.2
   },
   {
     "id": 390,
@@ -98194,7 +98583,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 391,
@@ -98451,7 +98841,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 392,
@@ -98712,7 +99103,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 393,
@@ -98964,7 +99356,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 394,
@@ -99216,7 +99609,8 @@
           "multi_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 395,
@@ -99462,7 +99856,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 396,
@@ -99719,7 +100114,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 397,
@@ -99976,7 +100372,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 398,
@@ -100237,7 +100634,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 399,
@@ -100510,7 +100908,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 400,
@@ -100779,7 +101178,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 401,
@@ -101009,7 +101409,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 402,
@@ -101260,7 +101661,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 403,
@@ -101522,7 +101924,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 404,
@@ -101784,7 +102187,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 405,
@@ -102041,7 +102445,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 406,
@@ -102296,7 +102701,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.2
   },
   {
     "id": 407,
@@ -102546,7 +102952,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 408,
@@ -102827,7 +103234,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 409,
@@ -103103,7 +103511,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 410,
@@ -103373,7 +103782,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 411,
@@ -103617,7 +104027,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 412,
@@ -103822,7 +104233,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.2
   },
   {
     "id": 413,
@@ -104083,7 +104495,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 414,
@@ -104374,7 +104787,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 415,
@@ -104556,7 +104970,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 416,
@@ -104817,7 +105232,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 417,
@@ -105062,7 +105478,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 418,
@@ -105317,7 +105734,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 419,
@@ -105567,7 +105985,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 420,
@@ -105812,7 +106231,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 421,
@@ -106052,7 +106472,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 422,
@@ -106321,7 +106742,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 423,
@@ -106586,7 +107008,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 424,
@@ -106850,7 +107273,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 425,
@@ -107127,7 +107551,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 426,
@@ -107399,7 +107824,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 427,
@@ -107664,7 +108090,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 428,
@@ -107919,7 +108346,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 429,
@@ -108165,7 +108593,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 430,
@@ -108413,7 +108842,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 431,
@@ -108679,7 +109109,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 432,
@@ -108940,7 +109371,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 433,
@@ -109183,7 +109615,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.2
   },
   {
     "id": 434,
@@ -109453,7 +109886,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 435,
@@ -109718,7 +110152,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 436,
@@ -109976,7 +110411,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 437,
@@ -110224,7 +110660,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 438,
@@ -110473,7 +110910,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 439,
@@ -110733,7 +111171,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 440,
@@ -110998,7 +111437,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 441,
@@ -111262,7 +111702,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.5
   },
   {
     "id": 442,
@@ -111520,7 +111961,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 443,
@@ -111771,7 +112213,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 444,
@@ -112022,7 +112465,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 445,
@@ -112273,7 +112717,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 1.9
   },
   {
     "id": 446,
@@ -112522,7 +112967,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.6
   },
   {
     "id": 447,
@@ -112795,7 +113241,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 448,
@@ -113070,7 +113517,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 449,
@@ -113320,7 +113768,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 450,
@@ -113565,7 +114014,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 451,
@@ -113830,7 +114280,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 452,
@@ -114090,7 +114541,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 453,
@@ -114362,7 +114814,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 0.7
   },
   {
     "id": 454,
@@ -114629,7 +115082,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 455,
@@ -114880,7 +115334,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 456,
@@ -115151,7 +115606,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 457,
@@ -115417,7 +115873,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 458,
@@ -115675,7 +116132,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 459,
@@ -115936,7 +116394,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 460,
@@ -116192,7 +116651,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.2
   },
   {
     "id": 461,
@@ -116444,7 +116904,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.1
   },
   {
     "id": 462,
@@ -116695,7 +117156,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.2
   },
   {
     "id": 463,
@@ -116942,7 +117404,8 @@
           "recharge"
         ]
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 464,
@@ -117191,7 +117654,8 @@
           "recoil"
         ]
       }
-    ]
+    ],
+    "height": 2.4
   },
   {
     "id": 465,
@@ -117440,7 +117904,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 466,
@@ -117683,7 +118148,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.8
   },
   {
     "id": 467,
@@ -117921,7 +118387,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 468,
@@ -118183,7 +118650,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 469,
@@ -118460,7 +118928,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.9
   },
   {
     "id": 470,
@@ -118707,7 +119176,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 1.0
   },
   {
     "id": 471,
@@ -118950,7 +119420,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.8
   },
   {
     "id": 472,
@@ -119203,7 +119674,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.0
   },
   {
     "id": 473,
@@ -119460,7 +119932,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 2.5
   },
   {
     "id": 474,
@@ -119704,7 +120177,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.9
   },
   {
     "id": 475,
@@ -119954,7 +120428,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.6
   },
   {
     "id": 476,
@@ -120200,7 +120675,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.4
   },
   {
     "id": 477,
@@ -120448,7 +120924,8 @@
           "always_hit"
         ]
       }
-    ]
+    ],
+    "height": 2.2
   },
   {
     "id": 478,
@@ -120695,7 +121172,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.3
   },
   {
     "id": 479,
@@ -120935,7 +121413,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 480,
@@ -121176,7 +121655,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 481,
@@ -121413,7 +121893,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 482,
@@ -121647,7 +122128,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 483,
@@ -121903,7 +122385,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 5.4
   },
   {
     "id": 484,
@@ -122147,7 +122630,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 4.2
   },
   {
     "id": 485,
@@ -122398,7 +122882,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.7
   },
   {
     "id": 486,
@@ -122637,7 +123122,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 3.7
   },
   {
     "id": 487,
@@ -122881,7 +123367,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 4.5
   },
   {
     "id": 488,
@@ -123123,7 +123610,8 @@
         "target": "self",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 489,
@@ -123372,7 +123860,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.4
   },
   {
     "id": 490,
@@ -123611,7 +124100,8 @@
           "multi_turn_lock"
         ]
       }
-    ]
+    ],
+    "height": 0.3
   },
   {
     "id": 491,
@@ -123860,7 +124350,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 1.5
   },
   {
     "id": 492,
@@ -124102,7 +124593,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 0.2
   },
   {
     "id": 493,
@@ -124336,7 +124828,8 @@
         "target": "opponent",
         "flags": []
       }
-    ]
+    ],
+    "height": 3.2
   },
   {
     "id": 494,
@@ -124698,7 +125191,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 3
+    "mega_of": 3,
+    "height": 2.4
   },
   {
     "id": 10034,
@@ -124940,7 +125434,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 6
+    "mega_of": 6,
+    "height": 1.7
   },
   {
     "id": 10035,
@@ -125182,7 +125677,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 6
+    "mega_of": 6,
+    "height": 1.7
   },
   {
     "id": 10036,
@@ -125444,7 +125940,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 9
+    "mega_of": 9,
+    "height": 1.6
   },
   {
     "id": 10090,
@@ -125688,7 +126185,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 15
+    "mega_of": 15,
+    "height": 1.4
   },
   {
     "id": 10073,
@@ -125934,7 +126432,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 18
+    "mega_of": 18,
+    "height": 2.2
   },
   {
     "id": 10037,
@@ -126182,7 +126681,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 65
+    "mega_of": 65,
+    "height": 1.2
   },
   {
     "id": 10071,
@@ -126432,7 +126932,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 80
+    "mega_of": 80,
+    "height": 2.0
   },
   {
     "id": 10038,
@@ -126674,7 +127175,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 94
+    "mega_of": 94,
+    "height": 1.4
   },
   {
     "id": 10039,
@@ -126919,7 +127421,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 115
+    "mega_of": 115,
+    "height": 2.2
   },
   {
     "id": 10040,
@@ -127179,7 +127682,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 127
+    "mega_of": 127,
+    "height": 1.7
   },
   {
     "id": 10041,
@@ -127436,7 +127940,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 130
+    "mega_of": 130,
+    "height": 6.5
   },
   {
     "id": 10042,
@@ -127685,7 +128190,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 142
+    "mega_of": 142,
+    "height": 2.1
   },
   {
     "id": 10045,
@@ -127927,7 +128433,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 181
+    "mega_of": 181,
+    "height": 1.4
   },
   {
     "id": 10072,
@@ -128177,7 +128684,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 208
+    "mega_of": 208,
+    "height": 10.5
   },
   {
     "id": 10046,
@@ -128424,7 +128932,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 212
+    "mega_of": 212,
+    "height": 2.0
   },
   {
     "id": 10047,
@@ -128679,7 +129188,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 214
+    "mega_of": 214,
+    "height": 1.7
   },
   {
     "id": 10048,
@@ -128931,7 +129441,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 229
+    "mega_of": 229,
+    "height": 1.9
   },
   {
     "id": 10049,
@@ -129177,7 +129688,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 248
+    "mega_of": 248,
+    "height": 2.5
   },
   {
     "id": 10065,
@@ -129422,7 +129934,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 254
+    "mega_of": 254,
+    "height": 1.9
   },
   {
     "id": 10050,
@@ -129670,7 +130183,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 257
+    "mega_of": 257,
+    "height": 1.9
   },
   {
     "id": 10064,
@@ -129922,7 +130436,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 260
+    "mega_of": 260,
+    "height": 1.9
   },
   {
     "id": 10051,
@@ -130169,7 +130684,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 282
+    "mega_of": 282,
+    "height": 1.6
   },
   {
     "id": 10066,
@@ -130409,7 +130925,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 302
+    "mega_of": 302,
+    "height": 0.5
   },
   {
     "id": 10052,
@@ -130668,7 +131185,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 303
+    "mega_of": 303,
+    "height": 1.0
   },
   {
     "id": 10053,
@@ -130926,7 +131444,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 306
+    "mega_of": 306,
+    "height": 2.2
   },
   {
     "id": 10054,
@@ -131161,7 +131680,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 308
+    "mega_of": 308,
+    "height": 1.3
   },
   {
     "id": 10055,
@@ -131402,7 +131922,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 310
+    "mega_of": 310,
+    "height": 1.8
   },
   {
     "id": 10070,
@@ -131661,7 +132182,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 319
+    "mega_of": 319,
+    "height": 2.5
   },
   {
     "id": 10087,
@@ -131905,7 +132427,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 323
+    "mega_of": 323,
+    "height": 2.5
   },
   {
     "id": 10067,
@@ -132163,7 +132686,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 334
+    "mega_of": 334,
+    "height": 1.5
   },
   {
     "id": 10056,
@@ -132402,7 +132926,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 354
+    "mega_of": 354,
+    "height": 1.2
   },
   {
     "id": 10057,
@@ -132638,7 +133163,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 359
+    "mega_of": 359,
+    "height": 1.2
   },
   {
     "id": 10074,
@@ -132879,7 +133405,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 362
+    "mega_of": 362,
+    "height": 2.1
   },
   {
     "id": 10089,
@@ -133131,7 +133658,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 373
+    "mega_of": 373,
+    "height": 1.8
   },
   {
     "id": 10076,
@@ -133398,7 +133926,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 376
+    "mega_of": 376,
+    "height": 2.5
   },
   {
     "id": 10088,
@@ -133648,7 +134177,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 428
+    "mega_of": 428,
+    "height": 1.3
   },
   {
     "id": 10058,
@@ -133897,7 +134427,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 445
+    "mega_of": 445,
+    "height": 1.9
   },
   {
     "id": 10059,
@@ -134166,7 +134697,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 448
+    "mega_of": 448,
+    "height": 1.3
   },
   {
     "id": 10060,
@@ -134420,7 +134952,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 460
+    "mega_of": 460,
+    "height": 2.7
   },
   {
     "id": 10068,
@@ -134664,7 +135197,8 @@
       }
     ],
     "is_mega": true,
-    "mega_of": 475
+    "mega_of": 475,
+    "height": 1.6
   },
   {
     "id": 10001,
@@ -134915,7 +135449,8 @@
     ],
     "form_of": 386,
     "form_key": "attack",
-    "form_label": "Attack Forme"
+    "form_label": "Attack Forme",
+    "height": 1.7
   },
   {
     "id": 10002,
@@ -135166,7 +135701,8 @@
     ],
     "form_of": 386,
     "form_key": "defense",
-    "form_label": "Defense Forme"
+    "form_label": "Defense Forme",
+    "height": 1.7
   },
   {
     "id": 10003,
@@ -135417,6 +135953,7 @@
     ],
     "form_of": 386,
     "form_key": "speed",
-    "form_label": "Speed Forme"
+    "form_label": "Speed Forme",
+    "height": 1.7
   }
 ]

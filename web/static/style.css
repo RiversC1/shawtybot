@@ -2089,11 +2089,12 @@ code {
     width: 108px;
     text-align: center;
     z-index: 2;
-    background: rgba(10, 10, 16, 0.5);
+    /* Solid-ish rather than a backdrop blur: the blur had to be recomputed
+       every frame over the animated weather/move effects (laggy). */
+    background: rgba(10, 10, 16, 0.72);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 8px;
-    backdrop-filter: blur(2px);
 }
 
 .battle-trainer-panel-b { top: 12px; right: 12px; }
@@ -2150,6 +2151,8 @@ code {
 
 .battle-mon-column-bottom .battle-sprite {
     --sprite-zoom: 2.4;
+    --sprite-px-per-m: 122;
+    --sprite-min-h: 48;
     --sprite-max-w: 260;
     --sprite-max-h: 215;
 }
@@ -2160,13 +2163,12 @@ code {
 }
 
 .battle-hp-label {
-    background: rgba(10, 10, 16, 0.55);
+    background: rgba(10, 10, 16, 0.74);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 8px 14px;
     min-width: 170px;
     text-align: left;
-    backdrop-filter: blur(2px);
 }
 
 .battle-hp-label.is-winner {
@@ -2198,7 +2200,11 @@ code {
 }
 
 .battle-sprite {
+    /* Read by battle_room.js's sizeSprite(): pixels per metre^0.7 of the
+       Pokémon's real height, a minimum height, and the slot's caps. */
     --sprite-zoom: 1.9;
+    --sprite-px-per-m: 100;
+    --sprite-min-h: 40;
     --sprite-max-w: 200;
     --sprite-max-h: 175;
     position: relative;
@@ -2250,10 +2256,10 @@ code {
         margin: 0;
     }
     .battle-sprite-slot { width: 150px; height: 130px; }
-    .battle-sprite { --sprite-zoom: 1.45; --sprite-max-w: 145; --sprite-max-h: 125; }
+    .battle-sprite { --sprite-zoom: 1.45; --sprite-px-per-m: 72; --sprite-min-h: 30; --sprite-max-w: 145; --sprite-max-h: 125; }
     .battle-platform { width: 115px; height: 26px; }
     .battle-mon-column-bottom .battle-sprite-slot { width: 185px; height: 155px; }
-    .battle-mon-column-bottom .battle-sprite { --sprite-zoom: 1.75; --sprite-max-w: 180; --sprite-max-h: 150; }
+    .battle-mon-column-bottom .battle-sprite { --sprite-zoom: 1.75; --sprite-px-per-m: 88; --sprite-min-h: 36; --sprite-max-w: 180; --sprite-max-h: 150; }
     .battle-mon-column-bottom .battle-platform { width: 145px; height: 30px; }
 }
 
@@ -3842,8 +3848,6 @@ body.lineup-dragging * {
     border-radius: 10px;
     padding: 9px 14px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    -webkit-backdrop-filter: blur(3px);
-    backdrop-filter: blur(3px);
     transition: opacity 0.35s ease;
     pointer-events: none;
 }
@@ -5164,8 +5168,7 @@ img[src$="/trainers/nowa.png"] {
 .battle-scene.weather-sun .battle-weather-layer {
     background:
         radial-gradient(ellipse 60% 70% at 90% -10%, rgba(255, 220, 130, 0.35), transparent 70%),
-        linear-gradient(180deg, rgba(255, 190, 80, 0.16), rgba(255, 140, 40, 0.08));
-    mix-blend-mode: screen;
+        linear-gradient(180deg, rgba(255, 190, 80, 0.13), rgba(255, 140, 40, 0.06));
 }
 
 .battle-scene.weather-rain .battle-weather-layer {
@@ -5237,9 +5240,8 @@ img[src$="/trainers/nowa.png"] {
     font-size: 0.8em;
     font-weight: bold;
     white-space: nowrap;
-    background: rgba(8, 8, 14, 0.75);
+    background: rgba(8, 8, 14, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(2px);
 }
 
 .battle-scene.weather-sun .battle-weather-chip { border-color: rgba(255, 200, 80, 0.7); }
@@ -5336,4 +5338,74 @@ img[src$="/trainers/nowa.png"] {
 .store-owned {
     font-weight: bold;
     color: #3ddc70;
+}
+
+/* Sun rays and dust clouds (created by battle_weather.js inside the tint
+   layer). Only transform/opacity animate, so the GPU compositor moves them
+   without repainting anything on the main thread. */
+.battle-weather-rays,
+.battle-weather-dust {
+    position: absolute;
+    display: none;
+    pointer-events: none;
+    will-change: transform;
+}
+
+.battle-scene.weather-sun .battle-weather-rays,
+.battle-scene.weather-sand .battle-weather-dust {
+    display: block;
+}
+
+.battle-weather-rays {
+    left: 90%;
+    top: -12%;
+    width: 260%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle, rgba(255, 244, 190, 0.5) 0, rgba(255, 200, 90, 0.18) 9%, transparent 22%),
+        repeating-conic-gradient(from 0deg, rgba(255, 236, 170, 0.2) 0deg 3deg, transparent 5deg 9deg, rgba(255, 225, 150, 0.12) 11deg 13deg, transparent 15deg 22deg);
+    -webkit-mask-image: radial-gradient(circle, #000 0, rgba(0, 0, 0, 0.8) 12%, transparent 48%);
+    mask-image: radial-gradient(circle, #000 0, rgba(0, 0, 0, 0.8) 12%, transparent 48%);
+    transform: translate(-50%, -50%) rotate(0deg);
+    animation: weather-rays-sway 11s ease-in-out infinite alternate, weather-rays-breathe 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes weather-rays-sway {
+    from { transform: translate(-50%, -50%) rotate(-4deg); }
+    to { transform: translate(-50%, -50%) rotate(4deg); }
+}
+
+@keyframes weather-rays-breathe {
+    from { opacity: 0.75; }
+    to { opacity: 1; }
+}
+
+/* Two identical halves side by side; sliding left by one half loops
+   seamlessly. */
+.battle-weather-dust {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 200%;
+    background:
+        radial-gradient(ellipse 13% 20% at 6% 28%, rgba(205, 165, 100, 0.34), transparent 70%),
+        radial-gradient(ellipse 16% 16% at 20% 70%, rgba(215, 175, 110, 0.3), transparent 70%),
+        radial-gradient(ellipse 11% 22% at 34% 45%, rgba(200, 160, 95, 0.32), transparent 70%),
+        radial-gradient(ellipse 14% 18% at 44% 85%, rgba(210, 170, 105, 0.28), transparent 70%),
+        radial-gradient(ellipse 13% 20% at 56% 28%, rgba(205, 165, 100, 0.34), transparent 70%),
+        radial-gradient(ellipse 16% 16% at 70% 70%, rgba(215, 175, 110, 0.3), transparent 70%),
+        radial-gradient(ellipse 11% 22% at 84% 45%, rgba(200, 160, 95, 0.32), transparent 70%),
+        radial-gradient(ellipse 14% 18% at 94% 85%, rgba(210, 170, 105, 0.28), transparent 70%);
+    animation: weather-dust-drift 9s linear infinite;
+}
+
+@keyframes weather-dust-drift {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+
+.battle-scene.motion-off .battle-weather-rays,
+.battle-scene.motion-off .battle-weather-dust {
+    animation: none;
 }
