@@ -155,7 +155,7 @@ STORE_ITEMS = {
     "greatball": {"label": "Great Ball", "price": 15},
     "ultraball": {"label": "Ultra Ball", "price": 35},
     "masterball": {"label": "Master Ball", "price": 10000},
-    "meteorite": {"label": "Meteorite", "price": 2500},
+    "meteorite": {"label": "Meteorite", "price": 25000},
     "fire-stone": {"label": "Fire Stone", "price": 80},
     "water-stone": {"label": "Water Stone", "price": 80},
     "thunder-stone": {"label": "Thunder Stone", "price": 80},
