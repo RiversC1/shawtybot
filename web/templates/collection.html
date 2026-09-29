@@ -2,20 +2,24 @@
 {% block title %}Collection — ShawtyBot Pokémon{% endblock %}
 {% block content %}
 <h1>Your Collection</h1>
-<p class="muted">{{ collection|length }} species caught. Click one to see its details.</p>
+{% set species = collection|map(attribute="dex_id")|unique|list %}
+<p class="muted">{{ collection|length }} Pokémon across {{ species|length }} species. Each catch is listed on its own, since IVs differ between individuals. Click one to see its details.</p>
 
-<input type="text" id="collection-search" class="search-input dex-search" placeholder="Search by name or nickname...">
+<input type="text" id="collection-search" class="search-input dex-search" placeholder="Search by name, nickname or type...">
 
 <div class="grid" id="collection-grid">
     {% for mon in collection %}
     <div class="dex-card collection-card" data-id="{{ mon.id }}"
-         data-name="{{ (mon.nickname or mon.name)|lower }} {{ mon.name|lower }}">
+         data-name="{{ (mon.nickname or mon.name)|lower }} {{ mon.name|lower }} {{ mon.types|join(' ') }}">
         <img src="{{ mon.artwork }}" alt="{{ mon.name }}" loading="lazy">
         <div class="dex-name">
             {{ mon.nickname or mon.name }}{% if mon.is_shiny %} ✨{% endif %}
         </div>
         {% if mon.nickname %}<div class="muted">{{ mon.name }}</div>{% endif %}
-        {% if mon.count > 1 %}<div class="muted">×{{ mon.count }}</div>{% endif %}
+        <div class="collection-card-types">
+            {% for t in mon.types %}<span class="type-badge type-{{ t }}">{{ t|capitalize }}</span>{% endfor %}
+        </div>
+        <div class="collection-card-iv" title="Overall IV quality of this individual">IV {{ "%.0f"|format(mon.iv_percent) }}%</div>
     </div>
     {% else %}
     <p>You haven't caught any Pokémon yet!</p>

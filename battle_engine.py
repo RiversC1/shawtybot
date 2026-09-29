@@ -8,8 +8,9 @@ types/STAB/effectiveness, accuracy rolls, critical hits, priority + speed
 turn order, stat-stage changes, the main status conditions (burn,
 paralysis, poison, toxic, sleep, freeze, confusion, flinch), and weather
 (sun, rain, sandstorm, hail: moves, weather-setting abilities, and the
-abilities that depend on weather; see the Weather section). Other abilities
-and held items are not simulated; ability is flavor text for those. Every battler is effectively level 100 (see webapi.py's
+abilities that depend on weather; see the Weather section), competitive held
+items (see the Held items section), and self-KO moves (Explosion etc.).
+Other abilities are not simulated; ability is flavor text for those. Every battler is effectively level 100 (see webapi.py's
 stat_at_level_100 — an owned Pokémon's stats are already fixed at that
 level's value), which is why the damage formula below folds the level term
 into a constant instead of taking a level parameter.
@@ -235,6 +236,7 @@ class BattlerState:
     confusion_counter: int = 0
     volatile: dict = field(default_factory=default_volatile)
     is_fainted: bool = False
+    item: Optional[str] = None  # held item key (HELD_ITEMS); None once consumed
 
 
 @dataclass
@@ -291,7 +293,7 @@ class TurnResult:
 # ---------------------------------------------------------------------------
 
 def build_battler_state(mon: dict, moves: list[str] | None, ability: str | None,
-                         ivs: dict | None = None) -> BattlerState:
+                         ivs: dict | None = None, item: str | None = None) -> BattlerState:
     """mon: one entry from data/pokemon.json (POKEDEX[dex_id]). moves: up to 4
     move names to load from that species' own embedded move pool (falls back
     to its first 4 known moves if not given/found). ivs: that individual's
@@ -320,7 +322,7 @@ def build_battler_state(mon: dict, moves: list[str] | None, ability: str | None,
     return BattlerState(
         dex_id=mon["id"], species_name=mon["name"], types=list(mon.get("types", [])),
         stats=stats, max_hp=stats["hp"], current_hp=stats["hp"], ability=ability,
-        ivs=dict(ivs), moves=move_slots,
+        ivs=dict(ivs), moves=move_slots, item=item if item in HELD_ITEMS else None,
     )
 
 
@@ -356,6 +358,7 @@ def battler_state_to_row_fields(b: BattlerState) -> dict:
         "is_fainted": b.is_fainted,
         "volatile": dict(b.volatile),
         "ivs": dict(b.ivs),
+        "item": b.item,
     }
 
 
@@ -392,7 +395,7 @@ def battler_state_from_row(mon: dict, row: dict, ability: str | None = None) -> 
         ability=ability, moves=move_slots, stat_stages=stages,
         status=row.get("status"), status_counter=row.get("status_counter", 0) or 0,
         confusion_counter=row.get("confusion_counter", 0) or 0, volatile=volatile,
-        is_fainted=bool(row.get("is_fainted")),
+        is_fainted=bool(row.get("is_fainted")), item=row.get("item"),
     )
 
 
@@ -407,6 +410,10 @@ def legal_actions(battle: BattleState, side_id: str) -> dict:
         switchable = [i for i, b in enumerate(side.roster) if not b.is_fainted]
         return {"usable_move_indices": [], "can_switch": True, "switchable_indices": switchable, "forced": True}
     usable = [i for i, ms in enumerate(active.moves) if ms.current_pp > 0]
+    lock = active.volatile.get("choice_lock")
+    if lock and active.item in CHOICE_ITEMS:
+        # A Choice item locks its holder into the first move it used.
+        usable = [i for i in usable if active.moves[i].move.name == lock]
     switchable = [i for i, b in enumerate(side.roster) if not b.is_fainted and i != side.active_index]
     return {"usable_move_indices": usable, "can_switch": bool(switchable),
             "switchable_indices": switchable, "forced": False}
@@ -423,8 +430,11 @@ def pick_npc_action(battle: BattleState, side_id: str) -> Action:
         return Action(kind="move", side=side_id, move_index=None)
 
     scored = []
+    low_hp = active.current_hp <= active.max_hp * 0.35 and la["can_switch"]
     for i in la["usable_move_indices"]:
         move = active.moves[i].move
+        if move.name in SELF_KO_MOVES and not low_hp:
+            continue  # only as a last-ditch move
         if move.category != "status" and move.power:
             eff = type_effectiveness(move.type, opp_active.types)
             stab = 1.5 if move.type in active.types else 1.0
@@ -432,6 +442,8 @@ def pick_npc_action(battle: BattleState, side_id: str) -> Action:
         else:
             score = 35  # modest baseline so status/utility moves get picked sometimes
         scored.append((i, score))
+    if not scored:
+        scored = [(i, 1) for i in la["usable_move_indices"]]
 
     total = sum(s for _, s in scored)
     roll = battle.rng.uniform(0, total)
@@ -472,7 +484,8 @@ def estimate_damage(attacker: BattlerState, defender: BattlerState, move: MoveDa
     if move.category == "status" or not move.power:
         return 0.0
     a_key, d_key = ("attack", "defense") if move.category == "physical" else ("sp_attack", "sp_defense")
-    A = attacker.stats[a_key] * stat_stage_multiplier(attacker.stat_stages[a_key]) * weather_stat_multiplier(weather, attacker, a_key)
+    A = (attacker.stats[a_key] * stat_stage_multiplier(attacker.stat_stages[a_key])
+         * weather_stat_multiplier(weather, attacker, a_key) * item_stat_multiplier(attacker, a_key))
     D = defender.stats[d_key] * stat_stage_multiplier(defender.stat_stages[d_key]) * weather_stat_multiplier(weather, defender, d_key)
     eff = type_effectiveness(move.type, defender.types)
     if eff == 0:
@@ -480,7 +493,8 @@ def estimate_damage(attacker: BattlerState, defender: BattlerState, move: MoveDa
     base = math.floor(LEVEL_100_STAGE_BASE * move.power * A / D / 50) + 2
     stab = 1.5 if move.type and move.type in attacker.types else 1.0
     burn_mult = 0.5 if (attacker.status == "burn" and move.category == "physical") else 1.0
-    return base * stab * eff * 0.925 * burn_mult * weather_damage_multiplier(weather, move, attacker)  # 0.925 ~= avg roll
+    return (base * stab * eff * 0.925 * burn_mult * weather_damage_multiplier(weather, move, attacker)  # 0.925 ~= avg roll
+            * item_damage_multiplier(attacker, move, eff))
 
 
 def _best_move_damage(attacker: BattlerState, defender: BattlerState) -> float:
@@ -545,8 +559,11 @@ def _best_attack(attacker: BattlerState, defender: BattlerState) -> float:
     """Expected per-turn damage of attacker's best usable damaging move
     (accuracy-weighted; recharge/charge moves count at their real rate)."""
     best = 0.0
+    lock = attacker.volatile.get("choice_lock") if attacker.item in CHOICE_ITEMS else None
     for slot in attacker.moves:
-        if slot.current_pp <= 0:
+        if slot.current_pp <= 0 or slot.move.name in SELF_KO_MOVES:
+            continue
+        if lock and slot.move.name != lock:
             continue
         m = weather_adjusted_move(slot.move, _AI_WEATHER.get())
         dmg = estimate_damage(attacker, defender, m, _AI_WEATHER.get())
@@ -608,6 +625,9 @@ def _value_move(battle: BattleState, side_id: str, move: MoveData) -> float:
     else:
         first = _effective_speed(me, weather) > _effective_speed(foe, weather)
     wasted = _race(me, foe, me.current_hp, foe.current_hp, my_first_hit=0.0, i_act_first=first)
+
+    if move.name in SELF_KO_MOVES:
+        return _value_sacrifice(battle, side_id, move)
 
     # Setting the weather: play the matchup out under the new weather.
     if move.name in WEATHER_MOVES:
@@ -718,6 +738,32 @@ def _value_move(battle: BattleState, side_id: str, move: MoveData) -> float:
     return wasted - 0.05  # Protect, Heal Pulse, etc.: no effect here, or helps the foe
 
 
+def _value_sacrifice(battle: BattleState, side_id: str, move: MoveData) -> float:
+    """Explosion & co. cost the user itself: worth it only when it's low
+    on HP (or losing anyway) and the hit (or the wish) buys a lot."""
+    side = battle.side(side_id)
+    me, foe = side.active, battle.other(side_id).active
+    teammates = [b for i, b in enumerate(side.roster) if i != side.active_index and not b.is_fainted]
+    my_frac = me.current_hp / max(me.max_hp, 1)
+    if move.name in ("Healing Wish", "Lunar Dance"):
+        if not teammates:
+            return -2.0
+        hurt = max(1 - b.current_hp / max(b.max_hp, 1) for b in teammates)
+        return 0.5 * hurt - 0.9 * my_frac - 0.2
+    if not teammates:
+        return -1.5  # sacrificing the last Pokémon loses the battle
+    if move.name == "Memento":
+        return 0.25 - 0.9 * my_frac - 0.1
+    if move.name == "Final Gambit":
+        dmg = me.current_hp if type_effectiveness(move.type, foe.types) else 0.0
+    else:
+        dmg = estimate_damage(me, foe, move, _AI_WEATHER.get()) * _hit_chance(move)
+    if dmg <= 0:
+        return -1.0
+    ko = dmg >= foe.current_hp
+    return 0.9 * min(dmg, foe.current_hp) / max(foe.max_hp, 1) + (0.3 if ko else 0.0) - 0.9 * my_frac - 0.15
+
+
 def _value_switch(battle: BattleState, side_id: str, index: int) -> float:
     """Switching in costs the new Pokémon a free hit from the foe."""
     cand = battle.side(side_id).roster[index]
@@ -759,6 +805,17 @@ def _pick_npc_action_hard(battle: BattleState, side_id: str) -> Action:
     # Pick among the near-best options so the League isn't fully predictable.
     top = [i for i, v in scored if v >= best_v - 0.03]
     return Action(kind="move", side=side_id, move_index=battle.rng.choice(top))
+
+
+MEDIUM_AI_SMART_SHARE = 0.65
+
+
+def pick_npc_action_medium(battle: BattleState, side_id: str) -> Action:
+    """Gym leaders: plays the League AI's move most turns and the loose,
+    weighted-random pick the rest, so they're dangerous but beatable."""
+    if battle.rng.random() < MEDIUM_AI_SMART_SHARE:
+        return pick_npc_action_hard(battle, side_id)
+    return pick_npc_action(battle, side_id)
 
 
 def pick_npc_forced_switch_hard(battle: BattleState, side_id: str) -> int:
@@ -820,10 +877,13 @@ def set_weather(battle: BattleState, weather: str, events: list, side_id: str, s
     that weather is already active."""
     if battle.weather == weather:
         return False
+    turns = WEATHER_ROCK_TURNS if WEATHER_ROCKS.get(mon.item or "") == weather else WEATHER_TURNS
     battle.weather = weather
-    battle.weather_turns = WEATHER_TURNS
+    battle.weather_turns = turns
     event = {"type": "weather_start", "weather": weather, "side": side_id, "source": source,
-             "name": mon.species_name, "turns": WEATHER_TURNS}
+             "name": mon.species_name, "turns": turns}
+    if turns != WEATHER_TURNS:
+        event["item"] = HELD_ITEMS[mon.item]["label"]
     if source == "ability":
         event["ability"] = ability_label(mon)
     events.append(event)
@@ -917,6 +977,7 @@ def _apply_end_of_turn_weather(battle: BattleState, mon: BattlerState, side_id: 
         events.append({"type": "weather_damage", "side": side_id, "weather": weather, "reason": reason,
                        "amount": amount, "new_hp": mon.current_hp, "max_hp": mon.max_hp})
         _check_and_emit_faint(mon, side_id, events)
+        _after_hp_loss(mon, side_id, events)
 
     def heal(amount: int, reason: str):
         if mon.current_hp >= mon.max_hp:
@@ -950,6 +1011,99 @@ def _apply_end_of_turn_weather(battle: BattleState, mon: BattlerState, side_id: 
 
 
 # ---------------------------------------------------------------------------
+# Held items
+# ---------------------------------------------------------------------------
+# Competitive battle items (no healing items like Potions or Revives). Each
+# Pokémon holds at most one; a consumed item (Focus Sash, berries) is gone
+# for the rest of that battle only — the trainer's own copy isn't used up.
+
+HELD_ITEMS = {
+    "leftovers": {"label": "Leftovers", "description": "Restores 1/16 of the holder's max HP at the end of every turn."},
+    "life-orb": {"label": "Life Orb", "description": "Boosts the power of the holder's attacks by 30%, but it loses 1/10 of its max HP each time it attacks."},
+    "choice-band": {"label": "Choice Band", "description": "Boosts Attack by 50%, but the holder can only use the first move it picks until it switches out."},
+    "choice-specs": {"label": "Choice Specs", "description": "Boosts Sp. Atk by 50%, but the holder can only use the first move it picks until it switches out."},
+    "choice-scarf": {"label": "Choice Scarf", "description": "Boosts Speed by 50%, but the holder can only use the first move it picks until it switches out."},
+    "focus-sash": {"label": "Focus Sash", "description": "If the holder is at full HP, it survives a hit that would knock it out with 1 HP. Single use per battle."},
+    "expert-belt": {"label": "Expert Belt", "description": "Boosts the power of super-effective moves by 20%."},
+    "muscle-band": {"label": "Muscle Band", "description": "Boosts the power of physical moves by 10%."},
+    "wise-glasses": {"label": "Wise Glasses", "description": "Boosts the power of special moves by 10%."},
+    "sitrus-berry": {"label": "Sitrus Berry", "description": "Restores 1/4 of max HP when the holder drops to half HP or less. Single use per battle."},
+    "lum-berry": {"label": "Lum Berry", "description": "Cures any status condition or confusion the moment the holder gets it. Single use per battle."},
+    "quick-claw": {"label": "Quick Claw", "description": "Gives the holder a 20% chance to move first among moves of the same priority."},
+    "scope-lens": {"label": "Scope Lens", "description": "Raises the holder's critical-hit ratio by one stage."},
+    "bright-powder": {"label": "Bright Powder", "description": "Makes moves aimed at the holder 10% less accurate."},
+    "heat-rock": {"label": "Heat Rock", "description": "Harsh sunlight the holder starts lasts 8 turns instead of 5."},
+    "damp-rock": {"label": "Damp Rock", "description": "Rain the holder starts lasts 8 turns instead of 5."},
+    "smooth-rock": {"label": "Smooth Rock", "description": "A sandstorm the holder starts lasts 8 turns instead of 5."},
+    "icy-rock": {"label": "Icy Rock", "description": "Hail the holder starts lasts 8 turns instead of 5."},
+}
+CHOICE_ITEMS = {"choice-band": "attack", "choice-specs": "sp_attack", "choice-scarf": "speed"}
+WEATHER_ROCKS = {"heat-rock": "sun", "damp-rock": "rain", "smooth-rock": "sand", "icy-rock": "hail"}
+WEATHER_ROCK_TURNS = 8
+QUICK_CLAW_CHANCE = 0.2
+
+# Moves that make their user faint (Explosion etc.). Healing Wish / Lunar
+# Dance fully heal whichever Pokémon replaces the user.
+SELF_KO_MOVES = {"Explosion", "Self Destruct", "Memento", "Healing Wish", "Lunar Dance", "Final Gambit"}
+
+
+def item_label(mon: BattlerState) -> str:
+    return HELD_ITEMS.get(mon.item or "", {}).get("label", "")
+
+
+def item_stat_multiplier(mon: BattlerState, stat: str) -> float:
+    return 1.5 if CHOICE_ITEMS.get(mon.item or "") == stat else 1.0
+
+
+def item_damage_multiplier(attacker: BattlerState, move: MoveData, eff: float) -> float:
+    item = attacker.item or ""
+    if item == "life-orb":
+        return 1.3
+    if item == "expert-belt" and eff > 1:
+        return 1.2
+    if (item == "muscle-band" and move.category == "physical") or (item == "wise-glasses" and move.category == "special"):
+        return 1.1
+    return 1.0
+
+
+def _consume_item(mon: BattlerState, side_id: str, events: list, **extra) -> None:
+    events.append({"type": "item_used", "side": side_id, "name": mon.species_name,
+                   "item": mon.item, "label": item_label(mon), **extra})
+    mon.item = None
+
+
+def _after_hp_loss(mon: BattlerState, side_id: str, events: list) -> None:
+    """Sitrus Berry: once, when the holder falls to half HP or below."""
+    if mon.item == "sitrus-berry" and not mon.is_fainted and 0 < mon.current_hp <= mon.max_hp // 2:
+        heal = min(mon.max_hp // 4, mon.max_hp - mon.current_hp)
+        mon.current_hp += heal
+        _consume_item(mon, side_id, events, amount=heal, new_hp=mon.current_hp, max_hp=mon.max_hp)
+
+
+def _after_status(mon: BattlerState, side_id: str, events: list) -> None:
+    """Lum Berry: cures a major status or confusion as soon as it lands."""
+    if mon.item != "lum-berry" or mon.is_fainted:
+        return
+    cured = mon.status or ("confusion" if mon.confusion_counter else None)
+    if not cured:
+        return
+    mon.status = None
+    mon.status_counter = 0
+    mon.confusion_counter = 0
+    _consume_item(mon, side_id, events, cured=cured)
+
+
+def _apply_end_of_turn_item(mon: BattlerState, side_id: str) -> list:
+    events: list = []
+    if mon.item == "leftovers" and not mon.is_fainted and mon.current_hp < mon.max_hp:
+        heal = min(max(1, mon.max_hp // 16), mon.max_hp - mon.current_hp)
+        mon.current_hp += heal
+        events.append({"type": "heal", "side": side_id, "amount": heal, "reason": "Leftovers",
+                       "new_hp": mon.current_hp, "max_hp": mon.max_hp})
+    return events
+
+
+# ---------------------------------------------------------------------------
 # Damage
 # ---------------------------------------------------------------------------
 
@@ -968,7 +1122,8 @@ def compute_damage(attacker: BattlerState, defender: BattlerState, move: MoveDat
 
     a_stage = 0 if is_crit and attacker.stat_stages[a_key] < 0 else attacker.stat_stages[a_key]
     d_stage = 0 if is_crit and defender.stat_stages[d_key] > 0 else defender.stat_stages[d_key]
-    A = attacker.stats[a_key] * stat_stage_multiplier(a_stage) * weather_stat_multiplier(weather, attacker, a_key)
+    A = (attacker.stats[a_key] * stat_stage_multiplier(a_stage) * weather_stat_multiplier(weather, attacker, a_key)
+         * item_stat_multiplier(attacker, a_key))
     D = defender.stats[d_key] * stat_stage_multiplier(d_stage) * weather_stat_multiplier(weather, defender, d_key)
 
     eff = type_effectiveness(move.type, defender.types)
@@ -982,7 +1137,9 @@ def compute_damage(attacker: BattlerState, defender: BattlerState, move: MoveDat
     burn_mult = 0.5 if (attacker.status == "burn" and move.category == "physical") else 1.0
     weather_mult = weather_damage_multiplier(weather, move, attacker)
 
-    damage = math.floor(base * stab * eff * crit_mult * random_roll * burn_mult * weather_mult)
+    item_mult = item_damage_multiplier(attacker, move, eff)
+
+    damage = math.floor(base * stab * eff * crit_mult * random_roll * burn_mult * weather_mult * item_mult)
     return max(1, damage)
 
 
@@ -1009,8 +1166,9 @@ def sample_multi_hit_count(move: MoveData, rng: random.Random) -> int:
     return candidates[-1]
 
 
-def crit_chance(move: MoveData) -> float:
-    return CRIT_TABLE.get(min(3, max(0, move.crit_rate)), CRIT_TABLE[0])
+def crit_chance(move: MoveData, attacker: Optional[BattlerState] = None) -> float:
+    stage = move.crit_rate + (1 if attacker is not None and attacker.item == "scope-lens" else 0)
+    return CRIT_TABLE.get(min(3, max(0, stage)), CRIT_TABLE[0])
 
 
 # ---------------------------------------------------------------------------
@@ -1033,15 +1191,25 @@ def _effective_speed(mon: BattlerState, weather: Optional[str] = None) -> float:
         spd *= 0.5
     if weather and SPEED_DOUBLERS.get(ability_key(mon)) == weather:
         spd *= 2
-    return spd
+    return spd * item_stat_multiplier(mon, "speed")
 
 
-def _order_actions(battle: BattleState, action_a: Action, action_b: Action) -> list:
+def _order_actions(battle: BattleState, action_a: Action, action_b: Action, events: Optional[list] = None) -> list:
     entries = [("A", action_a), ("B", action_b)]
     prio_a = _action_priority(battle, "A", action_a)
     prio_b = _action_priority(battle, "B", action_b)
     if prio_a != prio_b:
         return entries if prio_a > prio_b else [entries[1], entries[0]]
+    # Quick Claw: a 20% chance to jump ahead within the same priority.
+    claws = [s for s, a in entries if a.kind == "move" and battle.side(s).active.item == "quick-claw"
+             and battle.rng.random() < QUICK_CLAW_CHANCE]
+    if len(claws) == 1:
+        side_id = claws[0]
+        if events is not None:
+            mon = battle.side(side_id).active
+            events.append({"type": "item_activated", "side": side_id, "name": mon.species_name,
+                           "item": "quick-claw", "label": item_label(mon)})
+        return entries if side_id == "A" else [entries[1], entries[0]]
     weather = current_weather(battle)
     spd_a = _effective_speed(battle.side_a.active, weather)
     spd_b = _effective_speed(battle.side_b.active, weather)
@@ -1053,6 +1221,7 @@ def _order_actions(battle: BattleState, action_a: Action, action_b: Action) -> l
 def do_switch(side: BattleSide, target_index: int, battle: Optional[BattleState] = None) -> list:
     events = []
     outgoing = side.active
+    wish = outgoing.volatile.get("healing_wish") if outgoing.is_fainted else None
     events.append({"type": "switch_out", "side": side.side_id, "dex_id": outgoing.dex_id, "name": outgoing.species_name})
     outgoing.stat_stages = default_stat_stages()
     outgoing.volatile = default_volatile()
@@ -1060,6 +1229,13 @@ def do_switch(side: BattleSide, target_index: int, battle: Optional[BattleState]
     side.active_index = target_index
     incoming = side.active
     events.append({"type": "switch_in", "side": side.side_id, "dex_id": incoming.dex_id, "name": incoming.species_name})
+    if wish and not incoming.is_fainted:
+        heal = incoming.max_hp - incoming.current_hp
+        incoming.current_hp = incoming.max_hp
+        incoming.status = None
+        incoming.status_counter = 0
+        events.append({"type": "heal", "side": side.side_id, "amount": heal, "reason": wish,
+                       "new_hp": incoming.current_hp, "max_hp": incoming.max_hp})
     if battle is not None:
         trigger_entry_ability(battle, side.side_id, events)
     return events
@@ -1091,15 +1267,22 @@ def _apply_damage_and_emit(defender: BattlerState, amount: int, events: list, de
                             move_name: str, is_crit: bool, move_type: Optional[str]) -> int:
     eff = type_effectiveness(move_type, defender.types) if move_type is not None else 1.0
     amount = max(0, int(amount))
+    sash = (defender.item == "focus-sash" and defender.current_hp == defender.max_hp
+            and amount >= defender.current_hp and defender.max_hp > 1)
+    if sash:
+        amount = defender.current_hp - 1
     defender.current_hp = max(0, defender.current_hp - amount)
     events.append({
         "type": "damage", "side": defender_side_id, "move_name": move_name, "amount": amount,
         "new_hp": defender.current_hp, "max_hp": defender.max_hp,
         "effectiveness": effectiveness_label(eff), "is_crit": is_crit,
     })
+    if sash:
+        _consume_item(defender, defender_side_id, events)
     if defender.current_hp <= 0 and not defender.is_fainted:
         defender.is_fainted = True
         events.append({"type": "faint", "side": defender_side_id, "dex_id": defender.dex_id, "name": defender.species_name})
+    _after_hp_loss(defender, defender_side_id, events)
     return amount
 
 
@@ -1118,6 +1301,7 @@ def _maybe_apply_ailment(battle: BattleState, move: MoveData, target: BattlerSta
         if battle.rng.random() * 100 < move.ailment_chance:
             target.confusion_counter = battle.rng.randint(2, 5)
             events.append({"type": "status_applied", "side": target_side_id, "status": "confusion"})
+            _after_status(target, target_side_id, events)
         return
     if target.status is not None:
         return  # already has a major status; secondary status effects don't stack/overwrite
@@ -1133,6 +1317,7 @@ def _maybe_apply_ailment(battle: BattleState, move: MoveData, target: BattlerSta
         else:
             target.status_counter = 0
         events.append({"type": "status_applied", "side": target_side_id, "status": move.ailment})
+        _after_status(target, target_side_id, events)
 
 
 def _maybe_apply_stat_changes(battle: BattleState, move: MoveData, target: BattlerState, events: list, target_side_id: str) -> None:
@@ -1171,6 +1356,7 @@ def _apply_end_of_turn_status(mon: BattlerState, side_id: str) -> list:
         events.append({"type": "status_damage", "side": side_id, "status": mon.status,
                        "amount": dmg, "new_hp": mon.current_hp, "max_hp": mon.max_hp})
         _check_and_emit_faint(mon, side_id, events)
+        _after_hp_loss(mon, side_id, events)
     elif mon.status == "toxic":
         stacks = min(mon.status_counter, 15)
         dmg = max(1, (stacks * mon.max_hp) // 16)
@@ -1179,10 +1365,28 @@ def _apply_end_of_turn_status(mon: BattlerState, side_id: str) -> list:
         events.append({"type": "status_damage", "side": side_id, "status": "toxic",
                        "amount": dmg, "new_hp": mon.current_hp, "max_hp": mon.max_hp})
         _check_and_emit_faint(mon, side_id, events)
+        _after_hp_loss(mon, side_id, events)
     return events
 
 
 def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide, action: Action) -> list:
+    events = _execute_move_core(battle, side, opp, action)
+    active = side.active
+    used = next((e for e in events if e["type"] == "move_used" and e["side"] == side.side_id), None)
+    if used and used["move_name"] in SELF_KO_MOVES and not active.is_fainted:
+        spared = any(e["type"] == "move_failed" and e.get("reason") in ("no_teammates", "immune") for e in events)
+        if not spared:
+            # Explosion & co.: the user faints whether or not the move landed.
+            active.current_hp = 0
+            if used["move_name"] in ("Healing Wish", "Lunar Dance"):
+                active.volatile["healing_wish"] = used["move_name"]
+            events.append({"type": "self_ko", "side": side.side_id, "name": active.species_name,
+                           "move_name": used["move_name"]})
+            _check_and_emit_faint(active, side.side_id, events)
+    return events
+
+
+def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, action: Action) -> list:
     events: list = []
     active = side.active
     defender = opp.active
@@ -1289,10 +1493,17 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
 
     events.append({"type": "move_used", "side": side.side_id, "move_name": move.name,
                    "move_type": move.type, "category": move.category, "target": move.target})
+    if active.item in CHOICE_ITEMS and not v.get("choice_lock"):
+        v["choice_lock"] = move.name
 
     if move.name in WEATHER_MOVES:
         if not set_weather(battle, WEATHER_MOVES[move.name], events, side.side_id, "move", active):
             events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "weather_active"})
+        return events
+
+    if move.name in ("Healing Wish", "Lunar Dance"):
+        if not any(not b.is_fainted for i, b in enumerate(side.roster) if i != side.active_index):
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "no_teammates"})
         return events
 
     if move.target != "self" and defender.volatile.get("invulnerable_until_turn") == battle.turn_number:
@@ -1307,6 +1518,8 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
             active.stat_stages["accuracy"] - defender.stat_stages["evasion"], is_accuracy_or_evasion=True
         )
         effective_acc = move.accuracy * acc_mult * weather_evasion_multiplier(current_weather(battle), defender)
+        if defender.item == "bright-powder":
+            effective_acc *= 0.9
         if battle.rng.random() * 100 >= effective_acc:
             events.append({"type": "move_missed", "side": side.side_id, "move_name": move.name})
             if "recharge" in move.flags:
@@ -1317,7 +1530,12 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
     total_dealt = 0
     is_crit = False
 
-    if "ohko" in move.flags:
+    if move.name == "Final Gambit":
+        if type_effectiveness(move.type, defender.types) == 0:
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "immune"})
+            return events
+        total_dealt = _apply_damage_and_emit(defender, active.current_hp, events, opp.side_id, move.name, False, move.type)
+    elif "ohko" in move.flags:
         # The generic accuracy check above already gated this on the move's
         # own accuracy field (PokeAPI encodes OHKO moves' ~30% hit chance
         # there directly) — reaching here means it already hit, so the only
@@ -1337,13 +1555,13 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
         for _ in range(n):
             if defender.is_fainted:
                 break
-            hit_crit = battle.rng.random() < crit_chance(move)
+            hit_crit = battle.rng.random() < crit_chance(move, active)
             hit_dmg = compute_damage(active, defender, move, hit_crit, battle.rng, current_weather(battle))
             total_dealt += _apply_damage_and_emit(defender, hit_dmg, events, opp.side_id, move.name, hit_crit, move.type)
             hits += 1
         events.append({"type": "multi_hit_summary", "side": side.side_id, "hits": hits, "total_damage": total_dealt})
     else:
-        is_crit = battle.rng.random() < crit_chance(move)
+        is_crit = battle.rng.random() < crit_chance(move, active)
         dmg = compute_damage(active, defender, move, is_crit, battle.rng, current_weather(battle))
         total_dealt = _apply_damage_and_emit(defender, dmg, events, opp.side_id, move.name, is_crit, move.type)
 
@@ -1359,6 +1577,17 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
         events.append({"type": "recoil", "side": side.side_id, "amount": recoil,
                         "new_hp": active.current_hp, "max_hp": active.max_hp})
         _check_and_emit_faint(active, side.side_id, events)
+        _after_hp_loss(active, side.side_id, events)
+
+    if (active.item == "life-orb" and total_dealt > 0 and move.power and not active.is_fainted
+            and move.name not in SELF_KO_MOVES):
+        cost = max(1, active.max_hp // 10)
+        active.current_hp = max(0, active.current_hp - cost)
+        events.append({"type": "item_damage", "side": side.side_id, "name": active.species_name,
+                       "item": "life-orb", "label": item_label(active), "amount": cost,
+                       "new_hp": active.current_hp, "max_hp": active.max_hp})
+        _check_and_emit_faint(active, side.side_id, events)
+        _after_hp_loss(active, side.side_id, events)
 
     if move.healing_percent and not active.is_fainted:
         heal = max(1, math.floor(active.max_hp * move.healing_percent / 100))
@@ -1392,6 +1621,7 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
                 if not active.is_fainted:
                     active.confusion_counter = battle.rng.randint(2, 3)
                     events.append({"type": "status_applied", "side": side.side_id, "status": "confusion", "reason": "fatigue"})
+                    _after_status(active, side.side_id, events)
 
     if "recharge" in move.flags:
         active.volatile["must_recharge"] = True
@@ -1405,7 +1635,7 @@ def resolve_turn(battle: BattleState, action_a: Action, action_b: Action) -> Tur
     and mutates `battle` in place. The caller is responsible for persisting
     the mutated state and the returned events afterward."""
     events: list = [{"type": "turn_start", "turn_number": battle.turn_number}]
-    order = _order_actions(battle, action_a, action_b)
+    order = _order_actions(battle, action_a, action_b, events)
 
     battle_over = False
     winner = None
@@ -1422,8 +1652,11 @@ def resolve_turn(battle: BattleState, action_a: Action, action_b: Action) -> Tur
             events.extend(do_switch(side, action.switch_to_index, battle))
             continue
 
-        events.extend(_execute_move_action(battle, side, opp, action))
+        action_events = _execute_move_action(battle, side, opp, action)
+        events.extend(action_events)
         winner = apply_faint_and_check_winner(battle)
+        if winner == "draw" and any(e["type"] == "self_ko" and e["side"] == side_id for e in action_events):
+            winner = opp.side_id  # the user of a self-KO move loses a double knockout
         if winner:
             battle_over = True
             events.append({"type": "battle_end", "winner_side": winner, "reason": "all_fainted"})
@@ -1438,6 +1671,7 @@ def resolve_turn(battle: BattleState, action_a: Action, action_b: Action) -> Tur
             if side.active.is_fainted:
                 continue
             events.extend(_apply_end_of_turn_status(side.active, side_id))
+            events.extend(_apply_end_of_turn_item(side.active, side_id))
         if battle.weather:
             battle.weather_turns -= 1
             if battle.weather_turns <= 0:

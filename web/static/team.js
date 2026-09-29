@@ -18,6 +18,7 @@
   const configFormeSection = document.getElementById("config-forme-section");
   const configFormes = document.getElementById("config-formes");
   const configFormeNote = document.getElementById("config-forme-note");
+  const configItems = document.getElementById("config-items");
 
   if (!cardsContainer) return;
 
@@ -31,6 +32,7 @@
   let configSelectedMoves = [];
   let configSelectedAbility = null;
   let configSelectedForm = null;
+  let configSelectedItem = null;
 
   function typeBadges(types) {
     return (types || [])
@@ -84,6 +86,7 @@
       </div>
       <div class="team-card-footer">
         <span class="ability-badge">${mon.ability || "No ability set"}</span>
+        ${mon.held_item ? `<span class="held-item-badge" title="${mon.held_item.description}"><img src="${mon.held_item.icon}" alt="">${mon.held_item.label}</span>` : ""}
         <button class="link-danger remove-btn" data-index="${index}">Remove from team</button>
       </div>
     `;
@@ -286,6 +289,7 @@
         teamState[activeSlot] = {
           dex_id: mon.dex_id, name: mon.name, artwork: cfg.artwork || mon.artwork, types: mon.types,
           forms: cfg.forms || [], form: cfg.form, form_label: cfg.form_label, form_item: cfg.form_item,
+          held_item: cfg.held_item || null, held_item_options: cfg.held_item_options || [],
           base_stats: cfg.base_stats || [], moves: cfg.moves || [], move_pool: cfg.move_pool || [],
           ability: cfg.ability || null, ability_raw: cfg.ability_raw || null, abilities: cfg.abilities || [],
         };
@@ -312,6 +316,7 @@
     configTitle.textContent = `Configure ${mon.name}`;
     configStatus.textContent = "";
     renderFormes(mon);
+    renderHeldItems(mon);
 
     configMoves.innerHTML = "";
     for (const move of mon.move_pool || []) {
@@ -387,6 +392,44 @@
     }
   }
 
+  // Held items: the ones this trainer owns; an item can be held by as many
+  // Pokémon as copies owned.
+  function renderHeldItems(mon) {
+    configItems.innerHTML = "";
+    configSelectedItem = mon.held_item ? mon.held_item.key : null;
+    const options = mon.held_item_options || [];
+    const none = document.createElement("button");
+    none.type = "button";
+    none.className = "config-item" + (configSelectedItem ? "" : " selected");
+    none.innerHTML = `<span class="config-item-icon config-item-none">∅</span><span class="config-item-name">No item</span>`;
+    none.addEventListener("click", () => pickItem(none, null));
+    configItems.appendChild(none);
+    for (const it of options) {
+      const mine = it.key === configSelectedItem;
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "config-item" + (mine ? " selected" : "");
+      card.disabled = !mine && it.free <= 0;
+      card.title = it.description;
+      card.innerHTML = `<img class="config-item-icon" src="${it.icon}" alt=""><span class="config-item-name">${it.label}</span>
+        <span class="config-item-count">${card.disabled ? "all in use" : `${it.free} free`}</span>`;
+      card.addEventListener("click", () => pickItem(card, it.key));
+      configItems.appendChild(card);
+    }
+    if (!options.length) {
+      const hint = document.createElement("p");
+      hint.className = "muted config-item-hint";
+      hint.innerHTML = 'You don\'t have any held items yet — pick some up at the <a href="/store">Store</a>.';
+      configItems.appendChild(hint);
+    }
+  }
+
+  function pickItem(card, key) {
+    configSelectedItem = key;
+    for (const c of configItems.querySelectorAll(".config-item")) c.classList.remove("selected");
+    card.classList.add("selected");
+  }
+
   configClose.addEventListener("click", () => (configModal.hidden = true));
   configModal.addEventListener("click", (e) => {
     if (e.target === configModal) configModal.hidden = true;
@@ -404,6 +447,19 @@
       if (!formRes.ok) {
         const err = await formRes.json().catch(() => ({}));
         configStatus.textContent = err.detail || "Couldn't change Forme.";
+        return;
+      }
+    }
+    const currentItem = mon.held_item ? mon.held_item.key : null;
+    if (configSelectedItem !== currentItem) {
+      const itemRes = await fetch(`/api/proxy/pokemon-config/${mon.dex_id}/item`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item: configSelectedItem }),
+      });
+      if (!itemRes.ok) {
+        const err = await itemRes.json().catch(() => ({}));
+        configStatus.textContent = err.detail || "Couldn't change the held item.";
         return;
       }
     }

@@ -193,6 +193,18 @@ STORE_ITEMS = {
     "dawn-stone": {"label": "Dawn Stone", "price": 110},
 }
 
+# Held items (battle_engine.HELD_ITEMS) — cheap on purpose. Keep in sync
+# with webapi.py's STORE_ITEMS.
+HELD_ITEM_PRICES = {
+    "leftovers": 300, "life-orb": 350, "choice-band": 350, "choice-specs": 350, "choice-scarf": 350,
+    "focus-sash": 200, "expert-belt": 250, "muscle-band": 150, "wise-glasses": 150,
+    "sitrus-berry": 60, "lum-berry": 80, "quick-claw": 150, "scope-lens": 150, "bright-powder": 150,
+    "heat-rock": 120, "damp-rock": 120, "smooth-rock": 120, "icy-rock": 120,
+}
+STORE_ITEMS.update({
+    key: {"label": battle_store.be.HELD_ITEMS[key]["label"], "price": price} for key, price in HELD_ITEM_PRICES.items()
+})
+
 ITEM_LABELS = {key: v["label"] for key, v in BALLS.items()}
 ITEM_LABELS["candy"] = "Rare Candy"
 ITEM_LABELS["coin"] = "Poké Coin"
@@ -794,12 +806,12 @@ class QuantityModal(discord.ui.Modal):
 
 
 class StoreSelect(discord.ui.Select):
-    def __init__(self):
+    def __init__(self, keys: list[str], placeholder: str):
         options = [
-            discord.SelectOption(label=f"{cfg['label']} — {cfg['price']} coins", value=key)
-            for key, cfg in STORE_ITEMS.items()
+            discord.SelectOption(label=f"{STORE_ITEMS[key]['label']} — {STORE_ITEMS[key]['price']:,} coins", value=key)
+            for key in keys
         ]
-        super().__init__(placeholder="Choose an item to buy...", options=options)
+        super().__init__(placeholder=placeholder, options=options[:25])
 
     async def callback(self, interaction: discord.Interaction):
         view: "StoreView" = self.view
@@ -811,7 +823,12 @@ class StoreView(discord.ui.View):
         super().__init__(timeout=120)
         self.cog = cog
         self.user_id = user_id
-        self.add_item(StoreSelect())
+        # Discord caps a menu at 25 options: balls/stones/key items in one,
+        # battle held items in the other.
+        held = [k for k in STORE_ITEMS if k in battle_store.be.HELD_ITEMS]
+        other = [k for k in STORE_ITEMS if k not in battle_store.be.HELD_ITEMS]
+        self.add_item(StoreSelect(other, "Balls, stones & key items..."))
+        self.add_item(StoreSelect(held, "Held items for battle..."))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
@@ -2126,15 +2143,12 @@ class Pokemon(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @poke.command(name="give", description="[Bot owner only] Give a player balls, stones, candy, or coins")
-    @app_commands.describe(member="The player to give items to", quantity="How many to give")
-    @app_commands.choices(item=[
-        app_commands.Choice(name=ITEM_LABELS[key], value=key) for key in GIVABLE_ITEM_KEYS
-    ])
+    @app_commands.describe(member="The player to give items to", item="The item to give", quantity="How many to give")
     async def poke_give(
         self,
         interaction: discord.Interaction,
         member: discord.Member,
-        item: app_commands.Choice[str],
+        item: str,
         quantity: int,
     ):
         if not await self.bot.is_owner(interaction.user):
@@ -2152,10 +2166,21 @@ class Pokemon(commands.Cog):
             )
             return
 
-        self.add_item(member.id, item.value, quantity)
+        if item not in GIVABLE_ITEM_KEYS:
+            await interaction.response.send_message("Unknown item — pick one from the list.", ephemeral=True)
+            return
+        self.add_item(member.id, item, quantity)
         await interaction.response.send_message(
-            f"✅ Gave **{quantity}x {item.name}** to **{member.display_name}**.", ephemeral=True
+            f"✅ Gave **{quantity}x {ITEM_LABELS[item]}** to **{member.display_name}**.", ephemeral=True
         )
+
+    @poke_give.autocomplete("item")
+    async def give_item_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        current = (current or "").lower()
+        return [
+            app_commands.Choice(name=ITEM_LABELS[key], value=key)
+            for key in GIVABLE_ITEM_KEYS if current in ITEM_LABELS[key].lower()
+        ][:25]
 
     @poke.command(name="spawn", description="[Bot owner only] Manually spawn a specific Pokémon in this channel")
     @app_commands.describe(pokemon="The Pokémon species to spawn")

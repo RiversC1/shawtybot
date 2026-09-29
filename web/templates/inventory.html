@@ -46,6 +46,18 @@
         {% endfor %}
     </div>
 
+    <div class="card bag-section">
+        <h2>Held Items</h2>
+        {% for item in inventory.held_items %}
+        <div class="item-row" title="{{ item.description }}">
+            <span class="item-name"><img src="{{ item.icon }}" alt="" class="item-icon">{{ item.label }}</span>
+            <span class="item-qty">×{{ "{:,}".format(item.qty) }}</span>
+        </div>
+        {% else %}
+        <p class="muted">No held items yet — check the <a href="/store">Store</a>, then give them to your team on the <a href="/team">Team</a> page.</p>
+        {% endfor %}
+    </div>
+
     {% if inventory.key_items %}
     <div class="card bag-section">
         <h2>Key Items</h2>

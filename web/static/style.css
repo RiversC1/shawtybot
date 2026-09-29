@@ -5409,3 +5409,128 @@ img[src$="/trainers/nowa.png"] {
 .battle-scene.motion-off .battle-weather-dust {
     animation: none;
 }
+
+/* ---------- Held items ---------- */
+
+.config-item-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 8px;
+}
+
+.config-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 6px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: #0c0c14;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 0.12s ease, transform 0.12s ease;
+}
+
+.config-item:hover:not(:disabled) {
+    border-color: #f0c040;
+    transform: translateY(-2px);
+}
+
+.config-item.selected {
+    border-color: #f0c040;
+    box-shadow: 0 0 0 1px #f0c040;
+}
+
+.config-item:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.config-item-icon {
+    width: 32px;
+    height: 32px;
+    image-rendering: pixelated;
+}
+
+.config-item-none {
+    display: grid;
+    place-items: center;
+    font-size: 1.4em;
+    color: var(--text-muted);
+}
+
+.config-item-name {
+    font-size: 0.85em;
+    font-weight: bold;
+    text-align: center;
+}
+
+.config-item-count {
+    font-size: 0.72em;
+    color: var(--text-muted);
+}
+
+.config-item-hint {
+    grid-column: 1 / -1;
+    margin: 0;
+}
+
+.held-item-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.82em;
+    padding: 2px 8px 2px 4px;
+    border-radius: 999px;
+    background: rgba(240, 192, 64, 0.12);
+    border: 1px solid rgba(240, 192, 64, 0.4);
+}
+
+.held-item-badge img,
+.battle-held-item img {
+    width: 22px;
+    height: 22px;
+    image-rendering: pixelated;
+}
+
+.battle-held-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.78em;
+    color: #f0d080;
+}
+
+.store-item-desc {
+    font-size: 0.76em;
+    margin: 2px 0 0;
+    text-align: center;
+    line-height: 1.35;
+}
+
+.team-card-footer {
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Collection: one card per catch, with types and IV quality. */
+.collection-card-types {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.collection-card-types .type-badge {
+    font-size: 0.72em;
+}
+
+.collection-card-iv {
+    margin-top: 4px;
+    font-size: 0.75em;
+    color: var(--text-muted);
+}

@@ -12,6 +12,7 @@
     cannot_act: 550, move_missed: 550, move_failed: 500, charge_start: 500, multi_hit_summary: 450,
     badge_awarded: 3200,
     weather_start: 1100, weather_end: 700, weather_damage: 650,
+    item_used: 750, item_damage: 600, item_activated: 650, self_ko: 400,
   };
   const DEFAULT_EVENT_DELAY = 250; // structural events with no on-screen effect (turn_start, switch_out, battle_end)
 
@@ -363,6 +364,20 @@
       case "weather_start":
         visibleWeather = { weather: event.weather, turns: event.turns, suppressed: false };
         break;
+      case "item_used":
+      case "item_damage": {
+        if (current) {
+          const updated = { ...current };
+          if (event.new_hp !== undefined) updated.current_hp = event.new_hp;
+          if (event.type === "item_used") {
+            updated.item = null;
+            if (event.cured === "confusion") updated.confused = false;
+            else if (event.cured) updated.status = null;
+          }
+          if (isA) visibleA = updated; else visibleB = updated;
+        }
+        break;
+      }
       case "weather_tick":
         if (visibleWeather) visibleWeather = { ...visibleWeather, turns: event.turns_left };
         break;
@@ -438,6 +453,7 @@
         <div class="hp-bar-track"><div class="hp-bar-fill ${hpClass(activeMon.current_hp, activeMon.max_hp)}" style="width:${pct}%"></div></div>
         <div class="muted">${Math.max(0, activeMon.current_hp)}/${activeMon.max_hp} HP</div>
         ${conditionChipsHtml(activeMon)}
+        ${activeMon.item ? `<div class="battle-held-item" title="${esc(activeMon.item.description)}"><img src="${activeMon.item.icon}" alt="">${esc(activeMon.item.label)}</div>` : ""}
     `;
   }
 
@@ -746,18 +762,39 @@
         return `${mon} was hurt${event.status ? ` by its ${event.status}` : ""}! (-${event.amount})`;
       case "drain":
       case "heal":
+        if (event.reason === "Leftovers") return `${mon} restored <strong>${event.amount}</strong> HP using its Leftovers!`;
+        if (event.reason === "Healing Wish") return `✨ The healing wish came true for <strong>${mon}</strong>!`;
+        if (event.reason === "Lunar Dance") return `🌙 <strong>${mon}</strong> became cloaked in mystical moonlight!`;
         return event.reason
           ? `${mon} restored <strong>${event.amount}</strong> HP with ${esc(event.reason)}!`
           : `${mon} restored <strong>${event.amount}</strong> HP!`;
+      case "item_used": {
+        if (event.item === "focus-sash") return `${mon} hung on using its <strong>Focus Sash</strong>!`;
+        if (event.item === "sitrus-berry") return `${mon} restored <strong>${event.amount}</strong> HP with its <strong>Sitrus Berry</strong>!`;
+        if (event.item === "lum-berry") {
+          const what = { burn: "burn", paralysis: "paralysis", poison: "poison", toxic: "poison", sleep: "sleep", freeze: "freeze", confusion: "confusion" }[event.cured] || "status";
+          return `${mon}'s <strong>Lum Berry</strong> cured its ${what}!`;
+        }
+        return `${mon} used its <strong>${esc(event.label)}</strong>!`;
+      }
+      case "item_damage":
+        return `${mon} lost some of its HP to its <strong>${esc(event.label)}</strong>! (-${event.amount})`;
+      case "item_activated":
+        return `${mon}'s <strong>${esc(event.label)}</strong> let it move first!`;
+      case "self_ko":
+        return event.move_name === "Explosion" || event.move_name === "Self Destruct"
+          ? null  // the faint line right after says it all
+          : `${mon} gave everything it had!`;
       case "weather_start": {
         const text = {
           sun: "The sunlight turned harsh!", rain: "It started to rain!",
           sand: "A sandstorm kicked up!", hail: "It started to hail!",
         }[event.weather] || "The weather changed!";
         const icon = (WEATHER_INFO[event.weather] || {}).icon || "";
+        const rock = event.item ? ` <span class="muted">(${esc(event.item)}: ${event.turns} turns)</span>` : "";
         return event.source === "ability"
-          ? `${icon} <strong>${mon}</strong>'s ${esc(event.ability)}: ${text}`
-          : `${icon} ${text}`;
+          ? `${icon} <strong>${mon}</strong>'s ${esc(event.ability)}: ${text}${rock}`
+          : `${icon} ${text}${rock}`;
       }
       case "weather_end":
         return {
@@ -918,7 +955,7 @@
 
   // Events that begin a new "beat" (someone acting) start a fresh caption;
   // their consequences (damage, status, stat changes) append beneath it.
-  const CAPTION_STARTERS = new Set(["move_used", "charge_start", "cannot_act", "switch_in", "status_damage", "badge_awarded", "league_defeated", "weather_end", "weather_damage"]);
+  const CAPTION_STARTERS = new Set(["move_used", "charge_start", "cannot_act", "switch_in", "status_damage", "badge_awarded", "league_defeated", "weather_end", "weather_damage", "item_activated"]);
 
   function pctOf(amount, max) {
     if (!max) return "?";
@@ -1013,6 +1050,21 @@
         sprite.classList.remove("anim-hit");
         void sprite.offsetWidth;
         sprite.classList.add("anim-hit");
+        return null;
+      case "item_used":
+        BattleFX.glowSprite(sprite, "#ffe08a", 700);
+        BattleFX.floatText(slot, event.label, "info");
+        if (event.amount) {
+          BattleFX.healSparkles(slot);
+          setTimeout(() => BattleFX.floatText(slot, `+${pctOf(event.amount, maxHp)}%`, "heal"), 250);
+        }
+        return wait(250);
+      case "item_damage":
+        BattleFX.floatText(slot, `−${pctOf(event.amount, maxHp)}% ${event.label}`, "damage");
+        return null;
+      case "item_activated":
+        BattleFX.glowSprite(sprite, "#ffffff", 500);
+        BattleFX.floatText(slot, event.label, "info");
         return null;
       case "badge_awarded":
         playResultSound();

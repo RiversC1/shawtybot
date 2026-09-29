@@ -167,6 +167,20 @@ STORE_ITEMS = {
     "dawn-stone": {"label": "Dawn Stone", "price": 110},
 }
 
+# Held items (battle_engine.HELD_ITEMS) — cheap on purpose. Keep in sync
+# with cogs/pokemon.py's STORE_ITEMS.
+HELD_ITEM_PRICES = {
+    "leftovers": 300, "life-orb": 350, "choice-band": 350, "choice-specs": 350, "choice-scarf": 350,
+    "focus-sash": 200, "expert-belt": 250, "muscle-band": 150, "wise-glasses": 150,
+    "sitrus-berry": 60, "lum-berry": 80, "quick-claw": 150, "scope-lens": 150, "bright-powder": 150,
+    "heat-rock": 120, "damp-rock": 120, "smooth-rock": 120, "icy-rock": 120,
+}
+STORE_ITEMS.update({
+    key: {"label": be.HELD_ITEMS[key]["label"], "price": price} for key, price in HELD_ITEM_PRICES.items()
+})
+
+HELD_ITEM_KEYS = set(HELD_ITEM_PRICES)
+
 
 def item_icon(key: str) -> str:
     return BALL_SPRITES.get(key) or f"{ITEM_SPRITE_BASE}/{key}.png"
@@ -927,7 +941,7 @@ def get_inventory(user_id: int = Depends(get_current_user_id)):
 
     raw = {row["item"]: row["qty"] for row in rows}
 
-    balls, stones, key_items = [], [], []
+    balls, stones, key_items, held_items = [], [], [], []
     for key, cfg in STORE_ITEMS.items():
         if not raw.get(key):
             continue
@@ -936,6 +950,8 @@ def get_inventory(user_id: int = Depends(get_current_user_id)):
             balls.append(entry)
         elif key in battle_store.KEY_ITEMS:
             key_items.append(entry)
+        elif key in HELD_ITEM_KEYS:
+            held_items.append({**entry, "description": be.HELD_ITEMS[key]["description"]})
         else:
             stones.append(entry)
 
@@ -952,6 +968,7 @@ def get_inventory(user_id: int = Depends(get_current_user_id)):
         "balls": balls,
         "stones": stones,
         "key_items": key_items,
+        "held_items": held_items,
         "coins": raw.get("coin", 0),
         "rare_candy": raw.get("candy", 0),
         "family_candies": family_candies,
@@ -974,7 +991,9 @@ def get_store(user_id: int = Depends(get_current_user_id)):
     return {
         "items": [
             {"key": key, "label": cfg["label"], "price": cfg["price"], "icon": item_icon(key),
-             "key_item": key in battle_store.KEY_ITEMS, "owned": key in owned_keys}
+             "key_item": key in battle_store.KEY_ITEMS, "owned": key in owned_keys,
+             "held_item": key in HELD_ITEM_KEYS,
+             "description": be.HELD_ITEMS[key]["description"] if key in HELD_ITEM_KEYS else None}
             for key, cfg in STORE_ITEMS.items()
         ],
         "coins": coin_row["qty"] if coin_row else 0,
@@ -1052,6 +1071,32 @@ def resolve_pokemon_config(conn: sqlite3.Connection, user_id: int, dex_id: int) 
             {"name": a["name"], "label": format_ability_name(a["name"])} for a in abilities
         ],
         **resolve_forme(conn, user_id, dex_id),
+        **resolve_held_item(conn, user_id, dex_id),
+    }
+
+
+def held_item_entry(key: str) -> dict:
+    return {"key": key, "label": be.HELD_ITEMS[key]["label"], "description": be.HELD_ITEMS[key]["description"],
+            "icon": item_icon(key)}
+
+
+def resolve_held_item(conn: sqlite3.Connection, user_id: int, dex_id: int) -> dict:
+    """The species' held item plus the held items this trainer owns, each
+    with how many copies are still free (not held by another species)."""
+    current = battle_store.get_held_item(conn, user_id, dex_id)
+    owned = {r["item"]: r["qty"] for r in conn.execute(
+        "SELECT item, qty FROM poke_items WHERE user_id = ? AND qty > 0", (user_id,)) if r["item"] in be.HELD_ITEMS}
+    held_elsewhere: dict[str, int] = {}
+    for r in conn.execute(
+            "SELECT held_item FROM poke_pokemon_config WHERE user_id = ? AND dex_id != ? AND held_item IS NOT NULL",
+            (user_id, dex_id)):
+        held_elsewhere[r[0]] = held_elsewhere.get(r[0], 0) + 1
+    return {
+        "held_item": held_item_entry(current) if current else None,
+        "held_item_options": [
+            {**held_item_entry(k), "qty": q, "free": q - held_elsewhere.get(k, 0)}
+            for k, q in owned.items()
+        ],
     }
 
 
@@ -1122,6 +1167,27 @@ def get_pokemon_config(dex_id: int, user_id: int = Depends(get_current_user_id))
         "base_stats": resolved_base_stats(battle_mon, ivs),
         **config,
     }
+
+
+class HeldItemRequest(BaseModel):
+    item: str | None = None
+
+
+@app.post("/api/pokemon-config/{dex_id}/item")
+def set_pokemon_held_item(dex_id: int, body: HeldItemRequest, user_id: int = Depends(get_current_user_id)):
+    if dex_id not in POKEDEX:
+        raise HTTPException(404, "Unknown species")
+    with db() as conn:
+        owned = conn.execute(
+            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+        ).fetchone()[0]
+        if owned < 1:
+            raise HTTPException(404, "You don't own this Pokémon")
+        problem = battle_store.held_item_problem(conn, user_id, dex_id, body.item)
+    if problem:
+        raise HTTPException(400, problem)
+    battle_store.set_held_item(user_id, dex_id, body.item)
+    return {"ok": True}
 
 
 class FormeRequest(BaseModel):
@@ -1299,6 +1365,39 @@ def build_collection_by_species(conn: sqlite3.Connection, target_id: int, dex_id
             "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
         })
     return result
+
+
+def build_collection_individuals(conn: sqlite3.Connection, target_id: int) -> list[dict]:
+    """Every Pokémon a trainer owns, one entry per catch (two Charmander are
+    two cards: their IVs, shininess and nicknames differ), newest first."""
+    rows = conn.execute(
+        "SELECT id, dex_id, nickname, is_shiny, caught_at, "
+        "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed "
+        "FROM poke_collection WHERE user_id = ? ORDER BY caught_at DESC, id DESC",
+        (target_id,),
+    ).fetchall()
+    out = []
+    for r in rows:
+        mon = POKEDEX.get(r["dex_id"], {})
+        ivs = battle_store.ivs_from_collection_row(r)
+        out.append({
+            "id": r["id"],
+            "dex_id": r["dex_id"],
+            "name": mon.get("name", f"#{r['dex_id']}"),
+            "nickname": r["nickname"],
+            "types": mon.get("types", []),
+            "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if r["is_shiny"] else mon.get("artwork"),
+            "is_shiny": bool(r["is_shiny"]),
+            "caught_at": r["caught_at"],
+            "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
+        })
+    return out
+
+
+@app.get("/api/collection-individuals")
+def get_collection_individuals(user_id: int = Depends(get_current_user_id)):
+    with db() as conn:
+        return build_collection_individuals(conn, user_id)
 
 
 @app.get("/api/collection")
@@ -1649,6 +1748,11 @@ async def submit_battle_action(battle_id: int, body: BattleActionRequest, user_i
             return "You've already locked in your move this turn.", None
 
         action = be.Action(kind=body.kind, side=side, move_index=body.move_index, switch_to_index=body.switch_to_index)
+        legal = be.legal_actions(battle, side)
+        if body.kind == "move" and legal["usable_move_indices"] and body.move_index not in legal["usable_move_indices"]:
+            return "That move can't be used right now.", None
+        if body.kind == "switch" and body.switch_to_index not in legal["switchable_indices"]:
+            return "That Pokémon can't be switched in.", None
         battle_store.record_pending_action(battle_id, side, battle.turn_number, action)
 
         other_side = "B" if side == "A" else "A"

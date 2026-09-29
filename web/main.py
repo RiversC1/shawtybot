@@ -254,7 +254,7 @@ async def collection(request: Request):
     if not session:
         return RedirectResponse("/")
 
-    status, data = await api_get(session, "/api/collection")
+    status, data = await api_get(session, "/api/collection-individuals")
     if status == 401:
         return clear_session(RedirectResponse("/"))
 
@@ -543,6 +543,16 @@ async def proxy_set_pokemon_config(request: Request, dex_id: int):
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     body = await request.json()
     status, data = await api_post(session, f"/api/pokemon-config/{dex_id}", body)
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/pokemon-config/{dex_id}/item")
+async def proxy_set_pokemon_held_item(request: Request, dex_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, f"/api/pokemon-config/{dex_id}/item", body)
     return JSONResponse(data, status_code=status)
 
 

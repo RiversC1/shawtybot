@@ -205,6 +205,7 @@ def build_roster_for_player(user_id: int) -> list["be.BattlerState"] | None:
     if not team:
         return None
     roster = []
+    items = team_held_items(user_id, team)
     for dex_id in team:
         mon = POKEDEX.get(dex_id)
         if not mon:
@@ -214,7 +215,7 @@ def build_roster_for_player(user_id: int) -> list["be.BattlerState"] | None:
         # A Forme (e.g. Deoxys-Attack) battles as its own entry: its own
         # stats, name and sprites, same moves/ability/IVs as the species.
         mon = POKEDEX.get(get_form_dex_id(user_id, dex_id), mon)
-        roster.append(be.build_battler_state(mon, moves, ability, ivs=ivs))
+        roster.append(be.build_battler_state(mon, moves, ability, ivs=ivs, item=items.get(dex_id)))
     return roster or None
 
 
@@ -226,12 +227,60 @@ def build_roster_for_gym(gym_key: str) -> list["be.BattlerState"]:
     ]
 
 
+# League difficulty: Elite Four Pokémon roll IVs of 25-31 per stat each
+# battle (strong, not flawless); Champions field perfect IVs and every
+# Pokémon holds an item picked for it (see champion_held_items).
+ELITE_FOUR_IV_RANGE = (25, 31)
+
+
 def build_roster_for_league(league_key: str) -> list["be.BattlerState"]:
     entry = LEAGUE[league_key]
+    if entry["role"] == "champion":
+        items = champion_held_items(entry["roster"])
+        return [
+            be.build_battler_state(POKEDEX[m["dex_id"]], m["moves"], m.get("ability"), item=items[i])
+            for i, m in enumerate(entry["roster"])
+        ]
+    lo, hi = ELITE_FOUR_IV_RANGE
     return [
-        be.build_battler_state(POKEDEX[m["dex_id"]], m["moves"], m.get("ability"))
+        be.build_battler_state(POKEDEX[m["dex_id"]], m["moves"], m.get("ability"),
+                               ivs={k: random.randint(lo, hi) for k in be.IV_STAT_KEYS})
         for m in entry["roster"]
     ]
+
+
+def champion_held_items(roster: list[dict]) -> list[str | None]:
+    """A fitting item for each of a Champion's Pokémon, no duplicates (item
+    clause): weather setters get their rock, fast hitters a Life Orb, bulky
+    ones Leftovers, frail ones a Focus Sash, and so on."""
+    used: set[str] = set()
+    out: list[str | None] = []
+    for m in roster:
+        mon = POKEDEX[m["dex_id"]]
+        s = mon["base_stats"]
+        moves = set(m.get("moves") or [])
+        prefs: list[str] = []
+        rock_for = lambda w: next(k for k, x in be.WEATHER_ROCKS.items() if x == w)  # noqa: E731
+        auto_weather = be.WEATHER_ABILITIES.get((m.get("ability") or "").lower())
+        move_weather = next((be.WEATHER_MOVES[n] for n in moves if n in be.WEATHER_MOVES), None)
+        if auto_weather:
+            prefs.append(rock_for(auto_weather))  # its weather is always up
+        offense = max(s["attack"], s["sp_attack"])
+        bulk = s["hp"] + s["defense"] + s["sp_defense"]
+        if offense >= 115 and s["speed"] >= 90:
+            prefs.append("life-orb")
+        if bulk >= 300:
+            prefs.append("leftovers")
+        if s["defense"] + s["sp_defense"] <= 160:
+            prefs.append("focus-sash")
+        if move_weather:
+            prefs.append(rock_for(move_weather))
+        prefs += ["expert-belt", "sitrus-berry", "lum-berry", "leftovers", "life-orb", "scope-lens", "quick-claw"]
+        pick = next((p for p in prefs if p not in used), None)
+        if pick:
+            used.add(pick)
+        out.append(pick)
+    return out
 
 
 def build_roster_for_random_trainer(class_key: str) -> list["be.BattlerState"]:
@@ -323,20 +372,21 @@ def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster
     now = datetime.now(timezone.utc).isoformat()
     deadline = (datetime.now(timezone.utc) + timedelta(seconds=BATTLE_TURN_TIMEOUT_SECONDS)).isoformat()
     with db() as conn:
+        ensure_form_column(conn)
         for side_label, roster in (("A", roster_a), ("B", roster_b)):
             for slot, b in enumerate(roster):
                 fields = be.battler_state_to_row_fields(b)
                 conn.execute(
                     "INSERT INTO poke_battle_sides (battle_id, side, slot, dex_id, ability, current_hp, max_hp, "
-                    "status, status_counter, stat_stages, confusion_counter, moves, is_active, is_fainted, volatile, ivs) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "status, status_counter, stat_stages, confusion_counter, moves, is_active, is_fainted, volatile, ivs, "
+                    "held_item) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         battle_id, side_label, slot, fields["dex_id"], b.ability, fields["current_hp"],
                         fields["max_hp"], fields["status"], fields["status_counter"],
                         json.dumps(fields["stat_stages"]), fields["confusion_counter"],
                         json.dumps(fields["moves"]), 1 if slot == 0 else 0,
                         1 if fields["is_fainted"] else 0, json.dumps(fields["volatile"]),
-                        json.dumps(fields["ivs"]),
+                        json.dumps(fields["ivs"]), fields["item"],
                     ),
                 )
         conn.execute(
@@ -385,6 +435,7 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
             "stat_stages": json.loads(r["stat_stages"]), "confusion_counter": r["confusion_counter"],
             "moves": json.loads(r["moves"]), "is_fainted": r["is_fainted"], "volatile": json.loads(r["volatile"]),
             "ivs": json.loads(r["ivs"]) if r["ivs"] else dict(be.MAX_IVS),
+            "item": _row_get(r, "held_item"),
         }
         battler = be.battler_state_from_row(mon, row_dict, ability=r["ability"])
         if r["side"] == "A":
@@ -418,6 +469,7 @@ def persist_battle_state(battle_id: int, battle: "be.BattleState"):
     now = datetime.now(timezone.utc).isoformat()
     with db() as conn:
         ensure_weather_columns(conn)
+        ensure_form_column(conn)
         conn.execute("UPDATE poke_battles SET weather = ?, weather_turns = ? WHERE battle_id = ?",
                      (battle.weather, battle.weather_turns, battle_id))
         for side_label, side in (("A", battle.side_a), ("B", battle.side_b)):
@@ -425,13 +477,13 @@ def persist_battle_state(battle_id: int, battle: "be.BattleState"):
                 fields = be.battler_state_to_row_fields(b)
                 conn.execute(
                     "UPDATE poke_battle_sides SET current_hp = ?, max_hp = ?, status = ?, status_counter = ?, "
-                    "stat_stages = ?, confusion_counter = ?, moves = ?, is_active = ?, is_fainted = ?, volatile = ? "
-                    "WHERE battle_id = ? AND side = ? AND slot = ?",
+                    "stat_stages = ?, confusion_counter = ?, moves = ?, is_active = ?, is_fainted = ?, volatile = ?, "
+                    "held_item = ? WHERE battle_id = ? AND side = ? AND slot = ?",
                     (
                         fields["current_hp"], fields["max_hp"], fields["status"], fields["status_counter"],
                         json.dumps(fields["stat_stages"]), fields["confusion_counter"], json.dumps(fields["moves"]),
                         1 if slot == side.active_index else 0, 1 if fields["is_fainted"] else 0,
-                        json.dumps(fields["volatile"]), battle_id, side_label, slot,
+                        json.dumps(fields["volatile"]), fields["item"], battle_id, side_label, slot,
                     ),
                 )
         deadline = (
@@ -618,15 +670,82 @@ _form_column_ready = False
 
 
 def ensure_form_column(conn: sqlite3.Connection):
-    """Migration: poke_pokemon_config.form. Run by the bot's DB setup, and
-    lazily here so the API works even if it starts first."""
+    """Migrations: poke_pokemon_config.form and .held_item, and
+    poke_battle_sides.held_item. Run by the bot's DB setup, and lazily here so
+    the API works even if it starts first."""
     global _form_column_ready
     if _form_column_ready:
         return
     cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_pokemon_config)").fetchall()]
     if "form" not in cols:
         conn.execute("ALTER TABLE poke_pokemon_config ADD COLUMN form TEXT")
+    if "held_item" not in cols:
+        conn.execute("ALTER TABLE poke_pokemon_config ADD COLUMN held_item TEXT")
+    side_cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_battle_sides)").fetchall()]
+    if side_cols and "held_item" not in side_cols:
+        conn.execute("ALTER TABLE poke_battle_sides ADD COLUMN held_item TEXT")
     _form_column_ready = True
+
+
+# ---------- Held items ----------
+# Bought cheaply in the store and assigned per species on the team page
+# (poke_pokemon_config.held_item). A trainer can have as many Pokémon holding
+# an item as copies of it they own. Items a Pokémon uses up in battle (Focus
+# Sash, berries) are only gone for that battle.
+
+def get_held_item(conn: sqlite3.Connection, user_id: int, dex_id: int) -> str | None:
+    ensure_form_column(conn)
+    row = conn.execute(
+        "SELECT held_item FROM poke_pokemon_config WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+    ).fetchone()
+    item = row[0] if row else None
+    return item if item in be.HELD_ITEMS else None
+
+
+def held_item_problem(conn: sqlite3.Connection, user_id: int, dex_id: int, item: str | None) -> str | None:
+    """Why this species can't hold `item` (None = fine / clearing it)."""
+    if item is None:
+        return None
+    if item not in be.HELD_ITEMS:
+        return "That item can't be held."
+    ensure_form_column(conn)
+    owned = conn.execute("SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, item)).fetchone()
+    owned = owned[0] if owned else 0
+    holders = [r[0] for r in conn.execute(
+        "SELECT dex_id FROM poke_pokemon_config WHERE user_id = ? AND held_item = ? AND dex_id != ?",
+        (user_id, item, dex_id))]
+    label = be.HELD_ITEMS[item]["label"]
+    if owned < 1:
+        return f"You don't have a {label} — get one at the Store."
+    if len(holders) >= owned:
+        names = ", ".join(POKEDEX.get(d, {}).get("name", f"#{d}") for d in holders)
+        return f"All your {label} ({owned}) are already held by {names}. Buy another or take it off first."
+    return None
+
+
+def set_held_item(user_id: int, dex_id: int, item: str | None):
+    with db() as conn:
+        ensure_form_column(conn)
+        conn.execute(
+            "INSERT INTO poke_pokemon_config (user_id, dex_id, held_item) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id, dex_id) DO UPDATE SET held_item = excluded.held_item",
+            (user_id, dex_id, item),
+        )
+
+
+def team_held_items(user_id: int, dex_ids: list[int]) -> dict[int, str]:
+    """The items each team member actually brings into battle: never more
+    holders of an item than copies owned (e.g. if some were given away)."""
+    with db() as conn:
+        ensure_form_column(conn)
+        owned = {r[0]: r[1] for r in conn.execute("SELECT item, qty FROM poke_items WHERE user_id = ?", (user_id,))}
+        out, used = {}, {}
+        for dex_id in dex_ids:
+            item = get_held_item(conn, user_id, dex_id)
+            if item and used.get(item, 0) < owned.get(item, 0):
+                used[item] = used.get(item, 0) + 1
+                out[dex_id] = item
+    return out
 
 
 def forms_for(dex_id: int) -> list[dict]:
@@ -819,6 +938,9 @@ def snapshot_custom_gym_roster(owner_user_id: int, dex_ids: list[int]) -> list[d
             "ivs": get_best_ivs_for_species(owner_user_id, dex_id),
             "form_dex_id": get_form_dex_id(owner_user_id, dex_id),
         })
+    items = team_held_items(owner_user_id, dex_ids)
+    for m in roster:
+        m["item"] = items.get(m["dex_id"])
     return roster
 
 
@@ -827,7 +949,8 @@ def build_roster_for_custom_gym(owner_user_id: int) -> list["be.BattlerState"] |
     if not gym:
         return None
     return [
-        be.build_battler_state(POKEDEX.get(m.get("form_dex_id"), POKEDEX[m["dex_id"]]), m["moves"], m.get("ability"), m.get("ivs"))
+        be.build_battler_state(POKEDEX.get(m.get("form_dex_id"), POKEDEX[m["dex_id"]]), m["moves"], m.get("ability"),
+                               m.get("ivs"), item=m.get("item"))
         for m in gym["roster"] if m["dex_id"] in POKEDEX
     ]
 
@@ -1050,20 +1173,24 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
     return summary
 
 
-# NPC battles the League tier: given every trainer already fields max-IV,
-# level-100 Pokémon, a smarter opponent (battle_engine's "hard" AI) is the
-# only real lever left to make these fights tougher than a gym.
+# NPC difficulty tiers. Random trainers: the loose weighted-random AI. Gym
+# leaders: "medium" (the League AI most turns, the loose pick the rest, and
+# smart replacements after a faint). Elite Four / Champions: the full League
+# AI (Champions also get perfect IVs and held items; see build_roster_for_league).
 HARD_AI_BATTLE_TYPES = {"elite_four", "champion"}
+MEDIUM_AI_BATTLE_TYPES = {"gym", "custom_gym"}
 
 
 def npc_pick_action(battle: "be.BattleState", side_id: str, battle_row: sqlite3.Row) -> "be.Action":
     if battle_row["battle_type"] in HARD_AI_BATTLE_TYPES:
         return be.pick_npc_action_hard(battle, side_id)
+    if battle_row["battle_type"] in MEDIUM_AI_BATTLE_TYPES:
+        return be.pick_npc_action_medium(battle, side_id)
     return be.pick_npc_action(battle, side_id)
 
 
 def npc_pick_forced_switch(battle: "be.BattleState", side_id: str, battle_row: sqlite3.Row) -> int:
-    if battle_row["battle_type"] in HARD_AI_BATTLE_TYPES:
+    if battle_row["battle_type"] in HARD_AI_BATTLE_TYPES | MEDIUM_AI_BATTLE_TYPES:
         return be.pick_npc_forced_switch_hard(battle, side_id)
     return be.pick_npc_forced_switch(battle, side_id)
 
@@ -1363,6 +1490,10 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             "confused": bool(r["confusion_counter"]),
         }
         if reveal_moves:
+            item = _row_get(r, "held_item")
+            if item in be.HELD_ITEMS:
+                out["item"] = {"key": item, **be.HELD_ITEMS[item],
+                               "icon": f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/{item}.png"}
             moves = json.loads(r["moves"])
             pool_by_name = {m["name"]: m for m in mon.get("moves", [])}
             out["moves"] = []

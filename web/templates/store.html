@@ -4,7 +4,7 @@
 <div class="store-header">
     <div>
         <h1>Poké Store</h1>
-        <p class="muted">Stock up on balls and evolution stones with the coins you earn from catches and battles.</p>
+        <p class="muted">Stock up on balls, held items for battle and evolution stones with the coins you earn from catches and battles. Give held items to your Pokémon from the Team page.</p>
     </div>
     <div class="store-balance">
         <span class="muted">Balance</span>
@@ -16,11 +16,12 @@
 {% set balls = [] %}
 {% set others = [] %}
 {% set key_items = [] %}
+{% set held = [] %}
 {% for item in store['items'] %}
-    {% if item.key_item %}{% set _ = key_items.append(item) %}{% elif item.key.endswith("ball") %}{% set _ = balls.append(item) %}{% else %}{% set _ = others.append(item) %}{% endif %}
+    {% if item.key_item %}{% set _ = key_items.append(item) %}{% elif item.held_item %}{% set _ = held.append(item) %}{% elif item.key.endswith("ball") %}{% set _ = balls.append(item) %}{% else %}{% set _ = others.append(item) %}{% endif %}
 {% endfor %}
 <div id="store-grid">
-    {% for section_title, section_items in [("Poké Balls", balls), ("Evolution Stones", others), ("Key Items", key_items)] if section_items %}
+    {% for section_title, section_items in [("Poké Balls", balls), ("Held Items", held), ("Evolution Stones", others), ("Key Items", key_items)] if section_items %}
     <section class="store-section">
         <h2 class="store-section-title">{{ section_title }}</h2>
         <div class="store-items">
@@ -29,6 +30,7 @@
                 <img src="{{ item.icon }}" alt="{{ item.label }}" loading="lazy">
                 <div class="dex-name">{{ item.label }}</div>
                 <div class="store-price">🪙 {{ "{:,}".format(item.price) }}</div>
+                {% if item.description %}<p class="store-item-desc muted">{{ item.description }}</p>{% endif %}
                 {% if item.key_item %}
                 <p class="store-key-note muted">{% if item.key == "meteorite" %}Changes Deoxys' Forme. {% endif %}Key item — buy once, keep forever.</p>
                 <div class="store-buy-row">
