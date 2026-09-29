@@ -15,6 +15,9 @@
   const configAbilities = document.getElementById("config-abilities");
   const configSave = document.getElementById("config-save");
   const configStatus = document.getElementById("config-status");
+  const configFormeSection = document.getElementById("config-forme-section");
+  const configFormes = document.getElementById("config-formes");
+  const configFormeNote = document.getElementById("config-forme-note");
 
   if (!cardsContainer) return;
 
@@ -27,6 +30,7 @@
   let configSlot = null;
   let configSelectedMoves = [];
   let configSelectedAbility = null;
+  let configSelectedForm = null;
 
   function typeBadges(types) {
     return (types || [])
@@ -70,6 +74,7 @@
       <div class="team-card-mon">
         <img src="${mon.artwork}" alt="${mon.name}">
         <h3>${mon.name}</h3>
+        ${mon.forms && mon.forms.length ? `<div class="team-card-forme">${mon.form_label}</div>` : ""}
         <div class="favorite-types" style="justify-content:center;">${typeBadges(mon.types)}</div>
       </div>
       <div class="move-grid">${moveCells}</div>
@@ -279,7 +284,8 @@
         const cfgRes = await fetch(`/api/proxy/pokemon-config/${mon.dex_id}`);
         const cfg = cfgRes.ok ? await cfgRes.json() : {};
         teamState[activeSlot] = {
-          dex_id: mon.dex_id, name: mon.name, artwork: mon.artwork, types: mon.types,
+          dex_id: mon.dex_id, name: mon.name, artwork: cfg.artwork || mon.artwork, types: mon.types,
+          forms: cfg.forms || [], form: cfg.form, form_label: cfg.form_label, form_item: cfg.form_item,
           base_stats: cfg.base_stats || [], moves: cfg.moves || [], move_pool: cfg.move_pool || [],
           ability: cfg.ability || null, ability_raw: cfg.ability_raw || null, abilities: cfg.abilities || [],
         };
@@ -305,6 +311,7 @@
     configSelectedAbility = mon.ability_raw;
     configTitle.textContent = `Configure ${mon.name}`;
     configStatus.textContent = "";
+    renderFormes(mon);
 
     configMoves.innerHTML = "";
     for (const move of mon.move_pool || []) {
@@ -347,6 +354,39 @@
     configModal.hidden = false;
   }
 
+  // Alternate Formes (Deoxys): pick which one it battles in. Needs the
+  // species' key item (the Meteorite); without it the choices are shown locked.
+  function renderFormes(mon) {
+    const forms = mon.forms || [];
+    configFormeSection.hidden = !forms.length;
+    configFormes.innerHTML = "";
+    configSelectedForm = mon.form || null;
+    if (!forms.length) return;
+    const item = mon.form_item || {};
+    configFormeNote.innerHTML = item.owned
+      ? `<img src="${item.icon}" alt="" class="item-icon"> Your ${item.label} lets ${mon.name} change Forme.`
+      : `<img src="${item.icon}" alt="" class="item-icon"> Changing Forme needs a <strong>${item.label}</strong> — get one at the <a href="/store">Store</a> (🪙 ${Number(item.price).toLocaleString("en-US")}, yours to keep).`;
+    const statLabels = [["attack", "Atk"], ["defense", "Def"], ["sp_attack", "SpA"], ["sp_defense", "SpD"], ["speed", "Spe"]];
+    for (const f of forms) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "config-forme";
+      card.classList.toggle("selected", f.key === configSelectedForm);
+      card.disabled = !item.owned && f.key !== configSelectedForm;
+      card.innerHTML = `
+        <img src="${f.artwork}" alt="" loading="lazy">
+        <span class="config-forme-name">${f.label}</span>
+        <span class="config-forme-stats">${statLabels.map(([k, l]) => `${l} ${f.base_stats[k]}`).join(" · ")}</span>`;
+      card.addEventListener("click", () => {
+        if (!item.owned) return;
+        configSelectedForm = f.key;
+        for (const c of configFormes.children) c.classList.remove("selected");
+        card.classList.add("selected");
+      });
+      configFormes.appendChild(card);
+    }
+  }
+
   configClose.addEventListener("click", () => (configModal.hidden = true));
   configModal.addEventListener("click", (e) => {
     if (e.target === configModal) configModal.hidden = true;
@@ -355,6 +395,18 @@
   configSave.addEventListener("click", async () => {
     const mon = teamState[configSlot];
     configStatus.textContent = "Saving...";
+    if (mon.forms && mon.forms.length && configSelectedForm && configSelectedForm !== mon.form) {
+      const formRes = await fetch(`/api/proxy/pokemon-config/${mon.dex_id}/form`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ form: configSelectedForm }),
+      });
+      if (!formRes.ok) {
+        const err = await formRes.json().catch(() => ({}));
+        configStatus.textContent = err.detail || "Couldn't change Forme.";
+        return;
+      }
+    }
     const res = await fetch(`/api/proxy/pokemon-config/${mon.dex_id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

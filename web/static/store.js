@@ -9,6 +9,7 @@
     const key = card.dataset.key;
     const qtyInput = card.querySelector(".store-qty");
     const buyBtn = card.querySelector(".store-buy-btn");
+    if (!buyBtn) return; // an owned key item
 
     buyBtn.addEventListener("click", async () => {
       const quantity = parseInt(qtyInput.value, 10) || 1;
@@ -34,6 +35,9 @@
       coinsLabel.textContent = `🪙 ${Number(data.coins_left).toLocaleString("en-US")}`;
       status.textContent = `Bought ${quantity}× ${card.querySelector(".dex-name").textContent}!`;
       status.classList.add("is-success");
+      if (card.querySelector('input[type="hidden"].store-qty')) {
+        card.querySelector(".store-buy-row").innerHTML = '<span class="store-owned">✓ Owned</span>';
+      }
     });
   });
 })();

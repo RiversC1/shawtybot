@@ -37,6 +37,10 @@ def showdown_sprite_slug(name: str) -> str:
     'hooh'), except the gender symbols on Nidoran, which become a literal
     f/m ('Nidoran♀' -> 'nidoranf'). Verified against the live CDN for a
     sample including every one of these edge cases in our Gen 1-4 dataset."""
+    forme = FORME_BY_NAME.get(name)
+    if forme:
+        # Showdown keeps the hyphen for alternate Formes: "deoxys-attack".
+        return f"{showdown_sprite_slug(POKEDEX[forme['form_of']]['name'])}-{forme['form_key']}"
     if name.startswith("Mega "):
         # Showdown names Megas "<species>-mega[x|y]": "Mega Charizard X" ->
         # "charizard-megax", "Mega Venusaur" -> "venusaur-mega".
@@ -207,6 +211,9 @@ def build_roster_for_player(user_id: int) -> list["be.BattlerState"] | None:
             continue
         moves, ability = get_battle_pokemon_config(user_id, dex_id)
         ivs = get_best_ivs_for_species(user_id, dex_id)
+        # A Forme (e.g. Deoxys-Attack) battles as its own entry: its own
+        # stats, name and sprites, same moves/ability/IVs as the species.
+        mon = POKEDEX.get(get_form_dex_id(user_id, dex_id), mon)
         roster.append(be.build_battler_state(mon, moves, ability, ivs=ivs))
     return roster or None
 
@@ -233,7 +240,7 @@ def build_roster_for_random_trainer(class_key: str) -> list["be.BattlerState"]:
     size = random.randint(lo, hi)
     candidates = [
         dex_id for dex_id, mon in POKEDEX.items()
-        if not mon.get("is_legendary") and not mon.get("is_mythical") and not mon.get("is_mega")
+        if not mon.get("is_legendary") and not mon.get("is_mythical") and not is_alt_form_entry(mon)
         and any(t in tclass["preferred_types"] for t in mon.get("types", []))
     ]
     chosen = random.sample(candidates, min(size, len(candidates)))
@@ -589,7 +596,83 @@ def counts_toward_pokedex(dex_id: int) -> bool:
     """Species listed in the Pokédex and counted in completion totals: not
     Mega forms, and not the retired Mystery Pokémon."""
     mon = POKEDEX.get(dex_id)
-    return bool(mon) and not mon.get("is_mega") and dex_id != LEAGUE_REWARD_DEX_ID
+    return bool(mon) and not is_alt_form_entry(mon) and dex_id != LEAGUE_REWARD_DEX_ID
+
+
+def is_alt_form_entry(mon: dict) -> bool:
+    """Mega Evolutions and alternate Formes: data entries that aren't a
+    species of their own (never spawn, not counted in the Pokédex)."""
+    return bool(mon.get("is_mega") or mon.get("form_of"))
+
+
+# ---------- Alternate Formes (Deoxys) ----------
+# Each Forme is its own POKEDEX entry (form_of = the base species) that nobody
+# owns or catches. Trainers own the base species and choose which Forme it
+# battles in (poke_pokemon_config.form), which needs that species' form-change
+# item — a key item, bought once and kept.
+FORM_CHANGE_ITEMS = {386: "meteorite"}
+BASE_FORM_LABELS = {386: "Normal Forme"}
+FORME_BY_NAME = {m["name"]: m for m in POKEDEX.values() if m.get("form_of")}
+
+_form_column_ready = False
+
+
+def ensure_form_column(conn: sqlite3.Connection):
+    """Migration: poke_pokemon_config.form. Run by the bot's DB setup, and
+    lazily here so the API works even if it starts first."""
+    global _form_column_ready
+    if _form_column_ready:
+        return
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_pokemon_config)").fetchall()]
+    if "form" not in cols:
+        conn.execute("ALTER TABLE poke_pokemon_config ADD COLUMN form TEXT")
+    _form_column_ready = True
+
+
+def forms_for(dex_id: int) -> list[dict]:
+    """[{key, label, dex_id}] for a species with alternate Formes, base
+    Forme first; [] for everything else."""
+    alts = [m for m in POKEDEX.values() if m.get("form_of") == dex_id]
+    if not alts:
+        return []
+    base = {"key": "normal", "label": BASE_FORM_LABELS.get(dex_id, "Normal Forme"), "dex_id": dex_id}
+    return [base] + [{"key": m["form_key"], "label": m["form_label"], "dex_id": m["id"]} for m in alts]
+
+
+def form_dex_id_sql(conn: sqlite3.Connection, user_id: int, dex_id: int) -> int:
+    """The POKEDEX entry this trainer's species battles as: its chosen Forme,
+    or the species itself."""
+    if dex_id not in FORM_CHANGE_ITEMS:
+        return dex_id
+    ensure_form_column(conn)
+    row = conn.execute(
+        "SELECT form FROM poke_pokemon_config WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+    ).fetchone()
+    key = row[0] if row else None
+    return next((f["dex_id"] for f in forms_for(dex_id) if f["key"] == key), dex_id)
+
+
+# Key items are bought once and kept forever (not consumed by use).
+KEY_ITEMS = {"meteorite"}
+
+
+def set_form(user_id: int, dex_id: int, form_key: str):
+    """Saves which Forme this trainer's species battles in. Validation (owns
+    the species, has the item, real Forme key) is the caller's job."""
+    with db() as conn:
+        ensure_form_column(conn)
+        conn.execute(
+            "INSERT INTO poke_pokemon_config (user_id, dex_id, form) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id, dex_id) DO UPDATE SET form = excluded.form",
+            (user_id, dex_id, form_key),
+        )
+
+
+def get_form_dex_id(user_id: int, dex_id: int) -> int:
+    if dex_id not in FORM_CHANGE_ITEMS:
+        return dex_id
+    with db() as conn:
+        return form_dex_id_sql(conn, user_id, dex_id)
 
 
 # Poké League team rule: at most this many legendary/mythical Pokémon on
@@ -734,6 +817,7 @@ def snapshot_custom_gym_roster(owner_user_id: int, dex_ids: list[int]) -> list[d
         roster.append({
             "dex_id": dex_id, "moves": moves, "ability": ability,
             "ivs": get_best_ivs_for_species(owner_user_id, dex_id),
+            "form_dex_id": get_form_dex_id(owner_user_id, dex_id),
         })
     return roster
 
@@ -743,7 +827,7 @@ def build_roster_for_custom_gym(owner_user_id: int) -> list["be.BattlerState"] |
     if not gym:
         return None
     return [
-        be.build_battler_state(POKEDEX[m["dex_id"]], m["moves"], m.get("ability"), m.get("ivs"))
+        be.build_battler_state(POKEDEX.get(m.get("form_dex_id"), POKEDEX[m["dex_id"]]), m["moves"], m.get("ability"), m.get("ivs"))
         for m in gym["roster"] if m["dex_id"] in POKEDEX
     ]
 

@@ -5252,3 +5252,88 @@ img[src$="/trainers/nowa.png"] {
     /* Room for the turn badge and weather chip above the opponent's HP box. */
     .battle-scene { padding-top: 46px; }
 }
+
+/* ---------- Alternate Formes (Deoxys) + key items ---------- */
+
+.config-forme-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.config-forme-note .item-icon {
+    margin: 0;
+}
+
+.config-forme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.config-forme {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 8px;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    background: #0c0c14;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 0.12s ease, transform 0.12s ease;
+}
+
+.config-forme img {
+    width: 88px;
+    height: 88px;
+    object-fit: contain;
+}
+
+.config-forme:hover:not(:disabled) {
+    border-color: #f85888;
+    transform: translateY(-2px);
+}
+
+.config-forme.selected {
+    border-color: #f85888;
+    box-shadow: 0 0 0 1px #f85888, 0 8px 20px rgba(248, 88, 136, 0.25);
+}
+
+.config-forme:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    filter: grayscale(0.6);
+}
+
+.config-forme-name {
+    font-weight: bold;
+}
+
+.config-forme-stats {
+    font-size: 0.72em;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.4;
+}
+
+.team-card-forme {
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #f85888;
+    margin-top: -4px;
+}
+
+.store-key-note {
+    font-size: 0.78em;
+    margin: 0;
+    text-align: center;
+}
+
+.store-owned {
+    font-weight: bold;
+    color: #3ddc70;
+}

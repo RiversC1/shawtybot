@@ -15,11 +15,12 @@
 
 {% set balls = [] %}
 {% set others = [] %}
+{% set key_items = [] %}
 {% for item in store['items'] %}
-    {% if item.key.endswith("ball") %}{% set _ = balls.append(item) %}{% else %}{% set _ = others.append(item) %}{% endif %}
+    {% if item.key_item %}{% set _ = key_items.append(item) %}{% elif item.key.endswith("ball") %}{% set _ = balls.append(item) %}{% else %}{% set _ = others.append(item) %}{% endif %}
 {% endfor %}
 <div id="store-grid">
-    {% for section_title, section_items in [("Poké Balls", balls), ("Evolution Stones", others)] if section_items %}
+    {% for section_title, section_items in [("Poké Balls", balls), ("Evolution Stones", others), ("Key Items", key_items)] if section_items %}
     <section class="store-section">
         <h2 class="store-section-title">{{ section_title }}</h2>
         <div class="store-items">
@@ -28,10 +29,22 @@
                 <img src="{{ item.icon }}" alt="{{ item.label }}" loading="lazy">
                 <div class="dex-name">{{ item.label }}</div>
                 <div class="store-price">🪙 {{ "{:,}".format(item.price) }}</div>
+                {% if item.key_item %}
+                <p class="store-key-note muted">{% if item.key == "meteorite" %}Changes Deoxys' Forme. {% endif %}Key item — buy once, keep forever.</p>
+                <div class="store-buy-row">
+                    {% if item.owned %}
+                    <span class="store-owned">✓ Owned</span>
+                    {% else %}
+                    <input type="hidden" value="1" class="store-qty">
+                    <button class="btn-primary store-buy-btn">Buy</button>
+                    {% endif %}
+                </div>
+                {% else %}
                 <div class="store-buy-row">
                     <input type="number" min="1" value="1" class="store-qty" aria-label="Quantity">
                     <button class="btn-primary store-buy-btn">Buy</button>
                 </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>

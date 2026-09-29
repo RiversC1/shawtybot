@@ -46,6 +46,18 @@
         {% endfor %}
     </div>
 
+    {% if inventory.key_items %}
+    <div class="card bag-section">
+        <h2>Key Items</h2>
+        {% for item in inventory.key_items %}
+        <div class="item-row">
+            <span class="item-name"><img src="{{ item.icon }}" alt="" class="item-icon">{{ item.label }}</span>
+            <span class="item-qty muted">Key item</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="card bag-section">
         <h2>Evolution Candy</h2>
         {% for candy in inventory.family_candies %}

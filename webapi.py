@@ -155,6 +155,7 @@ STORE_ITEMS = {
     "greatball": {"label": "Great Ball", "price": 15},
     "ultraball": {"label": "Ultra Ball", "price": 35},
     "masterball": {"label": "Master Ball", "price": 10000},
+    "meteorite": {"label": "Meteorite", "price": 2500},
     "fire-stone": {"label": "Fire Stone", "price": 80},
     "water-stone": {"label": "Water Stone", "price": 80},
     "thunder-stone": {"label": "Thunder Stone", "price": 80},
@@ -926,12 +927,17 @@ def get_inventory(user_id: int = Depends(get_current_user_id)):
 
     raw = {row["item"]: row["qty"] for row in rows}
 
-    balls, stones = [], []
+    balls, stones, key_items = [], [], []
     for key, cfg in STORE_ITEMS.items():
-        if key not in raw:
+        if not raw.get(key):
             continue
         entry = {"key": key, "label": cfg["label"], "icon": item_icon(key), "qty": raw[key]}
-        (balls if key in BALL_KEYS else stones).append(entry)
+        if key in BALL_KEYS:
+            balls.append(entry)
+        elif key in battle_store.KEY_ITEMS:
+            key_items.append(entry)
+        else:
+            stones.append(entry)
 
     family_candies = []
     for key, qty in raw.items():
@@ -945,6 +951,7 @@ def get_inventory(user_id: int = Depends(get_current_user_id)):
     return {
         "balls": balls,
         "stones": stones,
+        "key_items": key_items,
         "coins": raw.get("coin", 0),
         "rare_candy": raw.get("candy", 0),
         "family_candies": family_candies,
@@ -959,9 +966,15 @@ def get_store(user_id: int = Depends(get_current_user_id)):
         coin_row = conn.execute(
             "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'coin'", (user_id,)
         ).fetchone()
+        owned_keys = {
+            r["item"] for r in conn.execute(
+                "SELECT item FROM poke_items WHERE user_id = ? AND qty > 0", (user_id,)
+            ) if r["item"] in battle_store.KEY_ITEMS
+        }
     return {
         "items": [
-            {"key": key, "label": cfg["label"], "price": cfg["price"], "icon": item_icon(key)}
+            {"key": key, "label": cfg["label"], "price": cfg["price"], "icon": item_icon(key),
+             "key_item": key in battle_store.KEY_ITEMS, "owned": key in owned_keys}
             for key, cfg in STORE_ITEMS.items()
         ],
         "coins": coin_row["qty"] if coin_row else 0,
@@ -981,9 +994,18 @@ def buy_item(body: BuyRequest, user_id: int = Depends(get_current_user_id)):
         raise HTTPException(400, "Quantity must be at least 1")
 
     item_cfg = STORE_ITEMS[body.item]
+    is_key_item = body.item in battle_store.KEY_ITEMS
+    if is_key_item and body.quantity != 1:
+        raise HTTPException(400, f"The {item_cfg['label']} is a key item — you only ever need one.")
     total_cost = item_cfg["price"] * body.quantity
 
     with db() as conn:
+        if is_key_item:
+            have = conn.execute(
+                "SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, body.item)
+            ).fetchone()
+            if have and have["qty"] > 0:
+                raise HTTPException(400, f"You already have the {item_cfg['label']} — it's a key item you keep forever.")
         coin_row = conn.execute(
             "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'coin'", (user_id,)
         ).fetchone()
@@ -1029,6 +1051,33 @@ def resolve_pokemon_config(conn: sqlite3.Connection, user_id: int, dex_id: int) 
         "abilities": [
             {"name": a["name"], "label": format_ability_name(a["name"])} for a in abilities
         ],
+        **resolve_forme(conn, user_id, dex_id),
+    }
+
+
+def resolve_forme(conn: sqlite3.Connection, user_id: int, dex_id: int) -> dict:
+    """Alternate-Forme info for species that have them (Deoxys): the Forme
+    it battles in (whose art/stats the team pages show) and the choices."""
+    forms = battle_store.forms_for(dex_id)
+    if not forms:
+        return {"forms": []}
+    current = battle_store.form_dex_id_sql(conn, user_id, dex_id)
+    item_key = battle_store.FORM_CHANGE_ITEMS[dex_id]
+    have = conn.execute(
+        "SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, item_key)
+    ).fetchone()
+    return {
+        "forms": [
+            {**f, "artwork": POKEDEX[f["dex_id"]]["artwork"], "base_stats": POKEDEX[f["dex_id"]]["base_stats"]}
+            for f in forms
+        ],
+        "form": next(f["key"] for f in forms if f["dex_id"] == current),
+        "form_label": next(f["label"] for f in forms if f["dex_id"] == current),
+        "artwork": POKEDEX[current]["artwork"],
+        "form_item": {
+            "key": item_key, "label": STORE_ITEMS[item_key]["label"], "price": STORE_ITEMS[item_key]["price"],
+            "icon": item_icon(item_key), "owned": bool(have and have["qty"] > 0),
+        },
     }
 
 
@@ -1065,13 +1114,41 @@ def get_pokemon_config(dex_id: int, user_id: int = Depends(get_current_user_id))
         if owned < 1:
             raise HTTPException(404, "You don't own this Pokémon")
         config = resolve_pokemon_config(conn, user_id, dex_id)
+        battle_mon = POKEDEX[battle_store.form_dex_id_sql(conn, user_id, dex_id)]
     ivs = battle_store.get_best_ivs_for_species(user_id, dex_id)
     return {
         "dex_id": dex_id,
         "name": mon["name"],
-        "base_stats": resolved_base_stats(mon, ivs),
+        "base_stats": resolved_base_stats(battle_mon, ivs),
         **config,
     }
+
+
+class FormeRequest(BaseModel):
+    form: str
+
+
+@app.post("/api/pokemon-config/{dex_id}/form")
+def set_pokemon_forme(dex_id: int, body: FormeRequest, user_id: int = Depends(get_current_user_id)):
+    forms = battle_store.forms_for(dex_id)
+    if not forms:
+        raise HTTPException(400, "This Pokémon doesn't have other Formes")
+    if body.form not in {f["key"] for f in forms}:
+        raise HTTPException(400, "Unknown Forme")
+    item_key = battle_store.FORM_CHANGE_ITEMS[dex_id]
+    with db() as conn:
+        owned = conn.execute(
+            "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+        ).fetchone()[0]
+        if owned < 1:
+            raise HTTPException(404, "You don't own this Pokémon")
+        have = conn.execute(
+            "SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, item_key)
+        ).fetchone()
+    if not have or have["qty"] < 1:
+        raise HTTPException(400, f"You need a {STORE_ITEMS[item_key]['label']} to change Formes — get one at the Store.")
+    battle_store.set_form(user_id, dex_id, body.form)
+    return {"ok": True}
 
 
 class PokemonConfigRequest(BaseModel):
@@ -1436,13 +1513,14 @@ def get_team(user_id: int = Depends(get_current_user_id)):
         for r in rows:
             dex_id = r["dex_id"]
             mon = POKEDEX.get(dex_id, {})
+            battle_mon = POKEDEX.get(battle_store.form_dex_id_sql(conn, user_id, dex_id), mon)
             ivs = battle_store.get_best_ivs_for_species(user_id, dex_id)
             result.append({
                 "dex_id": dex_id,
                 "name": mon.get("name", f"#{dex_id}"),
                 "artwork": mon.get("artwork"),
                 "types": mon.get("types", []),
-                "base_stats": resolved_base_stats(mon, ivs),
+                "base_stats": resolved_base_stats(battle_mon, ivs),
                 **resolve_pokemon_config(conn, user_id, dex_id),
             })
     return result

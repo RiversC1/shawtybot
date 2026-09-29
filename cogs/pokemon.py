@@ -181,6 +181,7 @@ STORE_ITEMS = {
     "greatball": {"label": "Great Ball", "price": 15},
     "ultraball": {"label": "Ultra Ball", "price": 35},
     "masterball": {"label": "Master Ball", "price": 10000},
+    "meteorite": {"label": "Meteorite", "price": 2500},
     "fire-stone": {"label": "Fire Stone", "price": 80},
     "water-stone": {"label": "Water Stone", "price": 80},
     "thunder-stone": {"label": "Thunder Stone", "price": 80},
@@ -330,7 +331,7 @@ def roll_spawn_mon(pokedex: dict[int, dict]) -> dict:
     """Pick a random species (legendaries/mythicals are much rarer) and roll
     whether this particular spawn is shiny. Returns a shallow copy so the
     shared pokedex entries are never mutated."""
-    population = [p for p in pokedex.values() if p["id"] not in REWARD_ONLY_DEX_IDS and not p.get("is_mega")]
+    population = [p for p in pokedex.values() if p["id"] not in REWARD_ONLY_DEX_IDS and not battle_store.is_alt_form_entry(p)]
     weights = [LEGENDARY_SPAWN_WEIGHT if is_rare(p) else 1.0 for p in population]
     base = random.choices(population, weights=weights, k=1)[0]
     mon = dict(base)
@@ -764,6 +765,13 @@ class QuantityModal(discord.ui.Modal):
             return
 
         item_cfg = STORE_ITEMS[self.item_key]
+        if self.item_key in battle_store.KEY_ITEMS:
+            if self.cog.get_item_qty(self.user_id, self.item_key) > 0:
+                await interaction.response.send_message(
+                    f"You already have the {item_cfg['label']} — it's a key item you keep forever.", ephemeral=True
+                )
+                return
+            qty = 1
         total_cost = item_cfg["price"] * qty
         balance = self.cog.get_coins(self.user_id)
 
@@ -1126,6 +1134,7 @@ class Pokemon(commands.Cog):
             if "ivs" not in cols:
                 conn.execute("ALTER TABLE poke_battle_sides ADD COLUMN ivs TEXT")
             battle_store.ensure_weather_columns(conn)
+            battle_store.ensure_form_column(conn)
             # The durable turn-by-turn event log — both the Discord embed and
             # the web spectate poll read from this.
             conn.execute("""
@@ -1259,6 +1268,13 @@ class Pokemon(commands.Cog):
         with sqlite3.connect(DB_PATH) as conn:
             row = conn.execute(
                 "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'candy'", (user_id,)
+            ).fetchone()
+        return row[0] if row else 0
+
+    def get_item_qty(self, user_id: int, item: str) -> int:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT qty FROM poke_items WHERE user_id = ? AND item = ?", (user_id, item)
             ).fetchone()
         return row[0] if row else 0
 
@@ -1826,7 +1842,7 @@ class Pokemon(commands.Cog):
         current = (current or "").lower()
         choices = []
         for mon in self.pokedex.values():
-            if mon.get("is_mega"):
+            if battle_store.is_alt_form_entry(mon):
                 continue
             if current and current not in mon["name"].lower():
                 continue
@@ -1905,6 +1921,43 @@ class Pokemon(commands.Cog):
                 lines.append(f"{name} Candy: {qty}")
 
         embed = discord.Embed(title="Your Bag", description="\n".join(lines), color=discord.Color.orange())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @poke.command(name="forme", description="Change your Deoxys' Forme (needs a Meteorite)")
+    @app_commands.describe(forme="The Forme your Deoxys battles in")
+    @app_commands.choices(forme=[
+        app_commands.Choice(name="Normal Forme", value="normal"),
+        app_commands.Choice(name="Attack Forme", value="attack"),
+        app_commands.Choice(name="Defense Forme", value="defense"),
+        app_commands.Choice(name="Speed Forme", value="speed"),
+    ])
+    async def poke_forme(self, interaction: discord.Interaction, forme: app_commands.Choice[str]):
+        dex_id = 386
+        item_key = battle_store.FORM_CHANGE_ITEMS[dex_id]
+        if not self.count_owned(interaction.user.id, dex_id):
+            await interaction.response.send_message("You don't have a Deoxys yet!", ephemeral=True)
+            return
+        if self.get_item_qty(interaction.user.id, item_key) < 1:
+            await interaction.response.send_message(
+                f"You need a **Meteorite** to change Deoxys' Forme — buy one with `/poke store` "
+                f"({STORE_ITEMS[item_key]['price']:,} {COIN_EMOJI}). It's a key item you keep forever.",
+                ephemeral=True,
+            )
+            return
+        option = next(f for f in battle_store.forms_for(dex_id) if f["key"] == forme.value)
+        battle_store.set_form(interaction.user.id, dex_id, forme.value)
+        mon = self.pokedex[option["dex_id"]]
+        stats = mon["base_stats"]
+        embed = discord.Embed(
+            title=f"Deoxys changed to its {option['label']}!",
+            description=(
+                "The Meteorite glows... Deoxys will battle in this Forme until you change it again.\n\n"
+                f"HP **{stats['hp']}** · Atk **{stats['attack']}** · Def **{stats['defense']}** · "
+                f"SpA **{stats['sp_attack']}** · SpD **{stats['sp_defense']}** · Spe **{stats['speed']}**"
+            ),
+            color=discord.Color.orange(),
+        )
+        embed.set_thumbnail(url=mon["artwork"])
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @poke.command(name="store", description="Spend your Poké Coins on balls and evolution stones")

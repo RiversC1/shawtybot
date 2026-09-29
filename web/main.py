@@ -546,6 +546,16 @@ async def proxy_set_pokemon_config(request: Request, dex_id: int):
     return JSONResponse(data, status_code=status)
 
 
+@app.post("/api/proxy/pokemon-config/{dex_id}/form")
+async def proxy_set_pokemon_forme(request: Request, dex_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, f"/api/pokemon-config/{dex_id}/form", body)
+    return JSONResponse(data, status_code=status)
+
+
 @app.get("/api/proxy/battles")
 async def proxy_list_battles(request: Request):
     session = request.cookies.get(SESSION_COOKIE)
