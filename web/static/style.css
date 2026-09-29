@@ -5534,3 +5534,103 @@ img[src$="/trainers/nowa.png"] {
     font-size: 0.75em;
     color: var(--text-muted);
 }
+
+/* ---------- Ability tooltips ---------- */
+
+.move-tooltip-note {
+    margin-top: 8px;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #3ddc70;
+}
+
+.move-tooltip-note.is-muted {
+    font-weight: normal;
+    color: var(--text-muted);
+}
+
+.ability-badge[tabindex] {
+    cursor: help;
+}
+
+/* ---------- Spectator cheers ---------- */
+
+.battle-cheer-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin-top: 12px;
+}
+
+.battle-cheer-label {
+    font-weight: bold;
+}
+
+.battle-cheer-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.battle-cheer-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.battle-cheer-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.battle-cheer-count {
+    min-width: 1.6em;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.battle-trainer-cheers {
+    margin-top: 6px;
+    font-size: 0.75em;
+    font-weight: bold;
+    color: #ffcf5c;
+}
+
+.battle-cheer-bubble {
+    position: absolute;
+    z-index: 8;
+    max-width: min(280px, 70%);
+    padding: 6px 12px;
+    border-radius: 14px;
+    background: rgba(255, 207, 92, 0.95);
+    color: #1a1406;
+    font-size: 0.85em;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+    animation: cheer-bubble 2.6s ease forwards;
+}
+
+@keyframes cheer-bubble {
+    0% { opacity: 0; transform: translateY(8px) scale(0.9); }
+    10% { opacity: 1; transform: translateY(0) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-10px); }
+}
+
+.battle-cheer-emoji {
+    position: absolute;
+    z-index: 8;
+    font-size: 1.4em;
+    pointer-events: none;
+    animation: cheer-emoji 1.7s ease-out forwards;
+}
+
+@keyframes cheer-emoji {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+    15% { opacity: 1; transform: translate(calc(var(--dx) * 0.2), -14px) scale(1.1); }
+    100% { opacity: 0; transform: translate(var(--dx), -90px) scale(0.9); }
+}

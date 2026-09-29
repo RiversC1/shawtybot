@@ -546,6 +546,16 @@ async def proxy_set_pokemon_config(request: Request, dex_id: int):
     return JSONResponse(data, status_code=status)
 
 
+@app.post("/api/proxy/battles/{battle_id}/cheer")
+async def proxy_cheer_battle(request: Request, battle_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Log in to cheer"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, f"/api/battles/{battle_id}/cheer", body)
+    return JSONResponse(data, status_code=status)
+
+
 @app.post("/api/proxy/pokemon-config/{dex_id}/item")
 async def proxy_set_pokemon_held_item(request: Request, dex_id: int):
     session = request.cookies.get(SESSION_COOKIE)

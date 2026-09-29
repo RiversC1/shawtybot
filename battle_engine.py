@@ -851,6 +851,12 @@ HAIL_IMMUNE_ABILITIES = {"ice-body", "snow-cloak", "overcoat"}
 WEATHER_BALL_TYPES = {"sun": "fire", "rain": "water", "sand": "rock", "hail": "ice"}
 SUN_HEAL_MOVES = {"Synthesis", "Morning Sun", "Moonlight"}
 
+# Every ability these battles actually simulate; the rest are flavor text for
+# now (the team page says which is which).
+BATTLE_ABILITIES = (set(WEATHER_ABILITIES) | WEATHER_NEGATING_ABILITIES | set(SPEED_DOUBLERS)
+                    | SAND_IMMUNE_ABILITIES | HAIL_IMMUNE_ABILITIES
+                    | {"rain-dish", "dry-skin", "hydration", "solar-power", "leaf-guard", "sand-force"})
+
 
 def ability_key(mon: BattlerState) -> str:
     return (mon.ability or "").strip().lower().replace(" ", "-").replace("_", "-")

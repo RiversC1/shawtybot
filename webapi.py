@@ -1046,6 +1046,19 @@ def buy_item(body: BuyRequest, user_id: int = Depends(get_current_user_id)):
 # species you own currently shares one loadout, since there's no battle
 # system yet to make per-individual loadouts matter.
 
+# Ability descriptions for the team page's tooltips (scripts/fetch_ability_data.py).
+with open(os.path.join(os.path.dirname(__file__), "data", "abilities.json"), encoding="utf-8") as _f:
+    ABILITY_DESCRIPTIONS: dict[str, str] = json.load(_f)
+
+
+def ability_info(name: str) -> dict:
+    return {
+        "name": name, "label": format_ability_name(name),
+        "description": ABILITY_DESCRIPTIONS.get(name),
+        "in_battle": name in be.BATTLE_ABILITIES,
+    }
+
+
 def resolve_pokemon_config(conn: sqlite3.Connection, user_id: int, dex_id: int) -> dict:
     mon = POKEDEX.get(dex_id, {})
     pool = mon.get("moves", [])
@@ -1067,9 +1080,8 @@ def resolve_pokemon_config(conn: sqlite3.Connection, user_id: int, dex_id: int) 
         "move_pool": pool,
         "ability": format_ability_name(ability_raw) if ability_raw else None,
         "ability_raw": ability_raw,
-        "abilities": [
-            {"name": a["name"], "label": format_ability_name(a["name"])} for a in abilities
-        ],
+        "abilities": [ability_info(a["name"]) for a in abilities],
+        "ability_info": ability_info(ability_raw) if ability_raw else None,
         **resolve_forme(conn, user_id, dex_id),
         **resolve_held_item(conn, user_id, dex_id),
     }
@@ -1812,6 +1824,20 @@ async def forfeit_battle(battle_id: int, user_id: int = Depends(get_current_user
         unlock_achievements_for_battle_winner(battle, battle_row)
     await battle_connections.broadcast(battle_id)
     return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
+
+
+class CheerRequest(BaseModel):
+    side: str
+
+
+@app.post("/api/battles/{battle_id}/cheer")
+async def cheer_battle(battle_id: int, body: CheerRequest, user_id: int = Depends(get_current_user_id)):
+    """A spectator cheers for side A or B; everyone watching sees it live."""
+    problem = await asyncio.to_thread(battle_store.add_cheer, battle_id, user_id, body.side)
+    if problem:
+        raise HTTPException(429 if "moment" in problem else 400, problem)
+    await battle_connections.broadcast(battle_id)
+    return {"ok": True}
 
 
 @app.websocket("/ws/battles/{battle_id}")

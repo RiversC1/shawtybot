@@ -1461,6 +1461,80 @@ def arena_type_for(battle_row: sqlite3.Row) -> str | None:
     return None
 
 
+# ---------- Spectator cheers ----------
+# Anyone watching a live battle they're not in can cheer for either side;
+# every viewer (players included) sees the cheers pop up live.
+CHEER_COOLDOWN_SECONDS = 2.0
+CHEER_RECENT_LIMIT = 15
+CHEERABLE_STATUSES = {"active", "awaiting_forced_switch"}
+_cheers_table_ready = False
+
+
+def ensure_cheers_table(conn: sqlite3.Connection):
+    global _cheers_table_ready
+    if _cheers_table_ready:
+        return
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS poke_battle_cheers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            battle_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            side TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_battle_cheers_battle ON poke_battle_cheers (battle_id, id)")
+    _cheers_table_ready = True
+
+
+def _is_participant(battle_row: sqlite3.Row, user_id: int | None) -> bool:
+    return user_id is not None and user_id in (battle_row["side_a_user_id"], battle_row["side_b_user_id"])
+
+
+def cheer_summary(conn: sqlite3.Connection, battle_row: sqlite3.Row, viewer_user_id: int | None) -> dict:
+    ensure_cheers_table(conn)
+    battle_id = battle_row["battle_id"]
+    counts = {"A": 0, "B": 0}
+    for side, n in conn.execute(
+            "SELECT side, COUNT(*) FROM poke_battle_cheers WHERE battle_id = ? GROUP BY side", (battle_id,)):
+        counts[side] = n
+    recent = [
+        {"id": r["id"], "side": r["side"], "name": trainer_display_name(conn, r["user_id"])}
+        for r in conn.execute(
+            "SELECT id, side, user_id FROM poke_battle_cheers WHERE battle_id = ? ORDER BY id DESC LIMIT ?",
+            (battle_id, CHEER_RECENT_LIMIT))
+    ]
+    return {
+        "A": counts["A"], "B": counts["B"], "recent": recent[::-1],
+        "can_cheer": (viewer_user_id is not None and not _is_participant(battle_row, viewer_user_id)
+                      and battle_row["status"] in CHEERABLE_STATUSES),
+    }
+
+
+def add_cheer(battle_id: int, user_id: int, side: str) -> str | None:
+    """Records a cheer; returns why it was refused, or None."""
+    if side not in ("A", "B"):
+        return "Pick a side to cheer for."
+    battle_row = get_battle_row(battle_id)
+    if not battle_row:
+        return "Battle not found."
+    if _is_participant(battle_row, user_id):
+        return "You can't cheer in your own battle — focus!"
+    if battle_row["status"] not in CHEERABLE_STATUSES:
+        return "This battle isn't live right now."
+    now = datetime.now(timezone.utc)
+    with db() as conn:
+        ensure_cheers_table(conn)
+        last = conn.execute(
+            "SELECT created_at FROM poke_battle_cheers WHERE battle_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1",
+            (battle_id, user_id)).fetchone()
+        if last and (now - datetime.fromisoformat(last[0])).total_seconds() < CHEER_COOLDOWN_SECONDS:
+            return "Catch your breath — you can cheer again in a moment."
+        conn.execute("INSERT INTO poke_battle_cheers (battle_id, user_id, side, created_at) VALUES (?, ?, ?, ?)",
+                     (battle_id, user_id, side, now.isoformat()))
+    return None
+
+
 def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -> dict | None:
     battle, battle_row = load_battle_state(battle_id)
     if not battle_row:
@@ -1476,6 +1550,7 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             "SELECT id, payload FROM poke_battle_events WHERE battle_id = ? ORDER BY turn_number DESC, seq DESC LIMIT 60",
             (battle_id,),
         ).fetchall()
+        cheers = cheer_summary(conn, battle_row, viewer_user_id)
 
     # Battle-scene sprite orientation: YOUR OWN side is always shown from
     # behind (as in the real games), the other side faces you. A spectator
@@ -1550,6 +1625,7 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
         "weather": be.current_weather(battle) if battle else None,
         "weather_raw": battle.weather if battle else None,
         "weather_turns": battle.weather_turns if battle else 0,
+        "cheers": cheers,
     }
     if viewer_user_id is not None:
         payload["you"] = get_viewer_info(battle, battle_row, viewer_user_id)

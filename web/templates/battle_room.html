@@ -66,6 +66,14 @@
 </div>
 
 <div class="card" id="br-action-panel" hidden></div>
+<div class="card battle-cheer-bar" id="br-cheer-bar" hidden>
+    <span class="battle-cheer-label">📣 You're spectating: cheer them on!</span>
+    <div class="battle-cheer-buttons">
+        <button type="button" class="btn-secondary battle-cheer-btn" data-side="A"></button>
+        <button type="button" class="btn-secondary battle-cheer-btn" data-side="B"></button>
+    </div>
+    <span class="battle-cheer-status muted" id="br-cheer-status" aria-live="polite"></span>
+</div>
 
 <h2 style="margin-top: 24px;">Battle Log</h2>
 <div class="battle-log" id="br-log"></div>

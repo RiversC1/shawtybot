@@ -92,6 +92,11 @@
     `;
 
     card.querySelector(".config-btn").addEventListener("click", () => openConfig(index));
+    const abilityBadge = card.querySelector(".ability-badge");
+    if (abilityBadge && mon.ability_info) {
+      abilityBadge.tabIndex = 0;
+      window.MoveTooltip.attachInfo(abilityBadge, window.MoveTooltip.abilityInfo(mon.ability_info));
+    }
     card.querySelector(".remove-btn").addEventListener("click", () => {
       teamState[index] = null;
       render();
@@ -292,6 +297,7 @@
           held_item: cfg.held_item || null, held_item_options: cfg.held_item_options || [],
           base_stats: cfg.base_stats || [], moves: cfg.moves || [], move_pool: cfg.move_pool || [],
           ability: cfg.ability || null, ability_raw: cfg.ability_raw || null, abilities: cfg.abilities || [],
+          ability_info: cfg.ability_info || null,
         };
         closePicker();
         render();
@@ -346,8 +352,10 @@
     for (const ability of mon.abilities || []) {
       const item = document.createElement("div");
       item.className = "picker-item";
+      item.tabIndex = 0;
       if (ability.name === configSelectedAbility) item.classList.add("selected");
       item.innerHTML = `<div>${ability.label}</div>`;
+      window.MoveTooltip.attachInfo(item, window.MoveTooltip.abilityInfo(ability));
       item.addEventListener("click", () => {
         configSelectedAbility = ability.name;
         for (const child of configAbilities.children) child.classList.remove("selected");
@@ -430,7 +438,10 @@
     card.classList.add("selected");
   }
 
-  configClose.addEventListener("click", () => (configModal.hidden = true));
+  configClose.addEventListener("click", () => {
+    configModal.hidden = true;
+    window.MoveTooltip.hide();
+  });
   configModal.addEventListener("click", (e) => {
     if (e.target === configModal) configModal.hidden = true;
   });
@@ -478,6 +489,7 @@
     const cfg = cfgRes.ok ? await cfgRes.json() : {};
     teamState[configSlot] = { ...mon, ...cfg };
     configModal.hidden = true;
+    window.MoveTooltip.hide();
     render();
   });
 

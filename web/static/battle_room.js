@@ -424,7 +424,7 @@
     return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   }
 
-  function renderTrainerPanel(panelEl, name, avatar, roster, isWinner) {
+  function renderTrainerPanel(panelEl, name, avatar, roster, isWinner, cheers) {
     name = esc(name);
     const avatarHtml = avatar ? `<img class="battle-trainer-portrait" src="${avatar}" alt="${name}">` : "";
     const rosterStrip = (roster || [])
@@ -438,6 +438,7 @@
         ${avatarHtml}
         <div class="battle-trainer-name">${name}</div>
         <div class="battle-roster-strip">${rosterStrip}</div>
+        ${cheers ? `<div class="battle-trainer-cheers" title="Cheers from spectators">📣 ${cheers}</div>` : ""}
     `;
   }
 
@@ -907,8 +908,9 @@
   }
 
   function renderFrame(animA, animB) {
-    renderTrainerPanel(trainerPanelA, truth.name_a, truth.avatar_a, truth.roster_a, truth.winner_side === "A");
-    renderTrainerPanel(trainerPanelB, truth.name_b, truth.avatar_b, truth.roster_b, truth.winner_side === "B");
+    const cheers = truth.cheers || {};
+    renderTrainerPanel(trainerPanelA, truth.name_a, truth.avatar_a, truth.roster_a, truth.winner_side === "A", cheers.A);
+    renderTrainerPanel(trainerPanelB, truth.name_b, truth.avatar_b, truth.roster_b, truth.winner_side === "B", cheers.B);
     renderHpLabel(hpLabelA, visibleA, truth.winner_side === "A");
     renderHpLabel(hpLabelB, visibleB, truth.winner_side === "B");
     renderSprite(spriteA, visibleA, animA);
@@ -1130,7 +1132,106 @@
     syncMusicAndResult();
   }
 
+  // ---------- Spectator cheers ----------
+  const cheerBar = document.getElementById("br-cheer-bar");
+  const cheerStatus = document.getElementById("br-cheer-status");
+  const CHEER_LINES = ["Go, go, {t}!", "You got this, {t}!", "Let's goooo {t}!", "{t} for the win!", "Come on, {t}!", "Show 'em, {t}!"];
+  const CHEER_EMOJIS = ["📣", "🎉", "👏", "🔥", "⭐", "💪"];
+  let lastCheerId = Math.max(0, ...((truth.cheers && truth.cheers.recent) || []).map((c) => c.id));
+  let cheerCooldownUntil = 0;
+
+  // New cheers since the last update pop up by the cheered trainer's panel,
+  // whether or not a turn is mid-animation.
+  function handleCheers(battle) {
+    const recent = (battle.cheers && battle.cheers.recent) || [];
+    for (const c of recent) {
+      if (c.id <= lastCheerId) continue;
+      lastCheerId = c.id;
+      showCheer(c);
+    }
+    renderCheerBar(battle);
+    const cheers = battle.cheers || {};
+    const countA = trainerPanelA.querySelector(".battle-trainer-cheers");
+    const countB = trainerPanelB.querySelector(".battle-trainer-cheers");
+    if (playing) {
+      // renderFrame will redraw the panels at the next step; update the
+      // counters now so they don't lag behind a long animation.
+      if (countA && cheers.A) countA.textContent = `📣 ${cheers.A}`;
+      if (countB && cheers.B) countB.textContent = `📣 ${cheers.B}`;
+    }
+  }
+
+  function showCheer(c) {
+    const panel = c.side === "A" ? trainerPanelA : trainerPanelB;
+    const trainer = c.side === "A" ? truth.name_a : truth.name_b;
+    const line = CHEER_LINES[c.id % CHEER_LINES.length].replace("{t}", trainer);
+    const bubble = document.createElement("div");
+    bubble.className = `battle-cheer-bubble is-${c.side === "A" ? "a" : "b"}`;
+    bubble.innerHTML = `<strong>${esc(c.name)}</strong>: ${esc(line)}`;
+    sceneEl.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 2600);
+    // Just above your side's panel (bottom-left), just below the foe's (top-right).
+    const pr = panel.getBoundingClientRect();
+    const sr = sceneEl.getBoundingClientRect();
+    if (c.side === "A") {
+      bubble.style.left = `${Math.max(8, pr.left - sr.left)}px`;
+      bubble.style.bottom = `${sr.bottom - pr.top + 8}px`;
+    } else {
+      bubble.style.right = `${Math.max(8, sr.right - pr.right)}px`;
+      bubble.style.top = `${pr.bottom - sr.top + 8}px`;
+    }
+    if (BattleFX.kit.reduceMotion) return;
+    for (let i = 0; i < 6; i++) {
+      const e = document.createElement("span");
+      e.className = "battle-cheer-emoji";
+      e.textContent = CHEER_EMOJIS[(c.id + i) % CHEER_EMOJIS.length];
+      e.style.left = `${pr.left - sr.left + pr.width * (0.15 + Math.random() * 0.7)}px`;
+      e.style.top = `${pr.top - sr.top + pr.height * 0.4}px`;
+      e.style.setProperty("--dx", `${(Math.random() - 0.5) * 60}px`);
+      e.style.animationDelay = `${i * 70}ms`;
+      sceneEl.appendChild(e);
+      setTimeout(() => e.remove(), 1800 + i * 70);
+    }
+  }
+
+  function renderCheerBar(battle) {
+    const cheers = battle.cheers || {};
+    cheerBar.hidden = !cheers.can_cheer;
+    if (!cheers.can_cheer) return;
+    for (const btn of cheerBar.querySelectorAll(".battle-cheer-btn")) {
+      const side = btn.dataset.side;
+      const name = side === "A" ? battle.name_a : battle.name_b;
+      btn.innerHTML = `📣 Cheer for <strong>${esc(name)}</strong> <span class="battle-cheer-count">${cheers[side] || 0}</span>`;
+      btn.disabled = Date.now() < cheerCooldownUntil;
+    }
+  }
+
+  cheerBar.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".battle-cheer-btn");
+    if (!btn || btn.disabled) return;
+    cheerCooldownUntil = Date.now() + 2100;
+    for (const b of cheerBar.querySelectorAll(".battle-cheer-btn")) b.disabled = true;
+    setTimeout(() => renderCheerBar(truth), 2150);
+    cheerStatus.textContent = "";
+    try {
+      const res = await fetch(`/api/proxy/battles/${window.BATTLE_ID}/cheer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ side: btn.dataset.side }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        cheerStatus.textContent = data.detail || "Couldn't cheer right now.";
+      } else if (!usingWs) {
+        poll();
+      }
+    } catch (err) {
+      cheerStatus.textContent = "Couldn't cheer right now.";
+    }
+  });
+
   function applyUpdate(battle) {
+    handleCheers(battle);
     truth = battle;
     const newEvents = unseenEvents(battle.events);
     markAnimated(battle.events);
@@ -1261,6 +1362,7 @@
     renderActionPanel(truth);
     syncMusicAndResult();
   }
+  renderCheerBar(truth);
 
   if (truth.status !== "finished" && truth.status !== "abandoned") {
     connectWs();

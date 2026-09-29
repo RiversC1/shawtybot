@@ -145,5 +145,42 @@ window.MoveTooltip = (function () {
     cardEl.addEventListener("mouseleave", hide);
   }
 
-  return { attach, hide };
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+
+  // A simple titled tooltip (abilities, items): { title, kicker, description, note }.
+  function showInfo(info, anchorEl) {
+    const tip = ensure();
+    tip.innerHTML = `
+      <div class="move-tooltip-header">${esc(info.title)}</div>
+      ${info.kicker ? `<div class="move-tooltip-label">${esc(info.kicker)}</div>` : ""}
+      <div class="move-tooltip-desc">${esc(info.description || "No description available.")}</div>
+      ${info.note ? `<div class="move-tooltip-note${info.noteMuted ? " is-muted" : ""}">${esc(info.note)}</div>` : ""}
+    `;
+    tip.hidden = false;
+    position(anchorEl);
+    watchAnchor(anchorEl);
+  }
+
+  function attachInfo(el, info) {
+    if (!info) return;
+    el.removeAttribute("title");
+    el.addEventListener("mouseenter", () => showInfo(info, el));
+    el.addEventListener("mouseleave", hide);
+    el.addEventListener("focus", () => showInfo(info, el));
+    el.addEventListener("blur", hide);
+  }
+
+  // Tooltip content for an ability from the API's ability_info shape.
+  function abilityInfo(a) {
+    if (!a) return null;
+    return {
+      title: a.label, kicker: "Ability", description: a.description,
+      note: a.in_battle ? "✓ Active in battles" : "Its battle effect isn't simulated yet",
+      noteMuted: !a.in_battle,
+    };
+  }
+
+  return { attach, attachInfo, abilityInfo, hide };
 })();
