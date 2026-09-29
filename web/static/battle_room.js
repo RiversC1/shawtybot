@@ -907,12 +907,32 @@
     resultEl.hidden = false;
   }
 
+  // `truth` is already the end-of-turn state while a turn is still being
+  // played back, so anything drawn from it directly would spoil the outcome.
+  // The winner highlight waits until the battle_end event has played, and
+  // the roster strip only shows faints / the active Pokémon as of playback.
+  function shownWinner() {
+    return revealed.some((e) => e.type === "battle_end") ? truth.winner_side : null;
+  }
+
+  function rosterAsShown(roster, side, visibleMon) {
+    const unplayedFaints = new Set(
+      pendingEvents.filter((e) => e.type === "faint" && e.side === side).map((e) => e.dex_id)
+    );
+    return (roster || []).map((m) => ({
+      ...m,
+      is_fainted: m.is_fainted && !unplayedFaints.has(m.dex_id),
+      is_active: visibleMon ? m.dex_id === visibleMon.dex_id : m.is_active,
+    }));
+  }
+
   function renderFrame(animA, animB) {
     const cheers = truth.cheers || {};
-    renderTrainerPanel(trainerPanelA, truth.name_a, truth.avatar_a, truth.roster_a, truth.winner_side === "A", cheers.A);
-    renderTrainerPanel(trainerPanelB, truth.name_b, truth.avatar_b, truth.roster_b, truth.winner_side === "B", cheers.B);
-    renderHpLabel(hpLabelA, visibleA, truth.winner_side === "A");
-    renderHpLabel(hpLabelB, visibleB, truth.winner_side === "B");
+    const winner = shownWinner();
+    renderTrainerPanel(trainerPanelA, truth.name_a, truth.avatar_a, rosterAsShown(truth.roster_a, "A", visibleA), winner === "A", cheers.A);
+    renderTrainerPanel(trainerPanelB, truth.name_b, truth.avatar_b, rosterAsShown(truth.roster_b, "B", visibleB), winner === "B", cheers.B);
+    renderHpLabel(hpLabelA, visibleA, winner === "A");
+    renderHpLabel(hpLabelB, visibleB, winner === "B");
     renderSprite(spriteA, visibleA, animA);
     renderSprite(spriteB, visibleB, animB);
     renderWeather();
