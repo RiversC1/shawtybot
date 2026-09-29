@@ -1452,6 +1452,8 @@ def get_team(user_id: int = Depends(get_current_user_id)):
 def set_team(body: TeamRequest, user_id: int = Depends(get_current_user_id)):
     if len(body.dex_ids) > 6:
         raise HTTPException(400, "A team can have at most 6 Pokémon")
+    if len(set(body.dex_ids)) != len(body.dex_ids):
+        raise HTTPException(400, "Each Pokémon can only be on your team once")
 
     with db() as conn:
         for dex_id in body.dex_ids:

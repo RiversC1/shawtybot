@@ -255,14 +255,24 @@
       pickerGrid.innerHTML = "<p class='muted'>You haven't caught any Pokémon yet!</p>";
       return;
     }
+    // A species can only be on the team once; the slot being replaced doesn't count.
+    const taken = new Set(teamState.filter((m, i) => m && i !== activeSlot).map((m) => m.dex_id));
     for (const mon of species) {
       const item = document.createElement("div");
       const mainType = (mon.types && mon.types[0]) || "normal";
-      item.className = `picker-item team-picker-item tint-${mainType}`;
+      const onTeam = taken.has(mon.dex_id);
+      item.className = `picker-item team-picker-item tint-${mainType}${onTeam ? " is-on-team" : ""}`;
       item.innerHTML = `
         <img src="${mon.artwork}" alt="${mon.name}" loading="lazy">
         <div class="team-picker-name">${mon.name}${mon.has_shiny ? " ✨" : ""}</div>
-        <div class="team-picker-types">${typeBadges(mon.types)}</div>`;
+        <div class="team-picker-types">${typeBadges(mon.types)}</div>
+        ${onTeam ? '<div class="team-picker-onteam">On team</div>' : ""}`;
+      if (onTeam) {
+        item.setAttribute("aria-disabled", "true");
+        item.title = `${mon.name} is already on your team`;
+        pickerGrid.appendChild(item);
+        continue;
+      }
       item.addEventListener("click", async () => {
         // Fetch the full enriched config (moves/stats/ability) for this species
         // so the new card renders identically to one loaded from /api/team.

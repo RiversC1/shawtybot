@@ -134,7 +134,9 @@ def db() -> sqlite3.Connection:
 def get_team(user_id: int) -> list[int]:
     with db() as conn:
         rows = conn.execute("SELECT dex_id FROM poke_team WHERE user_id = ? ORDER BY slot", (user_id,)).fetchall()
-    return [r["dex_id"] for r in rows]
+    # Teams saved before duplicates were rejected may repeat a species; battle
+    # with the first copy only.
+    return list(dict.fromkeys(r["dex_id"] for r in rows))
 
 
 def get_battle_pokemon_config(user_id: int, dex_id: int) -> tuple[list[str], str | None]:

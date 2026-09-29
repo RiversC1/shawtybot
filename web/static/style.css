@@ -4225,6 +4225,26 @@ body.lineup-dragging * {
     font-size: 0.72em;
 }
 
+.team-picker-item.is-on-team {
+    cursor: not-allowed;
+    opacity: 0.45;
+    filter: grayscale(0.7);
+}
+
+.team-picker-item.is-on-team:hover {
+    border-color: color-mix(in srgb, var(--t) 30%, transparent);
+    transform: none;
+    box-shadow: none;
+}
+
+.team-picker-onteam {
+    font-size: 0.72em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #ffcf5c;
+}
+
 .team-picker-item.tint-normal { --t: #A8A878; } .team-picker-item.tint-fire { --t: #F08030; }
 .team-picker-item.tint-water { --t: #6890F0; } .team-picker-item.tint-grass { --t: #78C850; }
 .team-picker-item.tint-electric { --t: #F8D030; } .team-picker-item.tint-ice { --t: #98D8D8; }
