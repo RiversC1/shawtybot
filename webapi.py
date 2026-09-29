@@ -1479,6 +1479,9 @@ def get_collection_detail(catch_id: int, user_id: int = Depends(get_current_user
         "base_stats": resolved_base_stats(mon, ivs),
         "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
         "evolution": evolution,
+        "transfer_candy": transfer_candy_for(row["dex_id"], bool(row["is_shiny"])),
+        "family_name": POKEDEX.get(mon.get("family_id", row["dex_id"]), mon)["name"],
+        "can_transfer": not battle_store.is_mega(row["dex_id"]) and row["dex_id"] not in REWARD_ONLY_DEX_IDS,
         **config,
     }
 
@@ -1498,6 +1501,95 @@ def set_nickname(catch_id: int, body: NicknameRequest, user_id: int = Depends(ge
             raise HTTPException(404, "Pokémon not found")
         conn.execute("UPDATE poke_collection SET nickname = ? WHERE id = ?", (nickname, catch_id))
     return {"ok": True, "nickname": nickname}
+
+
+# ---------- Transferring Pokémon for candy ----------
+# Send away Pokémon you don't want (e.g. duplicates) for their family's
+# candy. Your Pokédex keeps the species registered either way.
+TRANSFER_CANDY_BASE = 3
+TRANSFER_CANDY_EVOLVED = 5  # anything past its family's first stage
+TRANSFER_SHINY_MULTIPLIER = 2
+TRANSFER_MAX_PER_REQUEST = 200
+
+
+def transfer_candy_for(dex_id: int, is_shiny: bool) -> int:
+    mon = POKEDEX.get(dex_id, {})
+    base = TRANSFER_CANDY_EVOLVED if mon.get("family_id", dex_id) != dex_id else TRANSFER_CANDY_BASE
+    return base * (TRANSFER_SHINY_MULTIPLIER if is_shiny else 1)
+
+
+class TransferRequest(BaseModel):
+    catch_ids: list[int]
+
+
+@app.post("/api/collection/transfer")
+def transfer_pokemon(body: TransferRequest, user_id: int = Depends(get_current_user_id)):
+    ids = list(dict.fromkeys(body.catch_ids))
+    if not ids:
+        raise HTTPException(400, "Pick at least one Pokémon to transfer")
+    if len(ids) > TRANSFER_MAX_PER_REQUEST:
+        raise HTTPException(400, f"You can transfer up to {TRANSFER_MAX_PER_REQUEST} at a time")
+    marks = ",".join("?" * len(ids))
+    with db() as conn:
+        rows = conn.execute(
+            f"SELECT id, dex_id, is_shiny, nickname FROM poke_collection WHERE user_id = ? AND id IN ({marks})",
+            (user_id, *ids),
+        ).fetchall()
+        if len(rows) != len(ids):
+            raise HTTPException(404, "Some of those Pokémon aren't in your collection")
+        name = lambda r: r["nickname"] or POKEDEX.get(r["dex_id"], {}).get("name", f"#{r['dex_id']}")  # noqa: E731
+
+        for r in rows:
+            if battle_store.is_mega(r["dex_id"]) or r["dex_id"] in REWARD_ONLY_DEX_IDS:
+                raise HTTPException(400, f"{name(r)} is a special reward and can't be transferred")
+        traded = {x[0] for x in conn.execute(
+            f"SELECT side_a_catch_id FROM poke_trades WHERE status IN ('pending', 'active') AND side_a_catch_id IN ({marks}) "
+            f"UNION SELECT side_b_catch_id FROM poke_trades WHERE status IN ('pending', 'active') AND side_b_catch_id IN ({marks})",
+            (*ids, *ids))}
+        for r in rows:
+            if r["id"] in traded:
+                raise HTTPException(400, f"{name(r)} is offered in an open trade — cancel that first")
+
+        # Species you'd have none left of can't be on your team or your favorite.
+        removing: dict[int, int] = {}
+        for r in rows:
+            removing[r["dex_id"]] = removing.get(r["dex_id"], 0) + 1
+        team = {x[0] for x in conn.execute("SELECT dex_id FROM poke_team WHERE user_id = ?", (user_id,))}
+        fav = conn.execute("SELECT favorite_dex_id FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
+        fav = fav[0] if fav else None
+        emptied = []
+        for dex_id, n in removing.items():
+            owned = conn.execute(
+                "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND dex_id = ?", (user_id, dex_id)
+            ).fetchone()[0]
+            if owned - n > 0:
+                continue
+            species = POKEDEX.get(dex_id, {}).get("name", f"#{dex_id}")
+            if dex_id in team:
+                raise HTTPException(400, f"That's your last {species} and it's on your team — take it off your team first")
+            if dex_id == fav:
+                raise HTTPException(400, f"That's your last {species} and it's your favorite — change your favorite first")
+            emptied.append(dex_id)
+
+        candy: dict[int, int] = {}
+        for r in rows:
+            family_id = POKEDEX.get(r["dex_id"], {}).get("family_id", r["dex_id"])
+            candy[family_id] = candy.get(family_id, 0) + transfer_candy_for(r["dex_id"], bool(r["is_shiny"]))
+        conn.execute(f"DELETE FROM poke_collection WHERE user_id = ? AND id IN ({marks})", (user_id, *ids))
+        for family_id, qty in candy.items():
+            add_item_sql(conn, user_id, f"famcandy_{family_id}", qty)
+        if emptied:
+            # A held item on a species you no longer own goes back in the bag.
+            battle_store.ensure_form_column(conn)
+            conn.execute(
+                f"UPDATE poke_pokemon_config SET held_item = NULL WHERE user_id = ? AND dex_id IN ({','.join('?' * len(emptied))})",
+                (user_id, *emptied),
+            )
+    return {
+        "ok": True,
+        "transferred": len(rows),
+        "candy": [{"family": POKEDEX.get(f, {}).get("name", f"#{f}"), "qty": q} for f, q in candy.items()],
+    }
 
 
 class ConvertCandyRequest(BaseModel):

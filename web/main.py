@@ -488,6 +488,16 @@ async def proxy_collection_detail(request: Request, catch_id: int):
     return JSONResponse(data, status_code=status)
 
 
+@app.post("/api/proxy/collection/transfer")
+async def proxy_transfer_pokemon(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    body = await request.json()
+    status, data = await api_post(session, "/api/collection/transfer", body)
+    return JSONResponse(data, status_code=status)
+
+
 @app.post("/api/proxy/collection/{catch_id}/nickname")
 async def proxy_set_nickname(request: Request, catch_id: int):
     session = request.cookies.get(SESSION_COOKIE)

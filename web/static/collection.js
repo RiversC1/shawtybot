@@ -122,6 +122,16 @@
                 <button id="cm-nickname-save" class="btn-primary">Save</button>
             </div>
             <p id="cm-status" class="muted"></p>
+            ${mon.can_transfer ? `
+            <div class="transfer-box">
+                <div class="section-label">Transfer</div>
+                <p class="muted">Send Pokémon you don't need away for <strong>${mon.family_name} Candy</strong> (3 each, 5 if evolved, double for shinies). Your Pokédex keeps them registered.</p>
+                <div class="collection-actions">
+                    <button id="cm-transfer" class="btn-danger-outline">Transfer this one · +${mon.transfer_candy} 🍬</button>
+                    ${mon.count > 1 ? `<button id="cm-transfer-dupes" class="btn-secondary">Transfer duplicates…</button>` : ""}
+                </div>
+                <div id="cm-transfer-confirm" class="transfer-confirm" hidden></div>
+            </div>` : ""}
         `;
 
     body.querySelectorAll(".move-grid .move-card").forEach((cell, i) => {
@@ -130,6 +140,7 @@
 
     const evoBtn = document.getElementById("cm-view-evolution");
     if (evoBtn) evoBtn.addEventListener("click", () => openEvolution(catchId));
+    setupTransfer(mon, catchId);
 
     document.getElementById("cm-add-team").addEventListener("click", async () => {
       const status = document.getElementById("cm-status");
@@ -175,6 +186,87 @@
       status.textContent = "Nickname saved! Refresh the page to see it everywhere.";
       title.textContent = nickname || mon.name;
     });
+  }
+
+  // ---------- Transfer ----------
+
+  function setupTransfer(mon, rawCatchId) {
+    const catchId = Number(rawCatchId);
+    const single = document.getElementById("cm-transfer");
+    if (!single) return;
+    const dupes = document.getElementById("cm-transfer-dupes");
+    const confirmBox = document.getElementById("cm-transfer-confirm");
+    const label = mon.nickname || mon.name;
+
+    function ask(html, ids) {
+      confirmBox.innerHTML = `${html}
+        <div class="collection-actions">
+          <button class="btn-danger" data-act="yes">Yes, transfer</button>
+          <button class="btn-secondary" data-act="no">Cancel</button>
+        </div>`;
+      confirmBox.hidden = false;
+      confirmBox.querySelector('[data-act="no"]').addEventListener("click", () => (confirmBox.hidden = true));
+      confirmBox.querySelector('[data-act="yes"]').addEventListener("click", () => doTransfer(ids));
+    }
+
+    single.addEventListener("click", () => {
+      ask(`<p>Transfer <strong>${label}</strong>${mon.is_shiny ? " ✨" : ""} (IV ${mon.iv_percent}%) for <strong>${mon.transfer_candy} ${mon.family_name} Candy</strong>? This can't be undone.</p>`, [catchId]);
+    });
+
+    if (dupes) {
+      dupes.addEventListener("click", async () => {
+        const res = await fetch(`/api/proxy/collection/by-species/${mon.dex_id}`);
+        const all = res.ok ? await res.json() : [];
+        // Keep the best-IV one, plus any shiny or nicknamed ones (transfer
+        // those individually if you really mean to).
+        const best = all.reduce((a, b) => (b.iv_percent > a.iv_percent ? b : a), all[0]);
+        const extras = all.filter((m) => m.id !== best.id && !m.is_shiny && !m.nickname);
+        if (!extras.length) {
+          ask(`<p>Nothing to clear: besides your best ${mon.name} (IV ${best.iv_percent}%), the rest are shiny or nicknamed. Transfer those one at a time if you want.</p>`, []);
+          confirmBox.querySelector('[data-act="yes"]').hidden = true;
+          return;
+        }
+        const candy = extras.length * mon.transfer_candy / (mon.is_shiny ? 2 : 1);
+        ask(`<p>Transfer <strong>${extras.length}</strong> extra ${mon.name} (IV ${extras.map((m) => m.iv_percent + "%").join(", ")}) for <strong>${candy} ${mon.family_name} Candy</strong>?</p>
+             <p class="muted">You keep your best one (IV ${best.iv_percent}%)${all.length - 1 - extras.length ? " and your shiny / nicknamed ones" : ""}. This can't be undone.</p>`,
+            extras.map((m) => m.id));
+      });
+    }
+
+    async function doTransfer(ids) {
+      const status = document.getElementById("cm-status");
+      const res = await fetch("/api/proxy/collection/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ catch_ids: ids }),
+      });
+      const data = await res.json();
+      confirmBox.hidden = true;
+      if (!res.ok) {
+        status.classList.add("error");
+        status.textContent = data.detail || "Couldn't transfer.";
+        return;
+      }
+      for (const id of ids) {
+        const card = document.getElementById("collection-grid").querySelector(`.collection-card[data-id="${id}"]`);
+        if (card) card.remove();
+      }
+      const got = data.candy.map((c) => `${c.qty} ${c.family} Candy`).join(", ");
+      showToast(`Transferred ${data.transferred} Pokémon · +${got} 🍬`);
+      if (ids.includes(catchId)) {
+        modal.hidden = true;
+      } else {
+        openDetail(catchId);
+      }
+    }
+  }
+
+  function showToast(text) {
+    const t = document.createElement("div");
+    t.className = "collection-toast";
+    t.textContent = text;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
   }
 
   // ---------- Evolution modal ----------
