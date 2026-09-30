@@ -515,6 +515,8 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
         side_b.mega_forms = {b.dex_id: MEGA_BY_BASE[b.dex_id] for b in roster_b if b.dex_id in MEGA_BY_BASE}
     elif battle_row["battle_type"] == LEGEND_BATTLE_TYPE and battle_row["side_b_npc_key"] in LEGENDS:
         side_b.mega_forms = legend_mega_forms(battle_row["side_b_npc_key"])
+    elif battle_row["battle_type"] == CUSTOM_GYM_BATTLE_TYPE and _custom_gym_owner(battle_row):
+        side_b.mega_forms = custom_gym_mega_forms(_custom_gym_owner(battle_row), {b.dex_id for b in roster_b})
     forced = battle_row["forced_switch_side"].split(",") if battle_row["forced_switch_side"] else []
     battle = be.BattleState(
         battle_id=battle_id, side_a=side_a, side_b=side_b,
@@ -1137,6 +1139,20 @@ def snapshot_custom_gym_roster(owner_user_id: int, dex_ids: list[int]) -> list[d
     return roster
 
 
+def custom_gym_mega_forms(owner_user_id: int, dex_ids) -> dict[int, dict]:
+    """base dex_id -> Mega, for each of the gym's Pokémon whose Mega the
+    owner owns: those Mega Evolve mid-battle, like a Champion's."""
+    with db() as conn:
+        owned = {r[0] for r in conn.execute(
+            "SELECT DISTINCT dex_id FROM poke_collection WHERE user_id = ?", (owner_user_id,))}
+    forms: dict[int, dict] = {}
+    for mega_id in sorted(owned):
+        mega = POKEDEX.get(mega_id, {})
+        if mega.get("is_mega") and mega.get("mega_of") in dex_ids:
+            forms.setdefault(mega["mega_of"], mega)
+    return forms
+
+
 def build_roster_for_custom_gym(owner_user_id: int) -> list["be.BattlerState"] | None:
     gym = get_custom_gym(owner_user_id)
     if not gym:
@@ -1385,10 +1401,11 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
 # NPC difficulty tiers. Random trainers: the loose weighted-random AI, no
 # items. Gym leaders: "medium" (the League AI most turns, the loose pick the
 # rest, and smart replacements after a faint) with 1-2 held items. Elite Four
-# / Champions: the full League AI and items on the whole team (see
-# build_roster_for_gym and build_roster_for_league).
-HARD_AI_BATTLE_TYPES = {"elite_four", "champion", "legend"}
-MEDIUM_AI_BATTLE_TYPES = {"gym", "custom_gym"}
+# / Champions / Legends, and player-made gyms: the full League AI (see
+# build_roster_for_gym, build_roster_for_league, build_roster_for_legend;
+# a custom gym fields its owner's own team and items).
+HARD_AI_BATTLE_TYPES = {"elite_four", "champion", "legend", "custom_gym"}
+MEDIUM_AI_BATTLE_TYPES = {"gym"}
 
 
 def npc_pick_action(battle: "be.BattleState", side_id: str, battle_row: sqlite3.Row) -> "be.Action":
@@ -1766,7 +1783,7 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
         name = mon.get("name", f"#{r['dex_id']}")
         sprite_front, sprite_back = animated_sprite_urls(name)
         pre_mega = None
-        if mon.get("is_mega") and _row_get(battle_row, "battle_type") in ("champion", LEGEND_BATTLE_TYPE):
+        if mon.get("is_mega") and _row_get(battle_row, "battle_type") in ("champion", LEGEND_BATTLE_TYPE, CUSTOM_GYM_BATTLE_TYPE):
             # How it looked before Mega Evolving, so a replayed turn can show
             # the base form until the Mega Evolution event plays.
             base = POKEDEX.get(mon.get("mega_of"), {})

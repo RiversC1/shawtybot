@@ -2326,6 +2326,7 @@ def get_custom_gym_detail(owner_id: int, user_id: int = Depends(get_current_user
     with db() as conn:
         names = _trainer_names(conn)
     summary = _custom_gym_summary(gym, user_id, earned, battle_store.custom_gym_clear_counts(), names)
+    megas = battle_store.custom_gym_mega_forms(owner_id, {m["dex_id"] for m in gym["roster"]})
     roster = []
     for entry in gym["roster"]:
         mon = POKEDEX.get(entry["dex_id"], {})
@@ -2336,6 +2337,7 @@ def get_custom_gym_detail(owner_id: int, user_id: int = Depends(get_current_user
             "types": mon.get("types", []),
             "moves": entry["moves"],
             "ability": format_ability_name(entry["ability"]) if entry.get("ability") else None,
+            "mega": megas[entry["dex_id"]]["name"] if entry["dex_id"] in megas else None,
         })
     return {**summary, "badge_design": gym["badge_design"], "roster": roster,
             "cleared_by": battle_store.get_custom_gym_clearers(owner_id)}

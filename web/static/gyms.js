@@ -31,10 +31,11 @@
     return roster
       .map(
         (mon) => `
-        <div class="gym-roster-mon">
+        <div class="gym-roster-mon${mon.mega ? " has-mega" : ""}">
             <img src="${esc(artThumb(mon.artwork))}" alt="${esc(mon.name)}">
             <div class="gym-roster-mon-name">${esc(mon.name)}</div>
             <div class="favorite-types" style="justify-content:center;margin-top:2px;">${typeBadges(mon.types)}</div>
+            ${mon.mega ? `<div class="legend-mega-tag" title="Mega Evolves into ${esc(mon.mega)}">⇢ ${esc(mon.mega)}</div>` : ""}
         </div>`
       )
       .join("");
