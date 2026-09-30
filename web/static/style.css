@@ -6081,3 +6081,15 @@ img[src$="/trainers/nowa.png"] {
 .legend-trophy-name {
     font-weight: 700;
 }
+
+/* Item icons: the Dream World art is smooth, so it must not be scaled as
+   pixel art (webapi.item_icon); the Meteorite's 24px pixel sprite is shown
+   at an exact 3x so its pixels stay crisp. */
+img[src*="/sprites/items/dream-world/"] {
+    image-rendering: auto !important;
+}
+
+.store-item img[src$="/items/meteorite.png"] {
+    height: 72px;
+    margin-block: 4px;
+}

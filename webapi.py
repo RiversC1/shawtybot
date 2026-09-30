@@ -193,8 +193,16 @@ STORE_ITEMS.update({
 HELD_ITEM_KEYS = set(HELD_ITEM_PRICES)
 
 
+# The 30x30 bag sprites look blurry scaled up; the 90px Dream World art is
+# used wherever it exists (every store item but the Meteorite).
+NO_DREAM_WORLD_ART = {"meteorite"}
+BALL_SLUGS = {"pokeball": "poke-ball", "greatball": "great-ball", "ultraball": "ultra-ball", "masterball": "master-ball"}
+
+
 def item_icon(key: str) -> str:
-    return BALL_SPRITES.get(key) or f"{ITEM_SPRITE_BASE}/{key}.png"
+    if key in NO_DREAM_WORLD_ART:
+        return BALL_SPRITES.get(key) or f"{ITEM_SPRITE_BASE}/{key}.png"
+    return f"{ITEM_SPRITE_BASE}/dream-world/{BALL_SLUGS.get(key, key)}.png"
 
 
 # Keep in sync with cogs/pokemon.py.

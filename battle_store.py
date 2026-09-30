@@ -1789,7 +1789,7 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             item = _row_get(r, "held_item")
             if item in be.HELD_ITEMS:
                 out["item"] = {"key": item, **be.HELD_ITEMS[item],
-                               "icon": f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/{item}.png"}
+                               "icon": f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dream-world/{item}.png"}
             moves = json.loads(r["moves"])
             pool_by_name = {m["name"]: m for m in mon.get("moves", [])}
             out["moves"] = []
