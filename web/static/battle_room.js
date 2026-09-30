@@ -1016,6 +1016,14 @@
     revealed.push(event);
     renderLog();
     BattleFX.caption(currentLineFor(event), false);
+    // Load and decode the Mega's sprite during the build-up, so the swap at
+    // the flash doesn't stall on it.
+    const megaEntry = (isA ? truth.roster_a : truth.roster_b).find((m) => m.dex_id === event.mega_dex_id);
+    if (megaEntry && megaEntry.sprite) {
+      const pre = new Image();
+      pre.src = megaEntry.sprite;
+      if (pre.decode) pre.decode().catch(() => {});
+    }
     await BattleFX.megaEvolve(isA ? slotA : slotB, isA ? spriteA : spriteB, () => {
       const roster = isA ? truth.roster_a : truth.roster_b;
       const mega = roster.find((m) => m.dex_id === event.mega_dex_id);

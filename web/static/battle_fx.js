@@ -509,6 +509,14 @@ window.BattleFX = (function () {
       return;
     }
     const at = centerOf(slot);
+    // Lite (Firefox, or the weather already found this device slow; see
+    // battle_weather.js): no blur/blend on the orb, no glow shadows on the
+    // particles and fewer of them — those were most of the cost there.
+    const lite = scene.classList.contains("wx-lite") || /Firefox\//.test(navigator.userAgent);
+    const liteClass = (el) => {
+      if (lite) el.classList.add("fx-lite");
+      return el;
+    };
     if (reduceMotionNow()) {
       swap();
       glowSprite(spriteEl, "#c4b5fd", 900);
@@ -516,24 +524,31 @@ window.BattleFX = (function () {
       return wait(900);
     }
     const orb = document.createElement("div");
-    orb.className = "fx-mega-orb";
+    orb.className = `fx-mega-orb${lite ? " fx-lite" : ""}`;
     orb.style.left = `${at.x}px`;
     orb.style.top = `${at.y}px`;
     const size = Math.max(120, Math.min(at.w, at.h) * 1.25);
     orb.style.width = orb.style.height = `${size}px`;
     layer.appendChild(orb);
-    run(orb, [
+    // Lite: a soft glow that only scales (a rotating masked gradient has to
+    // be redrawn every frame when Firefox draws on the CPU).
+    run(orb, lite ? [
+      { transform: "translate(-50%,-50%) scale(0.2)", opacity: 0 },
+      { transform: "translate(-50%,-50%) scale(1)", opacity: 0.9, offset: 0.5 },
+      { transform: "translate(-50%,-50%) scale(1.1)", opacity: 0.95, offset: 0.9 },
+      { transform: "translate(-50%,-50%) scale(1.4)", opacity: 0 },
+    ] : [
       { transform: "translate(-50%,-50%) scale(0.2) rotate(0deg)", opacity: 0 },
       { transform: "translate(-50%,-50%) scale(1) rotate(360deg)", opacity: 0.9, offset: 0.5 },
       { transform: "translate(-50%,-50%) scale(1.15) rotate(720deg)", opacity: 0.95, offset: 0.9 },
       { transform: "translate(-50%,-50%) scale(1.6) rotate(800deg)", opacity: 0 },
     ], { duration: 1700, easing: "ease-in-out" });
     // Strands of energy pulled in from all around.
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < (lite ? 12 : 28); i++) {
       const a = rand(0, Math.PI * 2);
       const d = rand(size * 0.7, size * 1.2);
       const color = MEGA_COLORS[i % MEGA_COLORS.length];
-      const p = particle("orb", at.x + Math.cos(a) * d, at.y + Math.sin(a) * d, rand(6, 11), { color, glow: color });
+      const p = liteClass(particle("orb", at.x + Math.cos(a) * d, at.y + Math.sin(a) * d, rand(6, 11), { color, glow: color }));
       run(p, [
         { transform: "translate(-50%,-50%) scale(0.4)", opacity: 0 },
         { transform: "translate(-50%,-50%) scale(1)", opacity: 1, offset: 0.3 },
@@ -546,22 +561,23 @@ window.BattleFX = (function () {
 
     // The change: flash, new form, rainbow shockwaves, the Mega symbol.
     const white = { color: "#ffffff", glow: "#ffffff" };
-    flash(at, white, size * 1.6);
+    flash(at, white, size * (lite ? 1.1 : 1.6));
     swap();
     spriteEl.animate([{ filter: WHITE_FILTER }, { filter: WHITE_FILTER, offset: 0.35 }, { filter: BASE_FILTER }],
       { duration: 900, easing: "ease-out" });
     whiten.cancel();
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < (lite ? 2 : 4); i++) {
       const color = MEGA_COLORS[(i * 2) % MEGA_COLORS.length];
-      const r = particle("ring", at.x, at.y, 70, { color, glow: color });
+      const r = liteClass(particle("ring", at.x, at.y, 70, { color, glow: color }));
       run(r, [
         { transform: "translate(-50%,-50%) scale(0.4)", opacity: 0.95 },
-        { transform: "translate(-50%,-50%) scale(4)", opacity: 0 },
+        { transform: `translate(-50%,-50%) scale(${lite ? 3 : 4})`, opacity: 0 },
       ], { duration: 900, delay: i * 120, easing: "ease-out" });
     }
-    burst(at, { color: "#fff6c8", glow: "#ffffff", shape: "star" }, 18);
+    burst(at, { color: "#fff6c8", glow: "#ffffff", shape: "star" }, lite ? 8 : 18);
+    if (lite) layer.querySelectorAll(".fx-star:not(.fx-lite)").forEach(liteClass);
     const symbol = document.createElement("div");
-    symbol.className = "fx-mega-symbol";
+    symbol.className = `fx-mega-symbol${lite ? " fx-lite" : ""}`;
     symbol.innerHTML = MEGA_SYMBOL_SVG;
     symbol.style.left = `${at.x}px`;
     symbol.style.top = `${at.y - at.h * 0.1}px`;
@@ -572,7 +588,7 @@ window.BattleFX = (function () {
       { transform: "translate(-50%,-50%) scale(1)", opacity: 1, offset: 0.75 },
       { transform: "translate(-50%,-70%) scale(1)", opacity: 0 },
     ], { duration: 1400, easing: "ease-out" });
-    shakeScene(260);
+    if (!lite) shakeScene(260);
     return wait(1000);
   }
 

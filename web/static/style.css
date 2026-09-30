@@ -3806,6 +3806,25 @@ body.lineup-dragging * {
     will-change: transform, opacity;
 }
 
+.fx-mega-orb.fx-lite {
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 16%, rgba(244, 114, 182, 0.55) 30%,
+        rgba(167, 139, 250, 0.45) 42%, rgba(94, 200, 255, 0.35) 54%, transparent 68%);
+    -webkit-mask: none;
+    mask: none;
+    filter: none;
+    mix-blend-mode: normal;
+}
+
+.fx-orb.fx-lite {
+    background: var(--c);
+}
+
+.fx-p.fx-lite,
+.fx-mega-symbol.fx-lite {
+    box-shadow: none;
+    filter: none;
+}
+
 .fx-mega-symbol {
     position: absolute;
     width: 64px;
