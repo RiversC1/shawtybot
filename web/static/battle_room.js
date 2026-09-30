@@ -96,7 +96,7 @@
     weatherChip.hidden = false;
   }
   (function setupArena() {
-    const kind = { gym: "gym", custom_gym: "gym", elite_four: "elite", champion: "champion" }[truth.battle_type] || "field";
+    const kind = { gym: "gym", custom_gym: "gym", elite_four: "elite", champion: "champion", legend: "champion" }[truth.battle_type] || "field";
     sceneEl.classList.add(`arena-${kind}`);
     const tint = BattleFX.colorForType(truth.arena_type);
     if (tint) sceneEl.style.setProperty("--arena-tint", tint);
@@ -849,6 +849,10 @@
         if (event.role === "champion") {
           return `${speech}👑 Congratulations! ${isYou ? "You are" : `${side} is`} the new <strong>${esc(region)} Champion</strong>!`;
         }
+        if (event.role === "legend") {
+          const prize = event.reward ? `<br>🎁 <strong>${esc(event.reward)}</strong> (perfect IVs) joins ${isYou ? "your" : "their"} collection!` : "";
+          return `${speech}🌟 ${isYou ? "You" : side} defeated the Legend <strong>${esc(event.name)}</strong>!${prize}`;
+        }
         return `${speech}🏆 ${isYou ? "You" : side} defeated Elite Four <strong>${esc(event.name)}</strong>!`;
       }
       case "badge_awarded": {
@@ -881,7 +885,7 @@
 
   function renderMeta() {
     titleEl.textContent = `${truth.name_a} vs ${truth.name_b}`;
-    const BATTLE_TYPE_LABELS = { pvp: "PvP", gym: "Gym", custom_gym: "Custom Gym", trainer: "Trainer", elite_four: "Elite Four", champion: "Champion" };
+    const BATTLE_TYPE_LABELS = { pvp: "PvP", gym: "Gym", custom_gym: "Custom Gym", trainer: "Trainer", elite_four: "Elite Four", champion: "Champion", legend: "Legend" };
     const typeLabel = BATTLE_TYPE_LABELS[truth.battle_type]
       || truth.battle_type.charAt(0).toUpperCase() + truth.battle_type.slice(1);
     subtitleEl.textContent =
@@ -896,6 +900,7 @@
   function leaveDestination() {
     if (truth.battle_type === "gym" || truth.battle_type === "custom_gym") return "/gyms";
     if (truth.battle_type === "elite_four" || truth.battle_type === "champion") return "/league";
+    if (truth.battle_type === "legend") return "/legends";
     return "/battles";
   }
 
@@ -1171,7 +1176,7 @@
       case "league_defeated": {
         playResultSound();
         // Hold long enough to actually read the speech (Champions say more).
-        const grand = event.role === "champion";
+        const grand = event.role === "champion" || event.role === "legend";
         const readMs = Math.min(14000, 2600 + (event.quote || "").length * 32);
         if (event.portrait) BattleFX.showBadge(event.portrait, event.name, { grand, duration: readMs });
         return wait(readMs);

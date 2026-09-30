@@ -151,6 +151,17 @@ ACHIEVEMENTS = {
             "diamond": {"threshold": 250, "rewards": {"masterball": 2, "coin": 500}},
         },
     },
+    "legends": {
+        "label": "Legend Slayer", "description": "Defeat the Legends: Red, Silver, Steven, Cyrus and Ash",
+        "stat": "legends_beaten",
+        "tiers": {
+            "bronze": {"threshold": 1, "rewards": {"coin": 500}},
+            "silver": {"threshold": 2, "rewards": {"ultraball": 10, "coin": 1000}},
+            "gold": {"threshold": 3, "rewards": {"masterball": 1, "coin": 1500}},
+            "platinum": {"threshold": 4, "rewards": {"masterball": 2, "coin": 2000}},
+            "diamond": {"threshold": 5, "rewards": {"masterball": 3, "coin": 5000}},
+        },
+    },
 }
 
 TOTAL_ACHIEVEMENT_TIERS = sum(len(cat["tiers"]) for cat in ACHIEVEMENTS.values())
@@ -1464,6 +1475,7 @@ class Pokemon(commands.Cog):
             "evolution_count": self.get_evolution_count(user_id),
             "level": level,
             "battle_wins": self.get_battle_wins(user_id),
+            "legends_beaten": len(battle_store.get_legend_wins(user_id)),
         }
 
     def get_unlocked_achievements(self, user_id: int) -> set[str]:

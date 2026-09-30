@@ -1,0 +1,400 @@
+[
+  {
+    "key": "red",
+    "name": "Red",
+    "title": "The Silent Legend",
+    "region": "Kanto",
+    "order": 1,
+    "flavor": "The quiet boy from Pallet Town who became a legend, then vanished to the summit of Mt. Silver. He's been waiting a long time for a challenger.",
+    "portrait": "/static/legends/red.png",
+    "reward_mega": 10035,
+    "defeat_quotes": [
+      "...",
+      "...!",
+      "......"
+    ],
+    "roster": [
+      {
+        "dex_id": 25,
+        "ability": "static",
+        "moves": [
+          "Thunderbolt",
+          "Iron Tail",
+          "Wild Charge",
+          "Discharge"
+        ]
+      },
+      {
+        "dex_id": 142,
+        "ability": "rock-head",
+        "moves": [
+          "Stone Edge",
+          "Earthquake",
+          "Crunch",
+          "Brave Bird"
+        ],
+        "mega": 10042
+      },
+      {
+        "dex_id": 143,
+        "ability": "thick-fat",
+        "moves": [
+          "Body Slam",
+          "Crunch",
+          "Earthquake",
+          "Rest"
+        ]
+      },
+      {
+        "dex_id": 3,
+        "ability": "chlorophyll",
+        "moves": [
+          "Petal Blizzard",
+          "Sludge Bomb",
+          "Earthquake",
+          "Sleep Powder"
+        ],
+        "mega": 10033
+      },
+      {
+        "dex_id": 9,
+        "ability": "torrent",
+        "moves": [
+          "Hydro Pump",
+          "Ice Beam",
+          "Flash Cannon",
+          "Dark Pulse"
+        ],
+        "mega": 10036
+      },
+      {
+        "dex_id": 6,
+        "ability": "blaze",
+        "moves": [
+          "Flamethrower",
+          "Solar Beam",
+          "Air Slash",
+          "Dragon Pulse"
+        ],
+        "mega": 10035
+      }
+    ]
+  },
+  {
+    "key": "silver",
+    "name": "Silver",
+    "title": "The Rival Reforged",
+    "region": "Johto",
+    "order": 2,
+    "flavor": "Once he stole a Pokémon and believed only strength mattered. Now he trusts his partners, and he's never been more dangerous.",
+    "portrait": "/static/legends/silver.png",
+    "reward_mega": 10038,
+    "defeat_quotes": [
+      "...I lost again. But I'm not the same person who lost to you before.",
+      "Hmph. You and your Pokémon... you're the real deal."
+    ],
+    "roster": [
+      {
+        "dex_id": 461,
+        "ability": "pressure",
+        "moves": [
+          "Night Slash",
+          "Ice Punch",
+          "Swords Dance",
+          "Dark Pulse"
+        ]
+      },
+      {
+        "dex_id": 169,
+        "ability": "inner-focus",
+        "moves": [
+          "Cross Poison",
+          "Air Slash",
+          "Brave Bird",
+          "Leech Life"
+        ]
+      },
+      {
+        "dex_id": 462,
+        "ability": "sturdy",
+        "moves": [
+          "Thunderbolt",
+          "Flash Cannon",
+          "Thunder Wave",
+          "Discharge"
+        ]
+      },
+      {
+        "dex_id": 160,
+        "ability": "torrent",
+        "moves": [
+          "Waterfall",
+          "Crunch",
+          "Ice Fang",
+          "Dragon Dance"
+        ]
+      },
+      {
+        "dex_id": 65,
+        "ability": "inner-focus",
+        "moves": [
+          "Psychic",
+          "Shadow Ball",
+          "Calm Mind",
+          "Future Sight"
+        ],
+        "mega": 10037
+      },
+      {
+        "dex_id": 94,
+        "ability": "cursed-body",
+        "moves": [
+          "Shadow Ball",
+          "Sludge Bomb",
+          "Hypnosis",
+          "Dream Eater"
+        ],
+        "mega": 10038
+      }
+    ]
+  },
+  {
+    "key": "steven",
+    "name": "Steven",
+    "title": "The Steel Champion",
+    "region": "Hoenn",
+    "order": 3,
+    "flavor": "Hoenn's former Champion and a collector of rare stones. His steel-hard team has crushed more challengers than he can count.",
+    "portrait": "/static/legends/steven.png",
+    "reward_mega": 10076,
+    "defeat_quotes": [
+      "Congratulations! You've shown me the strength of a true trainer.",
+      "Ha! You're like a rare stone I've never seen before."
+    ],
+    "roster": [
+      {
+        "dex_id": 227,
+        "ability": "sturdy",
+        "moves": [
+          "Brave Bird",
+          "Iron Head",
+          "Roost",
+          "Night Slash"
+        ]
+      },
+      {
+        "dex_id": 248,
+        "ability": "sand-stream",
+        "moves": [
+          "Stone Edge",
+          "Crunch",
+          "Earthquake",
+          "Dragon Dance"
+        ],
+        "mega": 10049
+      },
+      {
+        "dex_id": 212,
+        "ability": "technician",
+        "moves": [
+          "X Scissor",
+          "Iron Head",
+          "Night Slash",
+          "Swords Dance"
+        ],
+        "mega": 10046
+      },
+      {
+        "dex_id": 464,
+        "ability": "solid-rock",
+        "moves": [
+          "Stone Edge",
+          "Earthquake",
+          "Megahorn",
+          "Hammer Arm"
+        ]
+      },
+      {
+        "dex_id": 306,
+        "ability": "rock-head",
+        "moves": [
+          "Iron Tail",
+          "Stone Edge",
+          "Earthquake",
+          "Heavy Slam"
+        ],
+        "mega": 10053
+      },
+      {
+        "dex_id": 376,
+        "ability": "clear-body",
+        "moves": [
+          "Meteor Mash",
+          "Zen Headbutt",
+          "Earthquake",
+          "Hammer Arm"
+        ],
+        "mega": 10076
+      }
+    ]
+  },
+  {
+    "key": "cyrus",
+    "name": "Cyrus",
+    "title": "The Architect of a New World",
+    "region": "Sinnoh",
+    "order": 4,
+    "flavor": "The cold, calculating boss of Team Galactic. He sees emotion as weakness and battles with ruthless precision.",
+    "portrait": "/static/legends/cyrus.png",
+    "reward_mega": 10041,
+    "defeat_quotes": [
+      "...So this is what it means to be defeated. How illogical.",
+      "Your spirit... it's something I discarded long ago."
+    ],
+    "roster": [
+      {
+        "dex_id": 169,
+        "ability": "inner-focus",
+        "moves": [
+          "Cross Poison",
+          "Air Slash",
+          "Brave Bird",
+          "Leech Life"
+        ]
+      },
+      {
+        "dex_id": 461,
+        "ability": "pressure",
+        "moves": [
+          "Night Slash",
+          "Ice Punch",
+          "Swords Dance",
+          "Dark Pulse"
+        ]
+      },
+      {
+        "dex_id": 430,
+        "ability": "super-luck",
+        "moves": [
+          "Brave Bird",
+          "Night Slash",
+          "Heat Wave",
+          "Foul Play"
+        ]
+      },
+      {
+        "dex_id": 359,
+        "ability": "super-luck",
+        "moves": [
+          "Night Slash",
+          "Psycho Cut",
+          "Swords Dance",
+          "Future Sight"
+        ],
+        "mega": 10057
+      },
+      {
+        "dex_id": 229,
+        "ability": "flash-fire",
+        "moves": [
+          "Flamethrower",
+          "Dark Pulse",
+          "Sludge Bomb",
+          "Nasty Plot"
+        ],
+        "mega": 10048
+      },
+      {
+        "dex_id": 130,
+        "ability": "intimidate",
+        "moves": [
+          "Waterfall",
+          "Crunch",
+          "Earthquake",
+          "Dragon Dance"
+        ],
+        "mega": 10041
+      }
+    ]
+  },
+  {
+    "key": "ash",
+    "name": "Ash",
+    "title": "The Very Best",
+    "region": "World",
+    "order": 5,
+    "flavor": "The trainer who swore to be the very best, like no one ever was, and did it. The final and hardest challenge of all.",
+    "portrait": "/static/legends/ash.png",
+    "reward_mega": 10059,
+    "defeat_quotes": [
+      "Whoa... that was the best battle I've had in forever! Let's battle again sometime!",
+      "Pikachu, did you see that? We've got a new rival!"
+    ],
+    "roster": [
+      {
+        "dex_id": 149,
+        "ability": "inner-focus",
+        "moves": [
+          "Outrage",
+          "Hurricane",
+          "Extreme Speed",
+          "Dragon Dance"
+        ]
+      },
+      {
+        "dex_id": 254,
+        "ability": "overgrow",
+        "moves": [
+          "Leaf Blade",
+          "Dragon Claw",
+          "Earthquake",
+          "Swords Dance"
+        ],
+        "mega": 10065
+      },
+      {
+        "dex_id": 94,
+        "ability": "cursed-body",
+        "moves": [
+          "Shadow Ball",
+          "Sludge Bomb",
+          "Thunderbolt",
+          "Hypnosis"
+        ],
+        "mega": 10038
+      },
+      {
+        "dex_id": 448,
+        "ability": "inner-focus",
+        "moves": [
+          "Aura Sphere",
+          "Flash Cannon",
+          "Dragon Pulse",
+          "Nasty Plot"
+        ],
+        "mega": 10059
+      },
+      {
+        "dex_id": 6,
+        "ability": "blaze",
+        "moves": [
+          "Flare Blitz",
+          "Dragon Claw",
+          "Earthquake",
+          "Dragon Dance"
+        ],
+        "mega": 10034
+      },
+      {
+        "dex_id": 25,
+        "ability": "static",
+        "moves": [
+          "Thunderbolt",
+          "Iron Tail",
+          "Quick Attack",
+          "Wild Charge"
+        ]
+      }
+    ]
+  }
+]

@@ -102,6 +102,24 @@
 
     <hr>
 
+    {% set beaten = trainer.legend_trophies | selectattr("beaten") | list %}
+    <div class="achievements-header">
+        <div class="section-label">Legend Trophies</div>
+        <div class="muted">{{ beaten|length }} / {{ trainer.legend_trophies|length }} defeated</div>
+    </div>
+    <div class="legend-trophies">
+        {% for l in trainer.legend_trophies %}
+        <a class="legend-trophy{{ ' is-beaten' if l.beaten else '' }}" href="/legends"
+           title="{{ l.name }}{{ (' — defeated ' ~ l.wins ~ '×') if l.beaten else ' — not yet defeated' }}">
+            <span class="legend-trophy-art"><img src="{{ l.portrait }}" alt="" loading="lazy"></span>
+            <span class="legend-trophy-name">{{ l.name }}</span>
+            <span class="legend-trophy-status">{{ ('🏆 ×' ~ l.wins) if l.beaten else '🔒' }}</span>
+        </a>
+        {% endfor %}
+    </div>
+
+    <hr>
+
     <div class="achievements-header">
         <div class="section-label">Permanent Achievements</div>
         <div class="muted">{{ trainer.achievements.unlocked }} / {{ trainer.achievements.total }} tiers</div>

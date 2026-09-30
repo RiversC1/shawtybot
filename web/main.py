@@ -441,6 +441,19 @@ async def league(request: Request):
     return templates.TemplateResponse(request, "league.html", {"league": data})
 
 
+@app.get("/legends")
+async def legends(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return RedirectResponse("/")
+
+    status, data = await api_get(session, "/api/legends")
+    if status == 401:
+        return clear_session(RedirectResponse("/"))
+
+    return templates.TemplateResponse(request, "legends.html", {"legends": data})
+
+
 @app.get("/rewards")
 async def rewards(request: Request):
     session = request.cookies.get(SESSION_COOKIE)
@@ -792,6 +805,24 @@ async def proxy_start_champion_battle(request: Request, generation: str):
     if not session:
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     status, data = await api_post(session, f"/api/battles/champion/{generation}", {})
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/legends/{legend_key}")
+async def proxy_get_legend(request: Request, legend_key: str):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/legends/{legend_key}")
+    return JSONResponse(data, status_code=status)
+
+
+@app.post("/api/proxy/battles/legend/{legend_key}")
+async def proxy_start_legend_battle(request: Request, legend_key: str):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_post(session, f"/api/battles/legend/{legend_key}", {})
     return JSONResponse(data, status_code=status)
 
 

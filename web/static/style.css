@@ -1457,7 +1457,7 @@ code {
 }
 
 .trade-picker-iv {
-    color: var(--muted, #9aa0b4);
+    color: var(--text-muted);
 }
 
 /* A species you have more than one of: the IV is what tells them apart. */
@@ -5837,4 +5837,247 @@ img[src$="/trainers/nowa.png"] {
    sun rays and dust into its canvas, so the CSS layers step aside. */
 .battle-scene.wx-lite .battle-weather-layer {
     display: none;
+}
+
+/* ---------- Legends (legends.html) ---------- */
+.legend-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    margin: 8px 0 12px;
+    border-color: rgba(239, 51, 64, 0.65);
+    background: linear-gradient(135deg, rgba(239, 51, 64, 0.16), rgba(255, 203, 5, 0.06));
+}
+
+.legend-warning strong {
+    display: block;
+    font-size: 1.05em;
+    margin-bottom: 2px;
+}
+
+.legend-warning-icon {
+    font-size: 1.5em;
+    line-height: 1;
+}
+
+.legend-champion-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px auto 14px;
+    width: fit-content;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+}
+
+.legend-champion-list li.is-done {
+    color: var(--text);
+}
+
+.legend-rewards-note {
+    margin: 10px 0 16px;
+}
+
+.legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 14px;
+    margin-top: 8px;
+}
+
+.legend-card {
+    font: inherit;
+    color: var(--text);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    padding: 14px 12px 12px;
+    cursor: pointer;
+    text-align: center;
+    background:
+        radial-gradient(120% 70% at 50% 0%, rgba(255, 203, 5, 0.12), transparent 60%),
+        var(--surface);
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.legend-card:hover,
+.legend-card:focus-visible {
+    border-color: var(--yellow);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(255, 203, 5, 0.15);
+}
+
+.legend-card.is-beaten {
+    border-color: rgba(255, 203, 5, 0.6);
+}
+
+.legend-card-region {
+    align-self: flex-start;
+    font-size: 0.72em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--yellow);
+}
+
+.legend-card-portrait {
+    position: relative;
+    display: block;
+    height: 190px;
+    width: 100%;
+}
+
+.legend-card-portrait img {
+    height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+
+.legend-card.is-locked .legend-card-portrait img {
+    filter: grayscale(100%) brightness(0.5);
+}
+
+.legend-card-name {
+    font-size: 1.2em;
+    font-weight: 700;
+}
+
+.legend-card-title {
+    font-size: 0.82em;
+}
+
+.legend-card-megas {
+    margin-top: 4px;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(90deg, #ff5f6d, #a78bfa, #5ec8ff);
+}
+
+.legend-card-reward {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.legend-card.is-beaten .legend-card-reward {
+    color: var(--yellow);
+    font-weight: 600;
+}
+
+.legend-card-reward img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+}
+
+.legend-mega-tag {
+    margin-top: 4px;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #c4b5fd;
+}
+
+.gym-roster-mon.has-mega {
+    border-color: rgba(167, 139, 250, 0.55);
+}
+
+.legend-reward-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 203, 5, 0.35);
+    border-radius: 10px;
+    background: rgba(255, 203, 5, 0.06);
+}
+
+.legend-reward-row img {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+}
+
+.legend-mega-count {
+    font-size: 0.75em;
+    font-weight: 400;
+}
+
+.legend-fight-btn {
+    background: linear-gradient(90deg, var(--red), #b0263a);
+}
+
+.legend-confirm {
+    padding: 10px 12px;
+    border: 1px solid rgba(239, 51, 64, 0.6);
+    border-radius: 10px;
+    background: rgba(239, 51, 64, 0.08);
+}
+
+.legend-confirm p {
+    margin: 0 0 8px;
+}
+
+.legend-confirm-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Profile: Legend trophies */
+.legend-trophies {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 10px;
+    margin: 10px 0 6px;
+}
+
+.legend-trophy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 6px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.82em;
+    background: var(--surface-alt);
+}
+
+.legend-trophy-art {
+    display: block;
+    height: 78px;
+}
+
+.legend-trophy-art img {
+    height: 100%;
+    object-fit: contain;
+    filter: grayscale(100%) brightness(0.45);
+}
+
+.legend-trophy.is-beaten {
+    color: var(--text);
+    border-color: rgba(255, 203, 5, 0.6);
+    background: radial-gradient(100% 80% at 50% 0%, rgba(255, 203, 5, 0.16), transparent 70%), var(--surface-alt);
+}
+
+.legend-trophy.is-beaten .legend-trophy-art img {
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+}
+
+.legend-trophy-name {
+    font-weight: 700;
 }

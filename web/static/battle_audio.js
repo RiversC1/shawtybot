@@ -12,6 +12,7 @@ window.BattleAudio = (function () {
     custom_gym: "gym_battle.mp3",
     elite_four: "elite_battle.mp3",
     champion: "champion_battle.mp3",
+    legend: "champion_battle.mp3",
   };
   // PvP and random-trainer battles keep the original general battle theme.
   const MUSIC_URL = `${AUDIO_BASE}/${MUSIC_BY_TYPE[window.BATTLE_TYPE] || "battle.mp3"}`;

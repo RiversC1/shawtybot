@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Legends — ShawtyBot Pokémon{% endblock %}
+{% block content %}
+<h1>Legends</h1>
+
+<div class="card legend-warning" role="note">
+    <span class="legend-warning-icon" aria-hidden="true">⚠️</span>
+    <div>
+        <strong>Do this at your own risk.</strong>
+        <span>These trainers are harder than any Champion: perfect IVs, a held item on every Pokémon,
+        TM movesets, and every Pokémon that can Mega Evolve <em>will</em>. Expect to lose. A lot.</span>
+    </div>
+</div>
+
+{% if not legends.unlocked %}
+<div class="card league-locked-banner">
+    <div class="league-locked-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7z"/></svg>
+    </div>
+    <h2>The Legends are waiting</h2>
+    <p class="muted">Defeat the Champion of every region to earn a shot at them.</p>
+    <ul class="legend-champion-list">
+        {% for c in legends.champions %}
+        <li class="{{ 'is-done' if c.beaten else '' }}">{{ '✅' if c.beaten else '⬜' }} {{ c.name }} <span class="muted">· {{ c.region|capitalize }} Champion</span></li>
+        {% endfor %}
+    </ul>
+    <a href="/league" class="btn-primary league-locked-cta">Go to the Poké League →</a>
+</div>
+{% else %}
+{% set team_legends = legends.team_legendaries or [] %}
+{% set max_leg = legends.max_legendaries or 1 %}
+<div class="card league-rule{{ ' is-broken' if team_legends|length > max_leg else '' }}">
+    <span class="league-rule-icon" aria-hidden="true">{{ "⚠️" if team_legends|length > max_leg else "⭐" }}</span>
+    <div>
+        <strong>Same rule as the League: max {{ max_leg }} legendary Pokémon per team.</strong>
+        {% if team_legends|length > max_leg %}
+        <span>Your team has {{ team_legends|length }} ({{ team_legends|join(", ") }}). <a href="/team">Swap some out</a> first.</span>
+        {% else %}
+        <span class="muted">Your team is allowed in.</span>
+        {% endif %}
+    </div>
+</div>
+<p class="muted legend-rewards-note">
+    First win against each Legend: their signature <strong>Mega Evolution with perfect IVs</strong>,
+    {{ "{:,}".format(legends.first_win.coin) }} coins, {{ "{:,}".format(legends.first_win.xp) }} XP and a Master Ball.
+    Rematches pay {{ "{:,}".format(legends.rematch.coin) }} coins and {{ legends.rematch.xp }} XP.
+</p>
+{% endif %}
+
+<div class="legend-grid">
+    {% for l in legends.legends %}
+    <button type="button" class="card legend-card{{ ' is-beaten' if l.beaten else '' }}{{ '' if legends.unlocked else ' is-locked' }}"
+            data-legend-key="{{ l.key }}">
+        <span class="legend-card-region">{{ l.region }}</span>
+        <span class="legend-card-portrait">
+            <img src="{{ l.portrait }}" alt="{{ l.name }}" loading="lazy">
+            {% if not legends.unlocked %}<span class="gym-card-lock">🔒</span>{% endif %}
+        </span>
+        <span class="legend-card-name">{{ l.name }}</span>
+        <span class="legend-card-title muted">{{ l.title }}</span>
+        <span class="legend-card-megas">{{ l.megas|length }} Mega Evolution{{ '' if l.megas|length == 1 else 's' }}</span>
+        <span class="legend-card-reward">
+            <img src="{{ l.reward.artwork|thumb }}" alt="" loading="lazy">
+            {% if l.beaten %}🏆 Defeated{% if l.wins > 1 %} ×{{ l.wins }}{% endif %}{% else %}Reward: {{ l.reward.name }}{% endif %}
+        </span>
+    </button>
+    {% endfor %}
+</div>
+
+<div id="legend-modal" class="modal-overlay" hidden>
+    <div class="modal collection-modal">
+        <div class="modal-header">
+            <h2 id="lg-title">Legend</h2>
+            <button id="lg-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="lg-body">
+            <p class="muted">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script src="{{ static_url('legends.js') }}"></script>
+{% endblock %}

@@ -452,16 +452,28 @@ def megas_by_base() -> dict[int, dict]:
 MEGA_BY_BASE = megas_by_base()
 
 
-def battle_mon(dex_id: int) -> dict:
+# Every move in the game by name, for movesets outside a species' own
+# level-up list (the Legends' TM/tutor moves).
+ALL_MOVES: dict[str, dict] = {}
+for _mon in POKEDEX.values():
+    for _mv in _mon.get("moves", []):
+        ALL_MOVES.setdefault(_mv["name"], _mv)
+
+
+def battle_mon(dex_id: int, move_names=()) -> dict:
     """The pokedex entry a battle slot uses. A Pokémon that Mega Evolved
     mid-battle keeps the moves it knew as its base form, so a Mega's move
-    pool also includes its base form's."""
+    pool also includes its base form's. Moves in `move_names` from outside
+    its own list (a Legend's TM moves) are added from the global table."""
     mon = POKEDEX.get(dex_id, {})
+    moves = list(mon.get("moves", []))
     base = POKEDEX.get(mon.get("mega_of")) if mon.get("is_mega") else None
-    if not base:
-        return mon
-    names = {m["name"] for m in mon.get("moves", [])}
-    return {**mon, "moves": mon.get("moves", []) + [m for m in base.get("moves", []) if m["name"] not in names]}
+    if base:
+        names = {m["name"] for m in moves}
+        moves += [m for m in base.get("moves", []) if m["name"] not in names]
+    names = {m["name"] for m in moves}
+    moves += [ALL_MOVES[n] for n in move_names if n not in names and n in ALL_MOVES]
+    return {**mon, "moves": moves}
 
 
 def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | tuple[None, None]:
@@ -476,7 +488,7 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
     roster_a, roster_b = [], []
     active_a, active_b = 0, 0
     for r in side_rows:
-        mon = battle_mon(r["dex_id"])
+        mon = battle_mon(r["dex_id"], [m["name"] for m in json.loads(r["moves"])])
         row_dict = {
             "dex_id": r["dex_id"], "current_hp": r["current_hp"], "max_hp": r["max_hp"],
             "status": r["status"], "status_counter": r["status_counter"],
@@ -501,6 +513,8 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
     )
     if battle_row["battle_type"] == "champion" and battle_row["side_b_npc_key"] in MEGA_TRAINERS:
         side_b.mega_forms = {b.dex_id: MEGA_BY_BASE[b.dex_id] for b in roster_b if b.dex_id in MEGA_BY_BASE}
+    elif battle_row["battle_type"] == LEGEND_BATTLE_TYPE and battle_row["side_b_npc_key"] in LEGENDS:
+        side_b.mega_forms = legend_mega_forms(battle_row["side_b_npc_key"])
     forced = battle_row["forced_switch_side"].split(",") if battle_row["forced_switch_side"] else []
     battle = be.BattleState(
         battle_id=battle_id, side_a=side_a, side_b=side_b,
@@ -920,6 +934,135 @@ def league_fully_completed(user_id: int) -> bool:
     return earned >= total
 
 
+# ---------- Legends ----------
+# Post-game boss battles (battle_type "legend", side_b_npc_key = the legend's
+# key): Red, Silver, Steven, Cyrus and Ash, unlocked once all 4 regional
+# Champions are beaten. Harder than any Champion: perfect IVs, an item on
+# every Pokémon, TM/tutor movesets, and every Pokémon that has a Mega Mega
+# Evolves. A first win awards that legend's signature Mega (perfect IVs) plus
+# coins and a Master Ball; rematches pay a smaller purse.
+
+LEGEND_BATTLE_TYPE = "legend"
+LEGENDS_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "legends.json")
+with open(LEGENDS_DATA_PATH, encoding="utf-8") as f:
+    LEGENDS: dict[str, dict] = {e["key"]: e for e in sorted(json.load(f), key=lambda e: e["order"])}
+
+LEGEND_FIRST_WIN = {"xp": 1500, "coin": 5000, "masterball": 1}
+LEGEND_REMATCH = {"xp": 400, "coin": 750}
+
+_legend_table_ready = False
+
+
+def ensure_legend_table(conn: sqlite3.Connection):
+    global _legend_table_ready
+    if _legend_table_ready:
+        return
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS poke_legend_wins (
+            user_id INTEGER NOT NULL,
+            legend_key TEXT NOT NULL,
+            first_won_at TEXT NOT NULL,
+            wins INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (user_id, legend_key)
+        )
+    """)
+    _legend_table_ready = True
+
+
+def legends_unlocked(user_id: int) -> bool:
+    """Open once every regional Champion has been defeated."""
+    champions = {k for k, e in LEAGUE.items() if e["role"] == "champion"}
+    return champions <= get_league_progress(user_id)
+
+
+def get_legend_wins(user_id: int) -> dict[str, dict]:
+    """legend_key -> {first_won_at, wins} for every legend this trainer beat."""
+    with db() as conn:
+        ensure_legend_table(conn)
+        rows = conn.execute(
+            "SELECT legend_key, first_won_at, wins FROM poke_legend_wins WHERE user_id = ?", (user_id,)
+        ).fetchall()
+    return {r["legend_key"]: {"first_won_at": r["first_won_at"], "wins": r["wins"]} for r in rows}
+
+
+def legend_mon(entry: dict) -> dict:
+    """A legend's Pokémon with its full moveset available: legends know
+    TM/tutor moves that aren't in a species' level-up list."""
+    return battle_mon(entry["dex_id"], entry["moves"])
+
+
+def build_roster_for_legend(legend_key: str) -> list["be.BattlerState"]:
+    roster = LEGENDS[legend_key]["roster"]
+    items = champion_held_items(roster)
+    return [
+        be.build_battler_state(legend_mon(m), m["moves"], m.get("ability"), item=items[i])
+        for i, m in enumerate(roster)
+    ]
+
+
+def legend_mega_forms(legend_key: str) -> dict[int, dict]:
+    """base dex_id -> the Mega that legend's Pokémon becomes (Charizard's is
+    chosen per legend: X or Y)."""
+    return {m["dex_id"]: POKEDEX[m["mega"]] for m in LEGENDS[legend_key]["roster"] if m.get("mega") in POKEDEX}
+
+
+def record_legend_win(user_id: int, legend_key: str) -> bool:
+    """Counts a win; True if it was this trainer's first over that legend.
+    The primary key makes the first-win reward race-proof."""
+    now = datetime.now(timezone.utc).isoformat()
+    with db() as conn:
+        ensure_legend_table(conn)
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO poke_legend_wins (user_id, legend_key, first_won_at, wins) VALUES (?, ?, ?, 1)",
+            (user_id, legend_key, now),
+        )
+        if cur.rowcount:
+            return True
+        conn.execute("UPDATE poke_legend_wins SET wins = wins + 1 WHERE user_id = ? AND legend_key = ?",
+                     (user_id, legend_key))
+    return False
+
+
+def grant_legend_first_win(user_id: int, legend_key: str) -> str:
+    """The first-win prize: the legend's signature Mega with perfect IVs,
+    coins, XP and a Master Ball. Returns the Mega's name."""
+    entry = LEGENDS[legend_key]
+    reward = POKEDEX[entry["reward_mega"]]
+    now = datetime.now(timezone.utc).isoformat()
+    add_xp_and_coins(user_id, LEGEND_FIRST_WIN["xp"], LEGEND_FIRST_WIN["coin"])
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO poke_items (user_id, item, qty) VALUES (?, 'masterball', ?) "
+            "ON CONFLICT(user_id, item) DO UPDATE SET qty = qty + ?",
+            (user_id, LEGEND_FIRST_WIN["masterball"], LEGEND_FIRST_WIN["masterball"]),
+        )
+        conn.execute(
+            "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, "
+            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
+            "VALUES (?, ?, ?, 0, 31, 31, 31, 31, 31, 31)",
+            (user_id, reward["id"], now),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
+            (user_id, reward["id"], now),
+        )
+    return reward["name"]
+
+
+def _announce_legend_defeat(battle_row: sqlite3.Row, battle: "be.BattleState", legend_key: str,
+                            reward_name: str | None):
+    entry = LEGENDS.get(legend_key)
+    if not entry:
+        return
+    quotes = entry.get("defeat_quotes") or []
+    append_battle_events(battle_row["battle_id"], battle.turn_number, [{
+        "type": "league_defeated", "side": battle.winner_side,
+        "role": "legend", "name": entry["name"], "region": entry["region"],
+        "quote": random.choice(quotes) if quotes else "",
+        "portrait": entry.get("portrait"), "reward": reward_name,
+    }])
+
+
 # ---------- Custom (player-run) gyms ----------
 # A trainer who has completed the whole Poké League can open their own gym:
 # a name, a type, a badge they design, and a team of 3-6 of their own
@@ -1112,6 +1255,8 @@ def avatar_for_side(battle_row: sqlite3.Row, side: str) -> str | None:
         return GYMS.get(npc_key, {}).get("leader_image")
     if battle_row["battle_type"] in ("elite_four", "champion"):
         return LEAGUE.get(npc_key, {}).get("portrait")
+    if battle_row["battle_type"] == LEGEND_BATTLE_TYPE:
+        return LEGENDS.get(npc_key, {}).get("portrait")
     tclass = TRAINER_CLASS_BY_KEY.get(npc_key)
     return tclass.get("sprite") if tclass else None
 
@@ -1132,6 +1277,8 @@ def display_name_for_side(battle_row: sqlite3.Row, side: str) -> str:
         return GYMS.get(npc_key, {}).get("leader_name", "Gym Leader")
     if battle_row["battle_type"] in ("elite_four", "champion"):
         return LEAGUE.get(npc_key, {}).get("name", "League Trainer")
+    if battle_row["battle_type"] == LEGEND_BATTLE_TYPE:
+        return LEGENDS.get(npc_key, {}).get("name", "Legend")
     tclass = TRAINER_CLASS_BY_KEY.get(npc_key)
     return tclass["display_name"] if tclass else "Wild Trainer"
 
@@ -1211,6 +1358,18 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         champ_name = LEAGUE.get(league_key, {}).get("name", "the Champion")
         _announce_league_defeat(battle_row, battle, league_key)
         summary = f"+{CHAMPION_BATTLE_XP} XP, +{CHAMPION_BATTLE_COIN} coins! {champ_name} has fallen — Champion crowned!"
+    elif battle_type == LEGEND_BATTLE_TYPE:
+        legend_key = battle_row["side_b_npc_key"]
+        name = LEGENDS.get(legend_key, {}).get("name", "the Legend")
+        if legend_key in LEGENDS and record_legend_win(winner_user_id, legend_key):
+            reward = grant_legend_first_win(winner_user_id, legend_key)
+            _announce_legend_defeat(battle_row, battle, legend_key, reward)
+            summary = (f"🌟 You defeated {name}! +{LEGEND_FIRST_WIN['xp']} XP, +{LEGEND_FIRST_WIN['coin']} coins, "
+                       f"a Master Ball, and {reward} (perfect IVs) joined your collection!")
+        else:
+            add_xp_and_coins(winner_user_id, LEGEND_REMATCH["xp"], LEGEND_REMATCH["coin"])
+            _announce_legend_defeat(battle_row, battle, legend_key, None)
+            summary = f"+{LEGEND_REMATCH['xp']} XP, +{LEGEND_REMATCH['coin']} coins! You beat {name} again."
     else:
         tclass = TRAINER_CLASS_BY_KEY.get(battle_row["side_b_npc_key"])
         rewards = TRAINER_BATTLE_REWARDS[tclass["reward_tier"] if tclass else "low"]
@@ -1228,7 +1387,7 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
 # rest, and smart replacements after a faint) with 1-2 held items. Elite Four
 # / Champions: the full League AI and items on the whole team (see
 # build_roster_for_gym and build_roster_for_league).
-HARD_AI_BATTLE_TYPES = {"elite_four", "champion"}
+HARD_AI_BATTLE_TYPES = {"elite_four", "champion", "legend"}
 MEDIUM_AI_BATTLE_TYPES = {"gym", "custom_gym"}
 
 
@@ -1603,11 +1762,11 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
     )
 
     def mon_summary(r: sqlite3.Row, reveal_moves: bool, side: str) -> dict:
-        mon = battle_mon(r["dex_id"])
+        mon = battle_mon(r["dex_id"], [m["name"] for m in json.loads(r["moves"])])
         name = mon.get("name", f"#{r['dex_id']}")
         sprite_front, sprite_back = animated_sprite_urls(name)
         pre_mega = None
-        if mon.get("is_mega") and _row_get(battle_row, "battle_type") == "champion":
+        if mon.get("is_mega") and _row_get(battle_row, "battle_type") in ("champion", LEGEND_BATTLE_TYPE):
             # How it looked before Mega Evolving, so a replayed turn can show
             # the base form until the Mega Evolution event plays.
             base = POKEDEX.get(mon.get("mega_of"), {})

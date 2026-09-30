@@ -138,6 +138,17 @@ ACHIEVEMENTS = {
             "diamond": {"threshold": 250, "rewards": {"masterball": 2, "coin": 500}},
         },
     },
+    "legends": {
+        "label": "Legend Slayer", "description": "Defeat the Legends: Red, Silver, Steven, Cyrus and Ash",
+        "stat": "legends_beaten",
+        "tiers": {
+            "bronze": {"threshold": 1, "rewards": {"coin": 500}},
+            "silver": {"threshold": 2, "rewards": {"ultraball": 10, "coin": 1000}},
+            "gold": {"threshold": 3, "rewards": {"masterball": 1, "coin": 1500}},
+            "platinum": {"threshold": 4, "rewards": {"masterball": 2, "coin": 2000}},
+            "diamond": {"threshold": 5, "rewards": {"masterball": 3, "coin": 5000}},
+        },
+    },
 }
 
 TOTAL_ACHIEVEMENT_TIERS = sum(len(cat["tiers"]) for cat in ACHIEVEMENTS.values())
@@ -224,6 +235,11 @@ def get_battle_wins(conn: sqlite3.Connection, target_id: int) -> int:
     return row[0] if row else 0
 
 
+def legends_beaten(conn: sqlite3.Connection, target_id: int) -> int:
+    battle_store.ensure_legend_table(conn)
+    return conn.execute("SELECT COUNT(*) FROM poke_legend_wins WHERE user_id = ?", (target_id,)).fetchone()[0]
+
+
 def unlock_achievements_for_battle_winner(battle: "be.BattleState", battle_row: sqlite3.Row):
     """Called right when a battle ends so the Battler achievement (and its
     rewards) lands immediately, instead of waiting for the winner's next
@@ -268,6 +284,7 @@ def check_and_unlock_achievements(conn: sqlite3.Connection, target_id: int) -> l
         "evolution_count": evolution_count,
         "level": level,
         "battle_wins": get_battle_wins(conn, target_id),
+        "legends_beaten": legends_beaten(conn, target_id),
     }
 
     unlocked = {
@@ -512,6 +529,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
     ]
     badges_total_earned = len(earned_badges & set(battle_store.GYMS.keys()))
     badges_total = len(battle_store.GYMS)
+    legend_wins = battle_store.get_legend_wins(target_id)
 
     return {
         "user_id": str(target_id),  # Discord snowflake — see the note in list_trainers()
@@ -544,6 +562,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
         "badges_total_earned": badges_total_earned,
         "badges_total": badges_total,
         "achievements": {"unlocked": unlocked_count, "total": TOTAL_ACHIEVEMENT_TIERS},
+        "legend_trophies": [_legend_card(k, legend_wins) for k in battle_store.LEGENDS],
     }
 
 
@@ -723,6 +742,7 @@ def build_achievements_payload(target_id: int, conn: sqlite3.Connection) -> dict
         "evolution_count": evolution_count,
         "level": level,
         "battle_wins": get_battle_wins(conn, target_id),
+        "legends_beaten": legends_beaten(conn, target_id),
     }
 
     categories = []
@@ -2562,6 +2582,82 @@ async def start_champion_battle(generation: str, user_id: int = Depends(get_curr
     def _do():
         roster_b = battle_store.build_roster_for_league(league_key)
         battle_id = battle_store.create_battle("champion", user_id, None, league_key, 0, 0)
+        battle_store.start_battle_sides(battle_id, roster_a, roster_b)
+        return battle_id
+
+    battle_id = await asyncio.to_thread(_do)
+    return {"battle_id": battle_id}
+
+
+# ---------- Legends ----------
+
+def _legend_card(key: str, wins: dict) -> dict:
+    entry = battle_store.LEGENDS[key]
+    reward = POKEDEX.get(entry["reward_mega"], {})
+    megas = [POKEDEX[m["mega"]]["name"] for m in entry["roster"] if m.get("mega") in POKEDEX]
+    return {
+        "key": key, "name": entry["name"], "title": entry["title"], "region": entry["region"],
+        "order": entry["order"], "flavor": entry["flavor"], "portrait": entry.get("portrait"),
+        "megas": megas,
+        "reward": {"dex_id": reward.get("id"), "name": reward.get("name"), "artwork": reward.get("artwork")},
+        "beaten": key in wins, "wins": wins.get(key, {}).get("wins", 0),
+        "first_won_at": wins.get(key, {}).get("first_won_at"),
+    }
+
+
+@app.get("/api/legends")
+def get_legends(user_id: int = Depends(get_current_user_id)):
+    wins = battle_store.get_legend_wins(user_id)
+    champions = [k for k, e in battle_store.LEAGUE.items() if e["role"] == "champion"]
+    earned = battle_store.get_league_progress(user_id)
+    return {
+        "unlocked": battle_store.legends_unlocked(user_id),
+        "champions": [{"name": battle_store.LEAGUE[k]["name"], "region": battle_store.LEAGUE[k]["generation"],
+                       "beaten": k in earned} for k in champions],
+        "legends": [_legend_card(k, wins) for k in battle_store.LEGENDS],
+        "first_win": battle_store.LEGEND_FIRST_WIN,
+        "rematch": battle_store.LEGEND_REMATCH,
+        "max_legendaries": battle_store.LEAGUE_MAX_LEGENDARIES,
+        "team_legendaries": [POKEDEX[d]["name"] for d in battle_store.get_team(user_id) if battle_store.is_legendary_species(d)],
+    }
+
+
+@app.get("/api/legends/{legend_key}")
+def get_legend_detail(legend_key: str, user_id: int = Depends(get_current_user_id)):
+    entry = battle_store.LEGENDS.get(legend_key)
+    if not entry:
+        raise HTTPException(404, "Unknown Legend")
+    card = _legend_card(legend_key, battle_store.get_legend_wins(user_id))
+    roster = []
+    for m in entry["roster"]:
+        mon = POKEDEX.get(m["dex_id"], {})
+        mega = POKEDEX.get(m.get("mega")) if m.get("mega") else None
+        roster.append({
+            "dex_id": m["dex_id"], "name": mon.get("name"), "artwork": mon.get("artwork"),
+            "types": mon.get("types", []),
+            "mega": {"name": mega["name"], "artwork": mega.get("artwork"), "types": mega.get("types", [])} if mega else None,
+        })
+    return {**card, "roster": roster, "unlocked": battle_store.legends_unlocked(user_id)}
+
+
+@app.post("/api/battles/legend/{legend_key}")
+async def start_legend_battle(legend_key: str, user_id: int = Depends(get_current_user_id)):
+    if legend_key not in battle_store.LEGENDS:
+        raise HTTPException(404, "Unknown Legend")
+    if battle_store.has_active_battle(user_id):
+        raise HTTPException(400, "You're already in a battle!")
+    if not battle_store.legends_unlocked(user_id):
+        raise HTTPException(400, "Defeat all 4 regional Champions to challenge the Legends.")
+    roster_a = battle_store.build_roster_for_player(user_id)
+    if not roster_a:
+        raise HTTPException(400, "You need to set your team first — use the Team page.")
+    problem = battle_store.league_team_problem(user_id)
+    if problem:
+        raise HTTPException(400, problem.replace("The Poké League allows", "Legend battles allow"))
+
+    def _do():
+        roster_b = battle_store.build_roster_for_legend(legend_key)
+        battle_id = battle_store.create_battle(battle_store.LEGEND_BATTLE_TYPE, user_id, None, legend_key, 0, 0)
         battle_store.start_battle_sides(battle_id, roster_a, roster_b)
         return battle_id
 
