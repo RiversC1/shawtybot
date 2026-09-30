@@ -1,8 +1,5 @@
-discord.py[voice]
+discord.py
 python-dotenv
-spotipy
-yt-dlp
-syncedlyrics
 watchfiles
 anthropic
 
