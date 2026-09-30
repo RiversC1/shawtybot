@@ -231,10 +231,10 @@ def build_roster_for_gym(gym_key: str) -> list["be.BattlerState"]:
 
 
 # League difficulty: Elite Four Pokémon roll IVs of 25-31 per stat each
-# battle (strong, not flawless) and half the team holds an item; Champions
-# field perfect IVs and every Pokémon holds an item picked for it.
+# battle (strong, not flawless); Champions field perfect IVs. Both give every
+# Pokémon an item picked for it.
 ELITE_FOUR_IV_RANGE = (25, 31)
-ELITE_FOUR_ITEM_HOLDERS = 3
+ELITE_FOUR_ITEM_HOLDERS = 6
 
 
 def build_roster_for_league(league_key: str) -> list["be.BattlerState"]:
@@ -1196,8 +1196,8 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
 # NPC difficulty tiers. Random trainers: the loose weighted-random AI, no
 # items. Gym leaders: "medium" (the League AI most turns, the loose pick the
 # rest, and smart replacements after a faint) with 1-2 held items. Elite Four
-# / Champions: the full League AI (items on half the team / the whole team;
-# see build_roster_for_gym and build_roster_for_league).
+# / Champions: the full League AI and items on the whole team (see
+# build_roster_for_gym and build_roster_for_league).
 HARD_AI_BATTLE_TYPES = {"elite_four", "champion"}
 MEDIUM_AI_BATTLE_TYPES = {"gym", "custom_gym"}
 

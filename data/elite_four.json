@@ -15,7 +15,7 @@
           "Ice Beam",
           "Aqua Tail",
           "Double Edge",
-          "Hail"
+          "Take Down"
         ]
       },
       {
@@ -42,20 +42,20 @@
         "dex_id": 124,
         "ability": "oblivious",
         "moves": [
-          "Blizzard",
           "Psychic",
           "Thrash",
-          "Perish Song"
+          "Blizzard",
+          "Body Slam"
         ]
       },
       {
         "dex_id": 131,
         "ability": "water-absorb",
         "moves": [
-          "Hydro Pump",
+          "Surf",
           "Blizzard",
           "Dragon Pulse",
-          "Perish Song"
+          "Hydro Pump"
         ]
       },
       {
@@ -63,8 +63,8 @@
         "ability": "inner-focus",
         "moves": [
           "Blizzard",
-          "Freeze Dry",
           "Crunch",
+          "Headbutt",
           "Hail"
         ]
       }
@@ -86,33 +86,33 @@
     "flavor": "A stone-hard Fighting-type specialist who trains through brute strength.",
     "roster": [
       {
-        "dex_id": 95,
-        "ability": "rock-head",
+        "dex_id": 448,
+        "ability": "inner-focus",
         "moves": [
-          "Stone Edge",
-          "Dig",
-          "Double Edge",
-          "Sandstorm"
+          "Close Combat",
+          "Meteor Mash",
+          "Dragon Pulse",
+          "Extreme Speed"
         ]
       },
       {
         "dex_id": 208,
         "ability": "rock-head",
         "moves": [
-          "Iron Tail",
-          "Dig",
           "Double Edge",
-          "Magnet Rise"
+          "Iron Tail",
+          "Stone Edge",
+          "Crunch"
         ]
       },
       {
         "dex_id": 106,
         "ability": "limber",
         "moves": [
-          "High Jump Kick",
           "Close Combat",
           "Mega Kick",
-          "Endure"
+          "Blaze Kick",
+          "High Jump Kick"
         ]
       },
       {
@@ -120,9 +120,9 @@
         "ability": "keen-eye",
         "moves": [
           "Focus Punch",
-          "Close Combat",
-          "Mega Punch",
-          "Detect"
+          "Thunder Punch",
+          "Ice Punch",
+          "Close Combat"
         ]
       },
       {
@@ -140,9 +140,9 @@
         "ability": "guts",
         "moves": [
           "Superpower",
-          "Cross Chop",
           "Double Edge",
-          "Scary Face"
+          "Cross Chop",
+          "Submission"
         ]
       }
     ],
@@ -167,29 +167,29 @@
         "ability": "cursed-body",
         "moves": [
           "Shadow Ball",
-          "Hex",
           "Dream Eater",
-          "Mean Look"
+          "Dark Pulse",
+          "Hex"
         ]
       },
       {
         "dex_id": 24,
         "ability": "intimidate",
         "moves": [
-          "Gunk Shot",
           "Belch",
-          "Spit Up",
-          "Haze"
+          "Gunk Shot",
+          "Acid",
+          "Spit Up"
         ]
       },
       {
-        "dex_id": 93,
+        "dex_id": 429,
         "ability": "levitate",
         "moves": [
           "Shadow Ball",
-          "Hex",
-          "Dream Eater",
-          "Mean Look"
+          "Power Gem",
+          "Extrasensory",
+          "Hex"
         ]
       },
       {
@@ -209,7 +209,7 @@
           "Air Slash",
           "Venoshock",
           "Leech Life",
-          "Haze"
+          "Poison Fang"
         ]
       },
       {
@@ -217,9 +217,9 @@
         "ability": "pressure",
         "moves": [
           "Shadow Ball",
-          "Hex",
           "Future Sight",
-          "Destiny Bond"
+          "Hex",
+          "Psychic"
         ]
       }
     ],
@@ -243,29 +243,29 @@
         "dex_id": 130,
         "ability": "intimidate",
         "moves": [
-          "Hurricane",
           "Hydro Pump",
-          "Hyper Beam",
+          "Thrash",
+          "Hurricane",
           "Rain Dance"
         ]
       },
       {
-        "dex_id": 148,
-        "ability": "shed-skin",
+        "dex_id": 330,
+        "ability": "levitate",
         "moves": [
-          "Outrage",
-          "Dragon Rush",
-          "Hyper Beam",
-          "Dragon Dance"
+          "Earthquake",
+          "Boomburst",
+          "Dragon Claw",
+          "Dragon Rush"
         ]
       },
       {
         "dex_id": 142,
         "ability": "rock-head",
         "moves": [
-          "Fly",
           "Rock Slide",
-          "Giga Impact",
+          "Sky Drop",
+          "Iron Head",
           "Agility"
         ]
       },
@@ -275,7 +275,7 @@
         "moves": [
           "Outrage",
           "Hurricane",
-          "Hyper Beam",
+          "Wing Attack",
           "Roost"
         ]
       },
@@ -284,9 +284,9 @@
         "ability": "intimidate",
         "moves": [
           "Outrage",
-          "Fly",
           "Double Edge",
-          "Scary Face"
+          "Flamethrower",
+          "Crunch"
         ]
       },
       {
@@ -294,9 +294,9 @@
         "ability": "swift-swim",
         "moves": [
           "Wave Crash",
+          "Dragon Pulse",
           "Hydro Pump",
-          "Rain Dance",
-          "Dragon Pulse"
+          "Rain Dance"
         ]
       }
     ],
@@ -321,9 +321,9 @@
         "ability": "keen-eye",
         "moves": [
           "Hurricane",
-          "Razor Wind",
-          "Mirror Move",
-          "Air Slash"
+          "Air Slash",
+          "Aerial Ace",
+          "Razor Wind"
         ]
       },
       {
@@ -332,8 +332,8 @@
         "moves": [
           "Future Sight",
           "Psychic",
-          "Trick",
-          "Psycho Cut"
+          "Psycho Cut",
+          "Trick"
         ]
       },
       {
@@ -342,16 +342,16 @@
         "moves": [
           "Earthquake",
           "Stone Edge",
-          "Giga Impact",
-          "Leer"
+          "Megahorn",
+          "Take Down"
         ]
       },
       {
         "dex_id": 103,
         "ability": "chlorophyll",
         "moves": [
-          "Leaf Storm",
           "Wood Hammer",
+          "Psyshock",
           "Egg Bomb",
           "Leech Seed"
         ]
@@ -361,9 +361,9 @@
         "ability": "intimidate",
         "moves": [
           "Flamethrower",
-          "Ember",
           "Double Edge",
-          "Leer"
+          "Extreme Speed",
+          "Take Down"
         ]
       },
       {
@@ -371,9 +371,9 @@
         "ability": "blaze",
         "moves": [
           "Flare Blitz",
-          "Inferno",
+          "Air Slash",
           "Slash",
-          "Heat Wave"
+          "Flamethrower"
         ]
       }
     ],
@@ -406,18 +406,18 @@
         "dex_id": 124,
         "ability": "oblivious",
         "moves": [
-          "Blizzard",
           "Psychic",
           "Thrash",
-          "Perish Song"
+          "Blizzard",
+          "Body Slam"
         ]
       },
       {
         "dex_id": 103,
         "ability": "chlorophyll",
         "moves": [
-          "Leaf Storm",
           "Wood Hammer",
+          "Psyshock",
           "Egg Bomb",
           "Leech Seed"
         ]
@@ -437,9 +437,9 @@
         "ability": "synchronize",
         "moves": [
           "Future Sight",
-          "Psychic",
           "Last Resort",
-          "Power Swap"
+          "Psychic",
+          "Double Edge"
         ]
       },
       {
@@ -470,13 +470,13 @@
     "flavor": "A former Gym Leader turned Poison-type ninja master.",
     "roster": [
       {
-        "dex_id": 168,
-        "ability": "swarm",
+        "dex_id": 452,
+        "ability": "sniper",
         "moves": [
-          "Poison Jab",
+          "Crunch",
           "Cross Poison",
-          "Psychic",
-          "Toxic Thread"
+          "X Scissor",
+          "Venoshock"
         ]
       },
       {
@@ -484,8 +484,8 @@
         "ability": "shield-dust",
         "moves": [
           "Bug Buzz",
-          "Leech Life",
           "Psychic",
+          "Poison Fang",
           "Quiver Dance"
         ]
       },
@@ -503,10 +503,10 @@
         "dex_id": 89,
         "ability": "stench",
         "moves": [
-          "Gunk Shot",
           "Belch",
-          "Memento",
-          "Sludge Wave"
+          "Gunk Shot",
+          "Sludge Wave",
+          "Sludge Bomb"
         ]
       },
       {
@@ -516,7 +516,7 @@
           "Air Slash",
           "Venoshock",
           "Leech Life",
-          "Haze"
+          "Poison Fang"
         ]
       },
       {
@@ -550,10 +550,10 @@
         "dex_id": 106,
         "ability": "limber",
         "moves": [
-          "High Jump Kick",
           "Close Combat",
           "Mega Kick",
-          "Endure"
+          "Blaze Kick",
+          "High Jump Kick"
         ]
       },
       {
@@ -561,9 +561,9 @@
         "ability": "keen-eye",
         "moves": [
           "Focus Punch",
-          "Close Combat",
-          "Mega Punch",
-          "Detect"
+          "Thunder Punch",
+          "Ice Punch",
+          "Close Combat"
         ]
       },
       {
@@ -591,9 +591,9 @@
         "ability": "water-absorb",
         "moves": [
           "Superpower",
-          "Dynamic Punch",
-          "Pound",
-          "Mind Reader"
+          "Submission",
+          "Circle Throw",
+          "Dynamic Punch"
         ]
       },
       {
@@ -601,9 +601,9 @@
         "ability": "guts",
         "moves": [
           "Superpower",
-          "Cross Chop",
           "Double Edge",
-          "Scary Face"
+          "Cross Chop",
+          "Submission"
         ]
       }
     ],
@@ -627,30 +627,30 @@
         "dex_id": 197,
         "ability": "synchronize",
         "moves": [
-          "Dark Pulse",
-          "Assurance",
           "Last Resort",
-          "Guard Swap"
+          "Dark Pulse",
+          "Double Edge",
+          "Assurance"
         ]
       },
       {
         "dex_id": 229,
         "ability": "early-bird",
         "moves": [
-          "Inferno",
           "Foul Play",
-          "Nasty Plot",
-          "Flamethrower"
+          "Flamethrower",
+          "Crunch",
+          "Nasty Plot"
         ]
       },
       {
-        "dex_id": 198,
-        "ability": "insomnia",
+        "dex_id": 430,
+        "ability": "super-luck",
         "moves": [
+          "Brave Bird",
           "Foul Play",
           "Dark Pulse",
-          "Quash",
-          "Sucker Punch"
+          "Air Slash"
         ]
       },
       {
@@ -658,29 +658,29 @@
         "ability": "cursed-body",
         "moves": [
           "Shadow Ball",
-          "Hex",
           "Dream Eater",
-          "Mean Look"
+          "Dark Pulse",
+          "Hex"
         ]
       },
       {
         "dex_id": 45,
         "ability": "chlorophyll",
         "moves": [
-          "Solar Beam",
           "Petal Dance",
-          "Sleep Powder",
-          "Petal Blizzard"
+          "Petal Blizzard",
+          "Acid",
+          "Sleep Powder"
         ]
       },
       {
         "dex_id": 359,
         "ability": "pressure",
         "moves": [
+          "Future Sight",
           "Sucker Punch",
           "Night Slash",
-          "Future Sight",
-          "Perish Song"
+          "Psycho Cut"
         ]
       }
     ],
@@ -704,9 +704,9 @@
         "dex_id": 130,
         "ability": "intimidate",
         "moves": [
-          "Hurricane",
           "Hydro Pump",
-          "Hyper Beam",
+          "Thrash",
+          "Hurricane",
           "Rain Dance"
         ]
       },
@@ -715,18 +715,18 @@
         "ability": "blaze",
         "moves": [
           "Flare Blitz",
-          "Inferno",
+          "Air Slash",
           "Slash",
-          "Heat Wave"
+          "Flamethrower"
         ]
       },
       {
         "dex_id": 142,
         "ability": "rock-head",
         "moves": [
-          "Fly",
           "Rock Slide",
-          "Giga Impact",
+          "Sky Drop",
+          "Iron Head",
           "Agility"
         ]
       },
@@ -735,9 +735,9 @@
         "ability": "swift-swim",
         "moves": [
           "Wave Crash",
+          "Dragon Pulse",
           "Hydro Pump",
-          "Rain Dance",
-          "Dragon Pulse"
+          "Rain Dance"
         ]
       },
       {
@@ -745,9 +745,9 @@
         "ability": "intimidate",
         "moves": [
           "Outrage",
-          "Fly",
           "Double Edge",
-          "Scary Face"
+          "Flamethrower",
+          "Crunch"
         ]
       },
       {
@@ -756,7 +756,7 @@
         "moves": [
           "Outrage",
           "Hurricane",
-          "Hyper Beam",
+          "Wing Attack",
           "Roost"
         ]
       }
@@ -777,13 +777,13 @@
     "flavor": "A grinning Dark-type Elite Four member who battles for the thrill of it.",
     "roster": [
       {
-        "dex_id": 262,
-        "ability": "intimidate",
+        "dex_id": 248,
+        "ability": "unnerve",
         "moves": [
+          "Stone Edge",
           "Crunch",
-          "Sucker Punch",
-          "Play Rough",
-          "Embargo"
+          "Thrash",
+          "Earthquake"
         ]
       },
       {
@@ -791,9 +791,9 @@
         "ability": "chlorophyll",
         "moves": [
           "Leaf Storm",
-          "Leaf Tornado",
           "Hurricane",
-          "Whirlwind"
+          "Leaf Tornado",
+          "Mega Drain"
         ]
       },
       {
@@ -802,8 +802,8 @@
         "moves": [
           "Energy Ball",
           "Sucker Punch",
-          "Pin Missile",
-          "Destiny Bond"
+          "Needle Arm",
+          "Payback"
         ]
       },
       {
@@ -812,7 +812,7 @@
         "moves": [
           "Crabhammer",
           "Crunch",
-          "Guillotine",
+          "Razor Shell",
           "Swords Dance"
         ]
       },
@@ -820,10 +820,10 @@
         "dex_id": 359,
         "ability": "pressure",
         "moves": [
+          "Future Sight",
           "Sucker Punch",
           "Night Slash",
-          "Future Sight",
-          "Perish Song"
+          "Psycho Cut"
         ]
       },
       {
@@ -832,8 +832,8 @@
         "moves": [
           "Liquidation",
           "Crunch",
-          "Skull Bash",
-          "Taunt"
+          "Take Down",
+          "Night Slash"
         ]
       }
     ],
@@ -858,9 +858,9 @@
         "ability": "pressure",
         "moves": [
           "Shadow Ball",
-          "Hex",
           "Future Sight",
-          "Mean Look"
+          "Hex",
+          "Psychic"
         ]
       },
       {
@@ -868,29 +868,29 @@
         "ability": "insomnia",
         "moves": [
           "Phantom Force",
-          "Shadow Ball",
           "Sucker Punch",
-          "Trick"
+          "Shadow Ball",
+          "Knock Off"
         ]
       },
       {
-        "dex_id": 302,
-        "ability": "keen-eye",
+        "dex_id": 94,
+        "ability": "cursed-body",
         "moves": [
-          "Foul Play",
           "Shadow Ball",
-          "Zen Headbutt",
-          "Mean Look"
+          "Dream Eater",
+          "Dark Pulse",
+          "Hex"
         ]
       },
       {
-        "dex_id": 292,
-        "ability": "wonder-guard",
+        "dex_id": 477,
+        "ability": "pressure",
         "moves": [
-          "Phantom Force",
           "Shadow Ball",
-          "Fury Swipes",
-          "Spite"
+          "Future Sight",
+          "Hex",
+          "Psychic"
         ]
       },
       {
@@ -898,8 +898,8 @@
         "ability": "levitate",
         "moves": [
           "Shadow Ball",
-          "Hex",
           "Power Gem",
+          "Extrasensory",
           "Hypnosis"
         ]
       },
@@ -909,8 +909,8 @@
         "moves": [
           "Phantom Force",
           "Shadow Ball",
-          "Explosion",
-          "Baton Pass"
+          "Ominous Wind",
+          "Explosion"
         ]
       }
     ],
@@ -935,8 +935,8 @@
         "ability": "inner-focus",
         "moves": [
           "Blizzard",
-          "Freeze Dry",
           "Crunch",
+          "Headbutt",
           "Hail"
         ]
       },
@@ -944,20 +944,20 @@
         "dex_id": 365,
         "ability": "thick-fat",
         "moves": [
-          "Blizzard",
           "Surf",
+          "Blizzard",
           "Body Slam",
           "Hail"
         ]
       },
       {
-        "dex_id": 364,
+        "dex_id": 473,
         "ability": "thick-fat",
         "moves": [
+          "Earthquake",
+          "Thrash",
           "Blizzard",
-          "Surf",
-          "Body Slam",
-          "Hail"
+          "Double Edge"
         ]
       },
       {
@@ -966,28 +966,28 @@
         "moves": [
           "Wood Hammer",
           "Blizzard",
-          "Ingrain",
-          "Energy Ball"
+          "Energy Ball",
+          "Icy Wind"
         ]
       },
       {
         "dex_id": 478,
         "ability": "snow-cloak",
         "moves": [
-          "Blizzard",
           "Shadow Ball",
-          "Destiny Bond",
-          "Hail"
+          "Blizzard",
+          "Hail",
+          "Destiny Bond"
         ]
       },
       {
         "dex_id": 461,
         "ability": "pressure",
         "moves": [
-          "Blizzard",
           "Dark Pulse",
-          "Metal Claw",
-          "Screech"
+          "Blizzard",
+          "Night Slash",
+          "Metal Claw"
         ]
       }
     ],
@@ -1011,20 +1011,20 @@
         "dex_id": 334,
         "ability": "natural-cure",
         "moves": [
-          "Sky Attack",
           "Dragon Pulse",
           "Moonblast",
-          "Perish Song"
+          "Take Down",
+          "Sky Attack"
         ]
       },
       {
         "dex_id": 330,
         "ability": "levitate",
         "moves": [
-          "Dragon Rush",
           "Earthquake",
-          "Hyper Beam",
-          "Sandstorm"
+          "Boomburst",
+          "Dragon Claw",
+          "Dragon Rush"
         ]
       },
       {
@@ -1032,9 +1032,9 @@
         "ability": "swift-swim",
         "moves": [
           "Wave Crash",
+          "Dragon Pulse",
           "Hydro Pump",
-          "Rain Dance",
-          "Dragon Pulse"
+          "Rain Dance"
         ]
       },
       {
@@ -1042,9 +1042,9 @@
         "ability": "intimidate",
         "moves": [
           "Outrage",
-          "Fly",
           "Double Edge",
-          "Scary Face"
+          "Flamethrower",
+          "Crunch"
         ]
       },
       {
@@ -1053,7 +1053,7 @@
         "moves": [
           "Outrage",
           "Hurricane",
-          "Hyper Beam",
+          "Wing Attack",
           "Roost"
         ]
       },
@@ -1062,9 +1062,9 @@
         "ability": "sand-veil",
         "moves": [
           "Outrage",
-          "Dragon Rush",
           "Double Edge",
-          "Sandstorm"
+          "Crunch",
+          "Dragon Claw"
         ]
       }
     ],
@@ -1088,19 +1088,19 @@
         "dex_id": 350,
         "ability": "marvel-scale",
         "moves": [
-          "Hydro Pump",
           "Surf",
-          "Rain Dance",
-          "Aqua Tail"
+          "Hydro Pump",
+          "Aqua Tail",
+          "Rain Dance"
         ]
       },
       {
         "dex_id": 130,
         "ability": "intimidate",
         "moves": [
-          "Hurricane",
           "Hydro Pump",
-          "Hyper Beam",
+          "Thrash",
+          "Hurricane",
           "Rain Dance"
         ]
       },
@@ -1110,8 +1110,8 @@
         "moves": [
           "Hydro Pump",
           "Bubble Beam",
-          "Fury Swipes",
-          "Growl"
+          "Water Gun",
+          "Mega Drain"
         ]
       },
       {
@@ -1119,9 +1119,9 @@
         "ability": "oblivious",
         "moves": [
           "Earthquake",
-          "Earth Power",
+          "Aqua Tail",
           "Future Sight",
-          "Rest"
+          "Earth Power"
         ]
       },
       {
@@ -1129,17 +1129,17 @@
         "ability": "swift-swim",
         "moves": [
           "Wave Crash",
+          "Dragon Pulse",
           "Hydro Pump",
-          "Rain Dance",
-          "Dragon Pulse"
+          "Rain Dance"
         ]
       },
       {
         "dex_id": 365,
         "ability": "thick-fat",
         "moves": [
-          "Blizzard",
           "Surf",
+          "Blizzard",
           "Body Slam",
           "Hail"
         ]
@@ -1161,23 +1161,23 @@
     "flavor": "A swift Bug-type specialist of the Sinnoh Elite Four.",
     "roster": [
       {
-        "dex_id": 267,
-        "ability": "swarm",
+        "dex_id": 452,
+        "ability": "sniper",
         "moves": [
-          "Bug Buzz",
-          "Air Slash",
-          "Giga Drain",
-          "Quiver Dance"
+          "Crunch",
+          "Cross Poison",
+          "X Scissor",
+          "Venoshock"
         ]
       },
       {
-        "dex_id": 269,
-        "ability": "shield-dust",
+        "dex_id": 348,
+        "ability": "battle-armor",
         "moves": [
-          "Bug Buzz",
-          "Silver Wind",
-          "Extrasensory",
-          "Quiver Dance"
+          "X Scissor",
+          "Ancient Power",
+          "Crush Claw",
+          "Slash"
         ]
       },
       {
@@ -1186,8 +1186,8 @@
         "moves": [
           "Attack Order",
           "Bug Buzz",
-          "Destiny Bond",
-          "Fell Stinger"
+          "Fell Stinger",
+          "Destiny Bond"
         ]
       },
       {
@@ -1207,7 +1207,7 @@
           "Bug Buzz",
           "Air Slash",
           "Crunch",
-          "Screech"
+          "Slash"
         ]
       },
       {
@@ -1215,9 +1215,9 @@
         "ability": "swarm",
         "moves": [
           "Iron Head",
-          "Fury Cutter",
           "Night Slash",
-          "Swords Dance"
+          "Swords Dance",
+          "Fury Cutter"
         ]
       }
     ],
@@ -1242,8 +1242,8 @@
         "ability": "sand-stream",
         "moves": [
           "Earthquake",
-          "High Horsepower",
           "Double Edge",
+          "Crunch",
           "Slack Off"
         ]
       },
@@ -1251,20 +1251,20 @@
         "dex_id": 76,
         "ability": "rock-head",
         "moves": [
-          "Stone Edge",
           "Earthquake",
-          "Explosion",
-          "Stealth Rock"
+          "Stone Edge",
+          "Double Edge",
+          "Explosion"
         ]
       },
       {
-        "dex_id": 195,
-        "ability": "damp",
+        "dex_id": 260,
+        "ability": "torrent",
         "moves": [
           "Earthquake",
-          "Muddy Water",
-          "Mist",
-          "Haze"
+          "Hydro Pump",
+          "Hammer Arm",
+          "Take Down"
         ]
       },
       {
@@ -1272,9 +1272,9 @@
         "ability": "oblivious",
         "moves": [
           "Earthquake",
-          "Earth Power",
+          "Aqua Tail",
           "Future Sight",
-          "Rest"
+          "Earth Power"
         ]
       },
       {
@@ -1282,8 +1282,8 @@
         "ability": "hyper-cutter",
         "moves": [
           "Earthquake",
-          "Earth Power",
           "Crabhammer",
+          "X Scissor",
           "Swords Dance"
         ]
       },
@@ -1291,9 +1291,9 @@
         "dex_id": 464,
         "ability": "lightning-rod",
         "moves": [
-          "Rock Wrecker",
           "Earthquake",
-          "Giga Impact",
+          "Stone Edge",
+          "Double Edge",
           "Megahorn"
         ]
       }
@@ -1319,8 +1319,8 @@
         "ability": "run-away",
         "moves": [
           "Flare Blitz",
-          "Fire Blast",
           "Take Down",
+          "Fire Blast",
           "Agility"
         ]
       },
@@ -1328,10 +1328,10 @@
         "dex_id": 208,
         "ability": "rock-head",
         "moves": [
-          "Iron Tail",
-          "Dig",
           "Double Edge",
-          "Magnet Rise"
+          "Iron Tail",
+          "Stone Edge",
+          "Crunch"
         ]
       },
       {
@@ -1340,8 +1340,8 @@
         "moves": [
           "Phantom Force",
           "Shadow Ball",
-          "Explosion",
-          "Baton Pass"
+          "Ominous Wind",
+          "Explosion"
         ]
       },
       {
@@ -1350,7 +1350,7 @@
         "moves": [
           "Fire Blast",
           "Flamethrower",
-          "Hyper Beam",
+          "Lava Plume",
           "Sunny Day"
         ]
       },
@@ -1358,10 +1358,10 @@
         "dex_id": 229,
         "ability": "early-bird",
         "moves": [
-          "Inferno",
           "Foul Play",
-          "Nasty Plot",
-          "Flamethrower"
+          "Flamethrower",
+          "Crunch",
+          "Nasty Plot"
         ]
       },
       {
@@ -1369,7 +1369,7 @@
         "ability": "blaze",
         "moves": [
           "Flare Blitz",
-          "Raging Fury",
+          "Close Combat",
           "Double Edge",
           "Calm Mind"
         ]
@@ -1406,19 +1406,19 @@
         "ability": "inner-focus",
         "moves": [
           "Psychic",
-          "Zen Headbutt",
           "Crunch",
+          "Zen Headbutt",
           "Nasty Plot"
         ]
       },
       {
-        "dex_id": 308,
-        "ability": "pure-power",
+        "dex_id": 196,
+        "ability": "synchronize",
         "moves": [
-          "High Jump Kick",
-          "Axe Kick",
-          "Recover",
-          "Reversal"
+          "Future Sight",
+          "Last Resort",
+          "Psychic",
+          "Double Edge"
         ]
       },
       {
@@ -1437,8 +1437,8 @@
         "moves": [
           "Future Sight",
           "Psychic",
-          "Trick",
-          "Psycho Cut"
+          "Psycho Cut",
+          "Trick"
         ]
       },
       {
@@ -1483,19 +1483,19 @@
         "ability": "natural-cure",
         "moves": [
           "Petal Dance",
+          "Poison Jab",
           "Energy Ball",
-          "Stun Spore",
-          "Poison Jab"
+          "Venoshock"
         ]
       },
       {
         "dex_id": 350,
         "ability": "marvel-scale",
         "moves": [
-          "Hydro Pump",
           "Surf",
-          "Rain Dance",
-          "Aqua Tail"
+          "Hydro Pump",
+          "Aqua Tail",
+          "Rain Dance"
         ]
       },
       {
@@ -1505,7 +1505,7 @@
           "Close Combat",
           "Meteor Mash",
           "Dragon Pulse",
-          "Heal Pulse"
+          "Extreme Speed"
         ]
       },
       {
@@ -1515,7 +1515,7 @@
           "Moonblast",
           "Air Slash",
           "Extrasensory",
-          "Baby Doll Eyes"
+          "Air Cutter"
         ]
       },
       {
@@ -1523,9 +1523,9 @@
         "ability": "sand-veil",
         "moves": [
           "Outrage",
-          "Dragon Rush",
           "Double Edge",
-          "Sandstorm"
+          "Crunch",
+          "Dragon Claw"
         ]
       }
     ],
