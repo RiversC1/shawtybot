@@ -436,6 +436,34 @@ def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster
         append_battle_events(battle_id, 1, ability_events)
 
 
+# Boss trainers whose Pokémon Mega Evolve mid-battle: each one that has a
+# Mega does so the first time it attacks (see battle_engine.mega_evolve).
+MEGA_TRAINERS = {"sinnoh:cynthia"}
+
+
+def megas_by_base() -> dict[int, dict]:
+    out: dict[int, dict] = {}
+    for mon in sorted(POKEDEX.values(), key=lambda m: m["id"]):
+        if mon.get("is_mega") and mon.get("mega_of"):
+            out.setdefault(mon["mega_of"], mon)  # Charizard: X
+    return out
+
+
+MEGA_BY_BASE = megas_by_base()
+
+
+def battle_mon(dex_id: int) -> dict:
+    """The pokedex entry a battle slot uses. A Pokémon that Mega Evolved
+    mid-battle keeps the moves it knew as its base form, so a Mega's move
+    pool also includes its base form's."""
+    mon = POKEDEX.get(dex_id, {})
+    base = POKEDEX.get(mon.get("mega_of")) if mon.get("is_mega") else None
+    if not base:
+        return mon
+    names = {m["name"] for m in mon.get("moves", [])}
+    return {**mon, "moves": mon.get("moves", []) + [m for m in base.get("moves", []) if m["name"] not in names]}
+
+
 def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | tuple[None, None]:
     battle_row = get_battle_row(battle_id)
     if not battle_row:
@@ -448,7 +476,7 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
     roster_a, roster_b = [], []
     active_a, active_b = 0, 0
     for r in side_rows:
-        mon = POKEDEX.get(r["dex_id"], {})
+        mon = battle_mon(r["dex_id"])
         row_dict = {
             "dex_id": r["dex_id"], "current_hp": r["current_hp"], "max_hp": r["max_hp"],
             "status": r["status"], "status_counter": r["status_counter"],
@@ -471,6 +499,8 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
     side_b = be.BattleSide(
         side_id="B", controller=(battle_row["side_b_user_id"] or "npc"), roster=roster_b, active_index=active_b
     )
+    if battle_row["battle_type"] == "champion" and battle_row["side_b_npc_key"] in MEGA_TRAINERS:
+        side_b.mega_forms = {b.dex_id: MEGA_BY_BASE[b.dex_id] for b in roster_b if b.dex_id in MEGA_BY_BASE}
     forced = battle_row["forced_switch_side"].split(",") if battle_row["forced_switch_side"] else []
     battle = be.BattleState(
         battle_id=battle_id, side_a=side_a, side_b=side_b,
@@ -496,11 +526,11 @@ def persist_battle_state(battle_id: int, battle: "be.BattleState"):
             for slot, b in enumerate(side.roster):
                 fields = be.battler_state_to_row_fields(b)
                 conn.execute(
-                    "UPDATE poke_battle_sides SET current_hp = ?, max_hp = ?, status = ?, status_counter = ?, "
-                    "stat_stages = ?, confusion_counter = ?, moves = ?, is_active = ?, is_fainted = ?, volatile = ?, "
-                    "held_item = ? WHERE battle_id = ? AND side = ? AND slot = ?",
+                    "UPDATE poke_battle_sides SET dex_id = ?, ability = ?, current_hp = ?, max_hp = ?, status = ?, "
+                    "status_counter = ?, stat_stages = ?, confusion_counter = ?, moves = ?, is_active = ?, "
+                    "is_fainted = ?, volatile = ?, held_item = ? WHERE battle_id = ? AND side = ? AND slot = ?",
                     (
-                        fields["current_hp"], fields["max_hp"], fields["status"], fields["status_counter"],
+                        fields["dex_id"], b.ability, fields["current_hp"], fields["max_hp"], fields["status"], fields["status_counter"],
                         json.dumps(fields["stat_stages"]), fields["confusion_counter"], json.dumps(fields["moves"]),
                         1 if slot == side.active_index else 0, 1 if fields["is_fainted"] else 0,
                         json.dumps(fields["volatile"]), fields["item"], battle_id, side_label, slot,
@@ -1573,9 +1603,18 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
     )
 
     def mon_summary(r: sqlite3.Row, reveal_moves: bool, side: str) -> dict:
-        mon = POKEDEX.get(r["dex_id"], {})
+        mon = battle_mon(r["dex_id"])
         name = mon.get("name", f"#{r['dex_id']}")
         sprite_front, sprite_back = animated_sprite_urls(name)
+        pre_mega = None
+        if mon.get("is_mega") and _row_get(battle_row, "battle_type") == "champion":
+            # How it looked before Mega Evolving, so a replayed turn can show
+            # the base form until the Mega Evolution event plays.
+            base = POKEDEX.get(mon.get("mega_of"), {})
+            bf, bb = animated_sprite_urls(base.get("name", ""))
+            pre_mega = {"dex_id": base.get("id"), "name": base.get("name"), "artwork": base.get("artwork"),
+                        "sprite": bb if side == back_side else bf, "types": base.get("types", []),
+                        "height": base.get("height")}
         out = {
             "dex_id": r["dex_id"], "name": name, "artwork": mon.get("artwork"),
             "sprite": sprite_back if side == back_side else sprite_front,
@@ -1585,6 +1624,8 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
             "stat_stages": {k: v for k, v in json.loads(r["stat_stages"] or "{}").items() if v},
             "confused": bool(r["confusion_counter"]),
         }
+        if pre_mega:
+            out["pre_mega"] = pre_mega
         if reveal_moves:
             item = _row_get(r, "held_item")
             if item in be.HELD_ITEMS:

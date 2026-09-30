@@ -246,6 +246,9 @@ class BattleSide:
     controller: object  # Discord user id (int) or "npc"
     roster: list  # list[BattlerState], up to 6
     active_index: int = 0
+    # Mega Evolutions this side may use: base dex_id -> the Mega's pokedex
+    # entry. Only set for boss trainers (see battle_store.MEGA_TRAINERS).
+    mega_forms: dict = field(default_factory=dict)
 
     @property
     def active(self) -> BattlerState:
@@ -440,7 +443,7 @@ def pick_npc_action(battle: BattleState, side_id: str) -> Action:
             continue  # only as a last-ditch move
         if move.category != "status" and move.power:
             eff = type_effectiveness(move.type, opp_active.types)
-            stab = 1.5 if move.type in active.types else 1.0
+            stab = stab_multiplier(active, move)
             score = max(move.power * eff * stab, 1)
         else:
             score = 35  # modest baseline so status/utility moves get picked sometimes
@@ -504,7 +507,7 @@ def estimate_damage(attacker: BattlerState, defender: BattlerState, move: MoveDa
     if eff == 0:
         return 0.0
     base = math.floor(LEVEL_100_STAGE_BASE * move.power * A / D / 50) + 2
-    stab = 1.5 if move.type and move.type in attacker.types else 1.0
+    stab = stab_multiplier(attacker, move)
     burn_mult = 0.5 if (attacker.status == "burn" and move.category == "physical") else 1.0
     return (base * stab * eff * 0.925 * burn_mult * weather_damage_multiplier(weather, move, attacker)  # 0.925 ~= avg roll
             * item_damage_multiplier(attacker, move, eff))
@@ -1243,7 +1246,7 @@ def compute_damage(attacker: BattlerState, defender: BattlerState, move: MoveDat
         return 0
 
     base = math.floor(LEVEL_100_STAGE_BASE * move.power * A / D / 50) + 2
-    stab = 1.5 if move.type and move.type in attacker.types else 1.0
+    stab = stab_multiplier(attacker, move)
     crit_mult = 2.0 if is_crit else 1.0
     random_roll = rng.uniform(0.85, 1.00)
     burn_mult = 0.5 if (attacker.status == "burn" and move.category == "physical") else 1.0
@@ -1839,11 +1842,47 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
     return events
 
 
+def stab_multiplier(attacker: BattlerState, move: MoveData) -> float:
+    """Same-type attack bonus: 1.5x, or 2x with Adaptability."""
+    if not move.type or move.type not in attacker.types:
+        return 1.0
+    return 2.0 if ability_key(attacker) == "adaptability" else 1.5
+
+
+def mega_evolve(battle: BattleState, side_id: str) -> list:
+    """Mega Evolves `side_id`'s active Pokémon if its side has a Mega for
+    it. Happens at the start of the turn, before anyone moves, so the new
+    Speed already counts. It keeps its HP, moves, item, status and stat
+    changes; its species, types, stats and ability become the Mega's."""
+    side = battle.side(side_id)
+    mon = side.active
+    mega = side.mega_forms.get(mon.dex_id)
+    if not mega or mon.is_fainted:
+        return []
+    base = mega.get("base_stats", {})
+    for key in ("attack", "defense", "sp_attack", "sp_defense", "speed"):
+        mon.stats[key] = stat_at_level_100(base.get(key, 1), mon.ivs.get(key, 31), False)
+    old_name, old_dex = mon.species_name, mon.dex_id
+    abilities = mega.get("abilities") or []
+    mon.dex_id, mon.species_name = mega["id"], mega["name"]
+    mon.types = list(mega.get("types", mon.types))
+    mon.ability = abilities[0]["name"] if abilities else mon.ability
+    mon.weight = float(mega.get("weight") or mon.weight)
+    events = [{"type": "mega_evolution", "side": side_id, "name": old_name, "dex_id": old_dex,
+               "mega_name": mon.species_name, "mega_dex_id": mon.dex_id, "types": list(mon.types),
+               "ability": ability_label(mon)}]
+    trigger_entry_ability(battle, side_id, events)  # e.g. a Mega whose new ability sets weather
+    return events
+
+
 def resolve_turn(battle: BattleState, action_a: Action, action_b: Action) -> TurnResult:
     """Resolves one simultaneous turn (both sides already chose an Action)
     and mutates `battle` in place. The caller is responsible for persisting
     the mutated state and the returned events afterward."""
     events: list = [{"type": "turn_start", "turn_number": battle.turn_number}]
+    for action in (action_a, action_b):
+        if action.kind == "move":
+            events.extend(mega_evolve(battle, action.side))
     order = _order_actions(battle, action_a, action_b, events)
 
     battle_over = False

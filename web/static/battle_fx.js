@@ -496,6 +496,104 @@ window.BattleFX = (function () {
     }, 350);
   }
 
+  // Mega Evolution: rainbow energy gathers around the Pokémon while it glows
+  // white, then a flash and the Mega Evolution symbol as it changes form.
+  // `swap` is called at the flash to switch the sprite to the Mega.
+  const MEGA_COLORS = ["#ff5f6d", "#ffc371", "#fff275", "#6ee7a8", "#5ec8ff", "#a78bfa", "#f472b6"];
+  const WHITE_FILTER = "brightness(0) invert(1) drop-shadow(0 0 16px #ffffff)";
+  const BASE_FILTER = "drop-shadow(0 6px 6px rgba(0,0,0,0.4)) brightness(1)";
+
+  async function megaEvolve(slot, spriteEl, swap) {
+    if (!layer || !slot) {
+      swap();
+      return;
+    }
+    const at = centerOf(slot);
+    if (reduceMotionNow()) {
+      swap();
+      glowSprite(spriteEl, "#c4b5fd", 900);
+      floatText(slot, "Mega Evolved!", "stat-up");
+      return wait(900);
+    }
+    const orb = document.createElement("div");
+    orb.className = "fx-mega-orb";
+    orb.style.left = `${at.x}px`;
+    orb.style.top = `${at.y}px`;
+    const size = Math.max(120, Math.min(at.w, at.h) * 1.25);
+    orb.style.width = orb.style.height = `${size}px`;
+    layer.appendChild(orb);
+    run(orb, [
+      { transform: "translate(-50%,-50%) scale(0.2) rotate(0deg)", opacity: 0 },
+      { transform: "translate(-50%,-50%) scale(1) rotate(360deg)", opacity: 0.9, offset: 0.5 },
+      { transform: "translate(-50%,-50%) scale(1.15) rotate(720deg)", opacity: 0.95, offset: 0.9 },
+      { transform: "translate(-50%,-50%) scale(1.6) rotate(800deg)", opacity: 0 },
+    ], { duration: 1700, easing: "ease-in-out" });
+    // Strands of energy pulled in from all around.
+    for (let i = 0; i < 28; i++) {
+      const a = rand(0, Math.PI * 2);
+      const d = rand(size * 0.7, size * 1.2);
+      const color = MEGA_COLORS[i % MEGA_COLORS.length];
+      const p = particle("orb", at.x + Math.cos(a) * d, at.y + Math.sin(a) * d, rand(6, 11), { color, glow: color });
+      run(p, [
+        { transform: "translate(-50%,-50%) scale(0.4)", opacity: 0 },
+        { transform: "translate(-50%,-50%) scale(1)", opacity: 1, offset: 0.3 },
+        { transform: `translate(calc(-50% + ${-Math.cos(a) * d}px), calc(-50% + ${-Math.sin(a) * d}px)) scale(0.3)`, opacity: 0.2 },
+      ], { duration: rand(650, 900), easing: "ease-in", delay: rand(0, 650) });
+    }
+    const whiten = spriteEl.animate([{ filter: BASE_FILTER }, { filter: WHITE_FILTER }],
+      { duration: 1200, easing: "ease-in", fill: "forwards" });
+    await wait(1450);
+
+    // The change: flash, new form, rainbow shockwaves, the Mega symbol.
+    const white = { color: "#ffffff", glow: "#ffffff" };
+    flash(at, white, size * 1.6);
+    swap();
+    spriteEl.animate([{ filter: WHITE_FILTER }, { filter: WHITE_FILTER, offset: 0.35 }, { filter: BASE_FILTER }],
+      { duration: 900, easing: "ease-out" });
+    whiten.cancel();
+    for (let i = 0; i < 4; i++) {
+      const color = MEGA_COLORS[(i * 2) % MEGA_COLORS.length];
+      const r = particle("ring", at.x, at.y, 70, { color, glow: color });
+      run(r, [
+        { transform: "translate(-50%,-50%) scale(0.4)", opacity: 0.95 },
+        { transform: "translate(-50%,-50%) scale(4)", opacity: 0 },
+      ], { duration: 900, delay: i * 120, easing: "ease-out" });
+    }
+    burst(at, { color: "#fff6c8", glow: "#ffffff", shape: "star" }, 18);
+    const symbol = document.createElement("div");
+    symbol.className = "fx-mega-symbol";
+    symbol.innerHTML = MEGA_SYMBOL_SVG;
+    symbol.style.left = `${at.x}px`;
+    symbol.style.top = `${at.y - at.h * 0.1}px`;
+    layer.appendChild(symbol);
+    run(symbol, [
+      { transform: "translate(-50%,-50%) scale(0.2)", opacity: 0 },
+      { transform: "translate(-50%,-50%) scale(1.15)", opacity: 1, offset: 0.2 },
+      { transform: "translate(-50%,-50%) scale(1)", opacity: 1, offset: 0.75 },
+      { transform: "translate(-50%,-70%) scale(1)", opacity: 0 },
+    ], { duration: 1400, easing: "ease-out" });
+    shakeScene(260);
+    return wait(1000);
+  }
+
+  // The Mega Evolution emblem: a rainbow ring around a white double helix.
+  const MEGA_SYMBOL_SVG = `<svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+    <defs><linearGradient id="fx-mega-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5f6d"/><stop offset=".35" stop-color="#ffc371"/>
+      <stop offset=".65" stop-color="#5ec8ff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+    <circle cx="32" cy="32" r="27" fill="rgba(20,16,40,.75)" stroke="url(#fx-mega-grad)" stroke-width="5"/>
+    <path d="M22 14c16 10 4 26 20 36M42 14C26 24 38 40 22 50" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+    <path d="M25 22h14M24 32h16M25 42h14" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".85"/>
+  </svg>`;
+
+  function shakeScene(ms) {
+    if (!scene) return;
+    scene.animate([
+      { transform: "translate(0,0)" }, { transform: "translate(-5px,2px)" }, { transform: "translate(4px,-3px)" },
+      { transform: "translate(-3px,-2px)" }, { transform: "translate(0,0)" },
+    ], { duration: ms, easing: "linear" });
+  }
+
   function colorForType(type) {
     return TYPE_FX[type] ? TYPE_FX[type].color : null;
   }
@@ -512,6 +610,6 @@ window.BattleFX = (function () {
   return {
     isMotionOn: () => motionOn, setMotion,
     init, playMove, floatText, showBadge, statusEffect, statArrows, healSparkles, glowSprite,
-    caption, fadeCaption, colorForType, STATUS_FX, kit,
+    caption, fadeCaption, colorForType, STATUS_FX, kit, megaEvolve,
   };
 })();

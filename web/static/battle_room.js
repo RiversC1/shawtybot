@@ -15,6 +15,8 @@
     item_used: 750, item_damage: 600, item_activated: 650, self_ko: 400,
     bide: 600, stockpile: 500, magnitude: 550,
   };
+  // Mega Stones whose name isn't just "<species>ite" (Garchomp -> Garchompite).
+  const MEGA_STONES = { Lucario: "Lucarionite" };
   const DEFAULT_EVENT_DELAY = 250; // structural events with no on-screen effect (turn_start, switch_out, battle_end)
 
   // switch_in plays as its own two-phase mini-sequence (see playSwitchIn)
@@ -742,6 +744,9 @@
         return `${mon} stockpiled ${event.count}!`;
       case "magnitude":
         return `Magnitude ${event.level}!`;
+      case "mega_evolution":
+        return `💎 <strong>${owned(event.side, event.name)}</strong>'s ${esc(MEGA_STONES[event.name] || `${event.name}ite`)} is reacting to ${side}'s Key Stone!<br>`
+          + `✨ <strong>${owned(event.side, event.name)}</strong> has <span class="mega-line">Mega Evolved</span> into <strong>${esc(event.mega_name)}</strong>!`;
       case "cannot_act": {
         const reasons = {
           recharge: "must recharge!", asleep: "is fast asleep.", frozen: "is frozen solid!",
@@ -867,6 +872,7 @@
       if (e.type === "switch_in") monBySide[e.side] = e.name;
       const line = formatEvent(e, nameBySide, monBySide);
       if (line) lines.push(line);
+      if (e.type === "mega_evolution") monBySide[e.side] = e.mega_name;
     }
     logEl.innerHTML = lines.length
       ? lines.map((l) => `<div class="battle-log-line">${l}</div>`).reverse().join("")
@@ -942,11 +948,24 @@
     const unplayedFaints = new Set(
       pendingEvents.filter((e) => e.type === "faint" && e.side === side).map((e) => e.dex_id)
     );
-    return (roster || []).map((m) => ({
-      ...m,
-      is_fainted: m.is_fainted && !unplayedFaints.has(m.dex_id),
-      is_active: visibleMon ? m.dex_id === visibleMon.dex_id : m.is_active,
-    }));
+    return (roster || []).map((m) => {
+      const shown = megaNotYetShown(m) ? { ...m, ...m.pre_mega } : m;
+      return {
+        ...shown,
+        is_fainted: m.is_fainted && !unplayedFaints.has(m.dex_id),
+        is_active: visibleMon ? sameMon(m, visibleMon) : m.is_active,
+      };
+    });
+  }
+
+  // A Pokémon that Mega Evolved this batch still looks like its base form
+  // until that event plays. Roster entries are the Mega from then on.
+  function megaNotYetShown(m) {
+    return Boolean(m.pre_mega) && pendingEvents.some((e) => e.type === "mega_evolution" && e.mega_dex_id === m.dex_id);
+  }
+
+  function sameMon(rosterMon, shown) {
+    return rosterMon.dex_id === shown.dex_id || Boolean(rosterMon.pre_mega && rosterMon.pre_mega.dex_id === shown.dex_id);
   }
 
   function renderFrame(animA, animB) {
@@ -980,13 +999,35 @@
     await wait(SEND_OUT_THROW_MS);
 
     const roster = isA ? truth.roster_a : truth.roster_b;
-    const match = roster.find((m) => m.dex_id === event.dex_id && !m.is_fainted) || roster.find((m) => m.dex_id === event.dex_id);
-    if (isA) visibleA = match ? { ...match } : visibleA;
-    else visibleB = match ? { ...match } : visibleB;
+    const match = roster.find((m) => sameMon(m, event) && !m.is_fainted) || roster.find((m) => sameMon(m, event));
+    const shown = match && match.dex_id !== event.dex_id && match.pre_mega ? { ...match, ...match.pre_mega } : match;
+    if (isA) visibleA = shown ? { ...shown } : visibleA;
+    else visibleB = shown ? { ...shown } : visibleB;
 
     BattleAudio.handleEvent(event); // the cry plays as the Pokémon itself appears
     renderFrame(isA ? "anim-switch-in" : null, !isA ? "anim-switch-in" : null);
     await wait(SEND_OUT_SETTLE_MS);
+  }
+
+  // Mega Evolution plays as its own beat: the energy gathers around the
+  // base form, then at the flash the sprite, name and types become the Mega's.
+  async function playMegaEvolution(event) {
+    const isA = event.side === "A";
+    revealed.push(event);
+    renderLog();
+    BattleFX.caption(currentLineFor(event), false);
+    await BattleFX.megaEvolve(isA ? slotA : slotB, isA ? spriteA : spriteB, () => {
+      const roster = isA ? truth.roster_a : truth.roster_b;
+      const mega = roster.find((m) => m.dex_id === event.mega_dex_id);
+      const current = isA ? visibleA : visibleB;
+      if (mega && current) {
+        const { dex_id, name, sprite, artwork, types, height, pre_mega } = mega;
+        const updated = { ...current, dex_id, name, sprite, artwork, types, height, pre_mega };
+        if (isA) visibleA = updated; else visibleB = updated;
+      }
+      BattleAudio.playCry(event.mega_dex_id);
+      renderFrame(null, null);
+    });
   }
 
   // The log line for an event as of *now* (who's active on each side), for
@@ -994,7 +1035,11 @@
   function currentLineFor(event) {
     const nameBySide = { A: truth.name_a, B: truth.name_b };
     const monBySide = { A: null, B: null };
-    for (const e of revealed) if (e.type === "switch_in") monBySide[e.side] = e.name;
+    for (const e of revealed) {
+      if (e === event) break;
+      if (e.type === "switch_in") monBySide[e.side] = e.name;
+      if (e.type === "mega_evolution") monBySide[e.side] = e.mega_name;
+    }
     return formatEvent(event, nameBySide, monBySide);
   }
 
@@ -1153,6 +1198,10 @@
       const event = pendingEvents.shift();
       if (event.type === "switch_in") {
         await playSwitchIn(event);
+        continue;
+      }
+      if (event.type === "mega_evolution") {
+        await playMegaEvolution(event);
         continue;
       }
       applyEventEffect(event);
