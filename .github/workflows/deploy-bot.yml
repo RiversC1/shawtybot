@@ -30,8 +30,19 @@ jobs:
             git pull origin main
             source venv/bin/activate
             pip install -r requirements.txt
-            sudo systemctl restart shawtybot
-            sudo systemctl restart shawtybot-api
-            sleep 2
-            sudo systemctl is-active shawtybot
-            sudo systemctl is-active shawtybot-api
+            # On a failed restart, print why (status + recent log) so the
+            # Actions log shows the cause without SSHing in.
+            for svc in shawtybot shawtybot-api; do
+              if ! sudo systemctl restart "$svc"; then
+                sudo systemctl status "$svc" --no-pager -l || true
+                exit 1
+              fi
+            done
+            sleep 3
+            for svc in shawtybot shawtybot-api; do
+              if ! sudo systemctl is-active "$svc"; then
+                sudo journalctl -u "$svc" -n 40 --no-pager || true
+                exit 1
+              fi
+            done
+            echo "Deployed $(git log --oneline -1)"
