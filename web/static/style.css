@@ -6093,3 +6093,58 @@ img[src*="/sprites/items/dream-world/"] {
     height: 72px;
     margin-block: 4px;
 }
+
+/* Store: purchase confirmation (store.js) */
+.buy-modal {
+    max-width: 380px;
+}
+
+.buy-summary {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.buy-summary img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+.buy-item {
+    font-size: 1.15em;
+    font-weight: 700;
+}
+
+.buy-lines {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px 12px;
+    margin: 16px 0 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-alt);
+}
+
+.buy-lines dt {
+    color: var(--text-muted);
+}
+
+.buy-lines dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 700;
+    color: var(--yellow);
+    font-variant-numeric: tabular-nums;
+}
+
+.buy-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.buy-actions button {
+    flex: 1;
+}

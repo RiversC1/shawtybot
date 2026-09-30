@@ -8,7 +8,7 @@
     </div>
     <div class="store-balance">
         <span class="muted">Balance</span>
-        <span id="store-coins">🪙 {{ "{:,}".format(store.coins or 0) }}</span>
+        <span id="store-coins" data-coins="{{ store.coins or 0 }}">🪙 {{ "{:,}".format(store.coins or 0) }}</span>
     </div>
 </div>
 <p id="store-status" class="store-status" hidden></p>
@@ -52,6 +52,33 @@
         </div>
     </section>
     {% endfor %}
+</div>
+
+<div id="buy-modal" class="modal-overlay" hidden>
+    <div class="modal buy-modal" role="dialog" aria-modal="true" aria-labelledby="buy-title">
+        <div class="modal-header">
+            <h2 id="buy-title">Confirm purchase</h2>
+            <button id="buy-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="buy-summary">
+                <img id="buy-icon" src="" alt="">
+                <div>
+                    <div class="buy-item" id="buy-item"></div>
+                    <div class="muted" id="buy-unit"></div>
+                </div>
+            </div>
+            <dl class="buy-lines">
+                <dt>Total</dt><dd id="buy-total"></dd>
+                <dt>Balance after</dt><dd id="buy-after"></dd>
+            </dl>
+            <p class="error" id="buy-warning" hidden></p>
+            <div class="buy-actions">
+                <button id="buy-confirm" class="btn-primary">Buy</button>
+                <button id="buy-cancel" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="{{ static_url('store.js') }}"></script>
