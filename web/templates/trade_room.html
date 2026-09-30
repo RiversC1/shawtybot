@@ -35,14 +35,7 @@
             <button id="tp-close" class="modal-close" aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
-            <input type="text" id="tp-search" placeholder="Search your catches..." class="search-input" style="width: 100%; margin-bottom: 12px;">
-            <div id="tp-species-view">
-                <div id="tp-species-grid" class="picker-grid"></div>
-            </div>
-            <div id="tp-individuals-view" hidden>
-                <button id="tp-back" class="btn-secondary" style="margin-bottom: 10px;">&larr; Back to species</button>
-                <div id="tp-individuals-grid" class="picker-grid"></div>
-            </div>
+            <div id="tp-picker"></div>
         </div>
     </div>
 </div>
@@ -59,5 +52,6 @@
 
 <script type="application/json" id="trade-data">{{ trade_json|safe }}</script>
 <script>window.TRADE_ID = {{ trade_id }};</script>
+<script src="{{ static_url('trade_picker.js') }}"></script>
 <script src="{{ static_url('trade_room.js') }}"></script>
 {% endblock %}

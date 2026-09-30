@@ -104,6 +104,10 @@ def propose_trade(
         ).fetchone()
         if not owns_request:
             return None, "That trainer doesn't own that Pokémon."
+        dex_ids = [r["dex_id"] for r in conn.execute(
+            "SELECT dex_id FROM poke_collection WHERE id IN (?, ?)", (offer_catch_id, request_catch_id))]
+        if any(battle_store.is_mega(d) for d in dex_ids):
+            return None, "Mega Evolutions are a personal Poké League reward and can't be traded."
         now = datetime.now(timezone.utc).isoformat()
         cur = conn.execute(
             "INSERT INTO poke_trades (status, side_a_user_id, side_b_user_id, side_a_catch_id, side_b_catch_id, "
@@ -165,8 +169,13 @@ def confirm_offer(trade_id: int, side: str) -> tuple[bool, str | None, bool]:
     if not row or row["status"] != "active":
         return False, "This trade isn't active right now.", False
     catch_col = "side_a_catch_id" if side == "A" else "side_b_catch_id"
+    other_col = "side_b_catch_id" if side == "A" else "side_a_catch_id"
     if not row[catch_col]:
         return False, "Choose a Pokémon to offer first.", False
+    # Both trainers have to put something on the table before either can
+    # lock in, so nobody confirms a one-sided "gift" by accident.
+    if not row[other_col]:
+        return False, "Wait for the other trainer to offer a Pokémon first.", False
     confirmed_col = "side_a_confirmed" if side == "A" else "side_b_confirmed"
 
     now = datetime.now(timezone.utc).isoformat()

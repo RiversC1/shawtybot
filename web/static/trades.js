@@ -1,6 +1,4 @@
 (function () {
-  const PAGE_SIZE = 12;
-
   const pickFriendBtn = document.getElementById("tp-pick-friend");
   const pickMineBtn = document.getElementById("tp-pick-mine");
   const pickTheirsBtn = document.getElementById("tp-pick-theirs");
@@ -111,125 +109,20 @@
   const pokeModal = document.getElementById("pokemon-picker-modal");
   const pokeTitle = document.getElementById("pp-title");
   const pokeClose = document.getElementById("pp-close");
-  const pokeSearch = document.getElementById("pp-search");
-  const speciesView = document.getElementById("pp-species-view");
-  const speciesGrid = document.getElementById("pp-species-grid");
-  const pagination = document.getElementById("pp-pagination");
-  const pageLabel = document.getElementById("pp-page-label");
-  const prevBtn = document.getElementById("pp-prev");
-  const nextBtn = document.getElementById("pp-next");
-  const individualsView = document.getElementById("pp-individuals-view");
-  const individualsGrid = document.getElementById("pp-individuals-grid");
-  const backBtn = document.getElementById("pp-back");
+  const picker = TradePicker.create(document.getElementById("pp-picker"), choosePick);
 
   let pokeMode = "mine";
-  let allSpecies = [];
-  let currentPage = 0;
 
   pokeClose.addEventListener("click", () => (pokeModal.hidden = true));
   pokeModal.addEventListener("click", (e) => {
     if (e.target === pokeModal) pokeModal.hidden = true;
   });
-  backBtn.addEventListener("click", () => {
-    individualsView.hidden = true;
-    speciesView.hidden = false;
-  });
-  pokeSearch.addEventListener("input", () => {
-    currentPage = 0;
-    renderSpeciesPage();
-  });
-  prevBtn.addEventListener("click", () => {
-    if (currentPage > 0) {
-      currentPage--;
-      renderSpeciesPage();
-    }
-  });
-  nextBtn.addEventListener("click", () => {
-    currentPage++;
-    renderSpeciesPage();
-  });
 
-  function speciesEndpoint() {
-    return pokeMode === "mine" ? "/api/proxy/collection" : `/api/proxy/trainer/${friend.user_id}/collection`;
-  }
-
-  function individualsEndpoint(dexId) {
-    return pokeMode === "mine"
-      ? `/api/proxy/collection/by-species/${dexId}`
-      : `/api/proxy/trainer/${friend.user_id}/collection/by-species/${dexId}`;
-  }
-
-  async function openPokemonPicker(mode) {
+  function openPokemonPicker(mode) {
     pokeMode = mode;
     pokeTitle.textContent = mode === "mine" ? "Choose your Pokémon" : `Choose ${friend.username}'s Pokémon`;
     pokeModal.hidden = false;
-    pokeSearch.value = "";
-    currentPage = 0;
-    speciesView.hidden = false;
-    individualsView.hidden = true;
-    speciesGrid.innerHTML = "<p class='muted'>Loading...</p>";
-    const res = await fetch(speciesEndpoint());
-    if (!res.ok) {
-      speciesGrid.innerHTML = "<p class='error'>Couldn't load that collection.</p>";
-      return;
-    }
-    allSpecies = await res.json();
-    renderSpeciesPage();
-  }
-
-  function renderSpeciesPage() {
-    const q = pokeSearch.value.trim().toLowerCase();
-    const filtered = q ? allSpecies.filter((m) => m.name.toLowerCase().includes(q)) : allSpecies;
-    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-    currentPage = Math.min(currentPage, totalPages - 1);
-    const pageItems = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
-
-    speciesGrid.innerHTML = "";
-    if (!pageItems.length) {
-      speciesGrid.innerHTML = "<p class='muted'>No Pokémon found.</p>";
-    }
-    for (const mon of pageItems) {
-      const item = document.createElement("div");
-      item.className = "picker-item";
-      item.innerHTML = `<img src="${artThumb(mon.artwork)}" alt="${mon.name}">
-        <div>${mon.name}${mon.is_shiny ? " ✨" : ""}</div>
-        <div class="muted">${mon.count > 1 ? `${mon.count} owned &middot; ` : ""}best IV ${mon.best_iv_percent}%</div>`;
-      item.addEventListener("click", () => {
-        if (mon.count <= 1) {
-          choosePick({ ...mon });
-          return;
-        }
-        openIndividuals(mon.dex_id);
-      });
-      speciesGrid.appendChild(item);
-    }
-
-    pagination.hidden = filtered.length <= PAGE_SIZE;
-    pageLabel.textContent = `Page ${currentPage + 1} of ${totalPages}`;
-    prevBtn.disabled = currentPage === 0;
-    nextBtn.disabled = currentPage >= totalPages - 1;
-  }
-
-  async function openIndividuals(dexId) {
-    speciesView.hidden = true;
-    individualsView.hidden = false;
-    individualsGrid.innerHTML = "<p class='muted'>Loading...</p>";
-    const res = await fetch(individualsEndpoint(dexId));
-    if (!res.ok) {
-      individualsGrid.innerHTML = "<p class='error'>Couldn't load those Pokémon.</p>";
-      return;
-    }
-    const individuals = await res.json();
-    individualsGrid.innerHTML = "";
-    for (const mon of individuals) {
-      const item = document.createElement("div");
-      item.className = "picker-item";
-      item.innerHTML = `<img src="${artThumb(mon.artwork)}" alt="${mon.name}">
-        <div>${mon.nickname || mon.name}${mon.is_shiny ? " ✨" : ""}</div>
-        <div class="muted">IV ${mon.iv_percent}%</div>`;
-      item.addEventListener("click", () => choosePick(mon));
-      individualsGrid.appendChild(item);
-    }
+    picker.load(mode === "mine" ? "/api/proxy/collection-individuals" : `/api/proxy/trainer/${friend.user_id}/collection-individuals`);
   }
 
   function choosePick(mon) {

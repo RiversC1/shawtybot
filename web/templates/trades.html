@@ -64,19 +64,7 @@
             <button id="pp-close" class="modal-close" aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
-            <input type="text" id="pp-search" class="search-input" placeholder="Search..." style="width:100%; margin-bottom:12px;">
-            <div id="pp-species-view">
-                <div id="pp-species-grid" class="picker-grid"></div>
-                <div class="picker-pagination" id="pp-pagination" hidden>
-                    <button id="pp-prev" class="btn-secondary">Previous</button>
-                    <span id="pp-page-label" class="muted"></span>
-                    <button id="pp-next" class="btn-secondary">Next</button>
-                </div>
-            </div>
-            <div id="pp-individuals-view" hidden>
-                <button id="pp-back" class="btn-secondary" style="margin-bottom:10px;">&larr; Back to species</button>
-                <div id="pp-individuals-grid" class="picker-grid"></div>
-            </div>
+            <div id="pp-picker"></div>
         </div>
     </div>
 </div>
@@ -101,5 +89,6 @@
     </div>
 </div>
 
+<script src="{{ static_url('trade_picker.js') }}"></script>
 <script src="{{ static_url('trades.js') }}"></script>
 {% endblock %}

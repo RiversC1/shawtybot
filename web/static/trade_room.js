@@ -33,6 +33,10 @@
     return data;
   }
 
+  function escHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+
   function typeBadges(types) {
     return (types || [])
       .map((t) => `<span class="type-badge type-${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</span>`)
@@ -84,90 +88,20 @@
     `;
   }
 
-  // ---------- Offer picker (species -> individuals -> POST offer) ----------
+  // ---------- Offer picker (one card per individual -> POST offer) ----------
 
   const pickerModal = document.getElementById("trade-picker-modal");
   const pickerClose = document.getElementById("tp-close");
-  const pickerSearch = document.getElementById("tp-search");
-  const speciesView = document.getElementById("tp-species-view");
-  const speciesGrid = document.getElementById("tp-species-grid");
-  const individualsView = document.getElementById("tp-individuals-view");
-  const individualsGrid = document.getElementById("tp-individuals-grid");
-  const backBtn = document.getElementById("tp-back");
-
-  let allSpecies = [];
+  const picker = TradePicker.create(document.getElementById("tp-picker"), (mon) => submitOffer(mon.id));
 
   pickerClose.addEventListener("click", () => (pickerModal.hidden = true));
   pickerModal.addEventListener("click", (e) => {
     if (e.target === pickerModal) pickerModal.hidden = true;
   });
-  backBtn.addEventListener("click", () => {
-    individualsView.hidden = true;
-    speciesView.hidden = false;
-  });
-  pickerSearch.addEventListener("input", () => {
-    const q = pickerSearch.value.trim().toLowerCase();
-    renderSpeciesGrid(allSpecies.filter((m) => !q || m.name.toLowerCase().includes(q)));
-  });
 
-  async function openPicker() {
+  function openPicker() {
     pickerModal.hidden = false;
-    speciesView.hidden = false;
-    individualsView.hidden = true;
-    pickerSearch.value = "";
-    speciesGrid.innerHTML = "<p class='muted'>Loading...</p>";
-    const res = await fetch("/api/proxy/collection");
-    if (!res.ok) {
-      speciesGrid.innerHTML = "<p class='error'>Couldn't load your collection.</p>";
-      return;
-    }
-    allSpecies = await res.json();
-    renderSpeciesGrid(allSpecies);
-  }
-
-  function renderSpeciesGrid(species) {
-    speciesGrid.innerHTML = "";
-    if (!species.length) {
-      speciesGrid.innerHTML = "<p class='muted'>You haven't caught any Pokémon yet!</p>";
-      return;
-    }
-    for (const mon of species) {
-      const item = document.createElement("div");
-      item.className = "picker-item";
-      item.innerHTML = `<img src="${artThumb(mon.artwork)}" alt="${mon.name}">
-        <div>${mon.name}${mon.is_shiny ? " ✨" : ""}</div>
-        <div class="muted">${mon.count > 1 ? `${mon.count} owned &middot; ` : ""}best IV ${mon.best_iv_percent}%</div>`;
-      item.addEventListener("click", async () => {
-        if (mon.count <= 1) {
-          await submitOffer(mon.id);
-          return;
-        }
-        await openIndividuals(mon.dex_id);
-      });
-      speciesGrid.appendChild(item);
-    }
-  }
-
-  async function openIndividuals(dexId) {
-    speciesView.hidden = true;
-    individualsView.hidden = false;
-    individualsGrid.innerHTML = "<p class='muted'>Loading...</p>";
-    const res = await fetch(`/api/proxy/collection/by-species/${dexId}`);
-    if (!res.ok) {
-      individualsGrid.innerHTML = "<p class='error'>Couldn't load those Pokémon.</p>";
-      return;
-    }
-    const individuals = await res.json();
-    individualsGrid.innerHTML = "";
-    for (const mon of individuals) {
-      const item = document.createElement("div");
-      item.className = "picker-item";
-      item.innerHTML = `<img src="${artThumb(mon.artwork)}" alt="${mon.name}">
-        <div>${mon.nickname || mon.name}${mon.is_shiny ? " ✨" : ""}</div>
-        <div class="muted">IV ${mon.iv_percent}%</div>`;
-      item.addEventListener("click", () => submitOffer(mon.id));
-      individualsGrid.appendChild(item);
-    }
+    picker.load("/api/proxy/collection-individuals");
   }
 
   async function submitOffer(catchId) {
@@ -246,13 +180,19 @@
     cancelBtn.hidden = false;
     const myConfirmed = you.side === "A" ? trade.confirmed_a : trade.confirmed_b;
     const myMon = you.side === "A" ? trade.mon_a : trade.mon_b;
+    const theirMon = you.side === "A" ? trade.mon_b : trade.mon_a;
+    const theirName = you.side === "A" ? trade.name_b : trade.name_a;
     actionPanel.hidden = false;
     if (myConfirmed) {
       actionPanel.innerHTML = `<p class="muted">✅ You're ready — waiting on the other trainer to confirm.</p>`;
     } else {
+      // Both trainers must offer something before either can confirm.
+      const hint = !myMon ? "Pick a Pokémon to offer above."
+        : !theirMon ? `Waiting for ${escHtml(theirName)} to offer a Pokémon...`
+        : "Confirm when you're happy with the trade.";
       actionPanel.innerHTML = `
-          <p class="muted">Pick a Pokémon above, then confirm when you're happy with the trade.</p>
-          <button id="tr-confirm" class="btn-primary" ${myMon ? "" : "disabled"}>Confirm Trade</button>`;
+          <p class="muted">${hint}</p>
+          <button id="tr-confirm" class="btn-primary" ${myMon && theirMon ? "" : "disabled"}>Confirm Trade</button>`;
       const confirmBtn = document.getElementById("tr-confirm");
       if (confirmBtn) {
         confirmBtn.addEventListener("click", async () => {

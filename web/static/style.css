@@ -1394,6 +1394,78 @@ code {
     image-rendering: pixelated;
 }
 
+/* Trade picker (trade_picker.js): one card per individual Pokémon. */
+.trade-picker-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.trade-picker-toolbar .tpk-search {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+.trade-picker-toolbar select {
+    flex: 0 1 auto;
+}
+
+.tpk-count {
+    font-size: 0.8em;
+    margin-bottom: 6px;
+}
+
+.trade-picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    max-height: min(52vh, 460px);
+}
+
+.trade-picker-item {
+    font: inherit;
+    font-size: 0.85em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+
+.trade-picker-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.trade-picker-item:disabled:hover {
+    border-color: transparent;
+}
+
+.trade-picker-name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.trade-picker-types {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 3px;
+}
+
+.trade-picker-types .type-badge {
+    font-size: 0.72em;
+    padding: 1px 7px;
+}
+
+.trade-picker-iv {
+    color: var(--muted, #9aa0b4);
+}
+
+/* A species you have more than one of: the IV is what tells them apart. */
+.trade-picker-iv.is-dupe {
+    color: var(--yellow);
+    font-weight: 600;
+}
+
 .config-move-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     max-height: none;

@@ -878,6 +878,24 @@ async def proxy_trainer_collection(request: Request, target_id: int):
     return JSONResponse(data, status_code=status)
 
 
+@app.get("/api/proxy/collection-individuals")
+async def proxy_collection_individuals(request: Request):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, "/api/collection-individuals")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/proxy/trainer/{target_id}/collection-individuals")
+async def proxy_trainer_collection_individuals(request: Request, target_id: int):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not session:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    status, data = await api_get(session, f"/api/trainer/{target_id}/collection-individuals")
+    return JSONResponse(data, status_code=status)
+
+
 @app.get("/api/proxy/trainer/{target_id}/collection/by-species/{dex_id}")
 async def proxy_trainer_collection_by_species(request: Request, target_id: int, dex_id: int):
     session = request.cookies.get(SESSION_COOKIE)

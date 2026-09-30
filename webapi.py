@@ -1402,6 +1402,7 @@ def build_collection_individuals(conn: sqlite3.Connection, target_id: int) -> li
             "is_shiny": bool(r["is_shiny"]),
             "caught_at": r["caught_at"],
             "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
+            "tradeable": not battle_store.is_mega(r["dex_id"]),
         })
     return out
 
@@ -1433,6 +1434,17 @@ def get_trainer_collection(target_id: int, user_id: int = Depends(get_current_us
         if not trainer:
             raise HTTPException(404, "Trainer not found")
         return build_collection_summary(conn, target_id)
+
+
+@app.get("/api/trainer/{target_id}/collection-individuals")
+def get_trainer_collection_individuals(target_id: int, user_id: int = Depends(get_current_user_id)):
+    """Another trainer's Pokémon one per catch, for the trade builder's
+    'what do they have' picker (duplicates differ by IVs)."""
+    with db() as conn:
+        trainer = conn.execute("SELECT 1 FROM poke_trainers WHERE user_id = ?", (target_id,)).fetchone()
+        if not trainer:
+            raise HTTPException(404, "Trainer not found")
+        return build_collection_individuals(conn, target_id)
 
 
 @app.get("/api/trainer/{target_id}/collection/by-species/{dex_id}")
