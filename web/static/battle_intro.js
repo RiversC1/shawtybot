@@ -1,4 +1,4 @@
-// The Elite Four / Champion intro, played over the battle scene before the
+// The Elite Four / Champion / Legend intro, played over the battle scene before the
 // first send-out (like Pokémon Platinum's): a blue panel sweeps in from the
 // bottom-left carrying the player, another from the top-right carrying the
 // opponent; each arrives as a silhouette and lights up with a flash; they

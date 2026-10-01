@@ -1452,9 +1452,9 @@
     });
   }
 
-  // Elite Four / Champion battles open with the Platinum-style "VS" intro,
+  // Elite Four, Champion and Legend battles open with the Platinum-style "VS" intro,
   // once per battle per browser tab; the battle music starts with it.
-  const INTRO_BATTLE_TYPES = new Set(["elite_four", "champion"]);
+  const INTRO_BATTLE_TYPES = new Set(["elite_four", "champion", "legend"]);
   const FULL_ART_CHARACTERS = new Set(["red", "leaf", "gold", "kris", "brendan", "may", "lucas", "dawn"]);
 
   function introArtFor(avatarUrl) {
