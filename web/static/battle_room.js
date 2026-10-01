@@ -14,6 +14,7 @@
     weather_start: 1100, weather_end: 700, weather_damage: 650,
     item_used: 750, item_damage: 600, item_activated: 650, self_ko: 400,
     bide: 600, stockpile: 500, magnitude: 550,
+    ability_activated: 700, ability_damage: 600,
   };
   // Mega Stones whose name isn't just "<species>ite" (Garchomp -> Garchompite).
   const MEGA_STONES = { Lucario: "Lucarionite" };
@@ -387,7 +388,8 @@
       case "weather_end":
         visibleWeather = null;
         break;
-      case "weather_damage": {
+      case "weather_damage":
+      case "ability_damage": {
         if (current && event.new_hp !== undefined) {
           const updated = { ...current, current_hp: event.new_hp };
           if (isA) visibleA = updated; else visibleB = updated;
@@ -744,6 +746,14 @@
         return `${mon} stockpiled ${event.count}!`;
       case "magnitude":
         return `Magnitude ${event.level}!`;
+      case "ability_activated": {
+        // "[Intimidate] Gyarados intimidates Machamp!"
+        const who = `<strong>${owned(event.side, esc(event.name))}</strong>`;
+        const tag = `<span class="ability-tag">${esc(event.ability)}</span>`;
+        return event.message ? `${tag} ${who} ${esc(event.message)}` : `${tag} ${who}'s ${esc(event.ability)} activated!`;
+      }
+      case "ability_damage":
+        return `<strong>${owned(event.side, esc(event.name))}</strong> ${esc(event.message)} ${esc(event.ability)}! (-${event.amount})`;
       case "mega_evolution":
         return `💎 <strong>${owned(event.side, event.name)}</strong>'s ${esc(MEGA_STONES[event.name] || `${event.name}ite`)} is reacting to ${side}'s Key Stone!<br>`
           + `✨ <strong>${owned(event.side, event.name)}</strong> has <span class="mega-line">Mega Evolved</span> into <strong>${esc(event.mega_name)}</strong>!`;
@@ -751,6 +761,7 @@
         const reasons = {
           recharge: "must recharge!", asleep: "is fast asleep.", frozen: "is frozen solid!",
           flinched: "flinched and couldn't move!", paralyzed: "is paralyzed and can't move!",
+          truant: "is loafing around!",
         };
         return `${mon} ${reasons[event.reason] || "could not act."}`;
       }
@@ -1164,6 +1175,16 @@
         return wait(250);
       case "item_damage":
         BattleFX.floatText(slot, `−${pctOf(event.amount, maxHp)}% ${event.label}`, "damage");
+        return null;
+      case "ability_activated":
+        BattleFX.glowSprite(sprite, "#c4b5fd", 700);
+        BattleFX.floatText(slot, event.ability, "info");
+        return wait(150);
+      case "ability_damage":
+        BattleFX.floatText(slot, `−${pctOf(event.amount, maxHp)}% ${event.ability}`, "damage");
+        sprite.classList.remove("anim-hit");
+        void sprite.offsetWidth;
+        sprite.classList.add("anim-hit");
         return null;
       case "item_activated":
         BattleFX.glowSprite(sprite, "#ffffff", 500);

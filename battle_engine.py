@@ -393,9 +393,10 @@ def battler_state_from_row(mon: dict, row: dict, ability: str | None = None) -> 
     stages.update(row.get("stat_stages") or {})
     volatile = default_volatile()
     volatile.update(row.get("volatile") or {})
+    types = list(volatile.get("types") or mon.get("types", []))
 
     return BattlerState(
-        dex_id=row["dex_id"], species_name=mon.get("name", f"#{row['dex_id']}"), types=list(mon.get("types", [])),
+        dex_id=row["dex_id"], species_name=mon.get("name", f"#{row['dex_id']}"), types=types,
         stats=stats, ivs=dict(ivs), max_hp=row.get("max_hp", stats["hp"]), current_hp=row.get("current_hp", stats["hp"]),
         ability=ability, moves=move_slots, stat_stages=stages,
         status=row.get("status"), status_counter=row.get("status_counter", 0) or 0,
@@ -420,7 +421,12 @@ def legal_actions(battle: BattleState, side_id: str) -> dict:
     if lock and active.item in CHOICE_ITEMS:
         # A Choice item locks its holder into the first move it used.
         usable = [i for i in usable if active.moves[i].move.name == lock]
+    disabled = (active.volatile.get("disabled") or {}).get("move")
+    if disabled:
+        usable = [i for i in usable if active.moves[i].move.name != disabled]
     switchable = [i for i, b in enumerate(side.roster) if not b.is_fainted and i != side.active_index]
+    if traps(battle.other(side_id).active, active):
+        switchable = []  # Shadow Tag / Arena Trap / Magnet Pull
     return {"usable_move_indices": usable, "can_switch": bool(switchable),
             "switchable_indices": switchable, "forced": False}
 
@@ -486,9 +492,11 @@ def estimate_damage(attacker: BattlerState, defender: BattlerState, move: MoveDa
     """Deterministic average-case damage estimate (no RNG consumed) — used
     only for NPC decision-making, never for real turn resolution, so it
     never perturbs the battle's own RNG stream."""
-    move = weather_adjusted_move(move, weather)
+    move = ability_adjusted_move(attacker, weather_adjusted_move(move, weather))
+    if ability_blocks_move(attacker, defender, move):
+        return 0.0
     if move.category != "status" and not move.power:
-        immune = type_effectiveness(move.type, defender.types) == 0
+        immune = move_effectiveness(attacker, move, defender) == 0
         if "fixed_damage" in move.flags:
             return 0.0 if immune else float(move.fixed_damage_amount or 100)
         if move.name == "Super Fang":
@@ -499,18 +507,13 @@ def estimate_damage(attacker: BattlerState, defender: BattlerState, move: MoveDa
             move = variable_power(attacker, defender, move, weather=weather) or move
     if move.category == "status" or not move.power:
         return 0.0
-    a_key, d_key = ("attack", "defense") if move.category == "physical" else ("sp_attack", "sp_defense")
-    A = (attacker.stats[a_key] * stat_stage_multiplier(attacker.stat_stages[a_key])
-         * weather_stat_multiplier(weather, attacker, a_key) * item_stat_multiplier(attacker, a_key))
-    D = defender.stats[d_key] * stat_stage_multiplier(defender.stat_stages[d_key]) * weather_stat_multiplier(weather, defender, d_key)
-    eff = type_effectiveness(move.type, defender.types)
+    A, D = _attack_and_defense(attacker, defender, move, False, weather)
+    eff = move_effectiveness(attacker, move, defender)
     if eff == 0:
         return 0.0
     base = math.floor(LEVEL_100_STAGE_BASE * move.power * A / D / 50) + 2
-    stab = stab_multiplier(attacker, move)
-    burn_mult = 0.5 if (attacker.status == "burn" and move.category == "physical") else 1.0
-    return (base * stab * eff * 0.925 * burn_mult * weather_damage_multiplier(weather, move, attacker)  # 0.925 ~= avg roll
-            * item_damage_multiplier(attacker, move, eff))
+    hits = 2 if ability_key(attacker) == "parental-bond" and "multi_hit" not in move.flags else 1
+    return base * _damage_multiplier(attacker, defender, move, eff, weather) * 0.925 * (1.25 if hits == 2 else 1)  # 0.925 ~= avg roll
 
 
 def _best_move_damage(attacker: BattlerState, defender: BattlerState) -> float:
@@ -862,20 +865,16 @@ WEATHER_ABILITIES = {"drought": "sun", "drizzle": "rain", "sand-stream": "sand",
 WEATHER_NEGATING_ABILITIES = {"cloud-nine", "air-lock"}
 SPEED_DOUBLERS = {"swift-swim": "rain", "chlorophyll": "sun", "sand-rush": "sand"}
 SAND_IMMUNE_TYPES = {"rock", "ground", "steel"}
-SAND_IMMUNE_ABILITIES = {"sand-veil", "sand-rush", "sand-force", "overcoat"}
-HAIL_IMMUNE_ABILITIES = {"ice-body", "snow-cloak", "overcoat"}
+SAND_IMMUNE_ABILITIES = {"sand-veil", "sand-rush", "sand-force", "overcoat", "magic-guard"}
+HAIL_IMMUNE_ABILITIES = {"ice-body", "snow-cloak", "overcoat", "magic-guard"}
 WEATHER_BALL_TYPES = {"sun": "fire", "rain": "water", "sand": "rock", "hail": "ice"}
 SUN_HEAL_MOVES = {"Synthesis", "Morning Sun", "Moonlight"}
 
-# Every ability these battles actually simulate; the rest are flavor text for
-# now (the team page says which is which).
-BATTLE_ABILITIES = (set(WEATHER_ABILITIES) | WEATHER_NEGATING_ABILITIES | set(SPEED_DOUBLERS)
-                    | SAND_IMMUNE_ABILITIES | HAIL_IMMUNE_ABILITIES
-                    | {"rain-dish", "dry-skin", "hydration", "solar-power", "leaf-guard", "sand-force"})
-
-
 def ability_key(mon: BattlerState) -> str:
-    return (mon.ability or "").strip().lower().replace(" ", "-").replace("_", "-")
+    """The Pokémon's ability right now (a traced one replaces its own until it
+    switches out)."""
+    override = mon.volatile.get("ability_override") if isinstance(mon.volatile, dict) else None
+    return (override or mon.ability or "").strip().lower().replace(" ", "-").replace("_", "-")
 
 
 def ability_label(mon: BattlerState) -> str:
@@ -912,12 +911,15 @@ def set_weather(battle: BattleState, weather: str, events: list, side_id: str, s
     return True
 
 
-def trigger_entry_ability(battle: BattleState, side_id: str, events: list) -> None:
-    """Abilities that act as a Pokémon enters battle (currently: weather)."""
+def trigger_entry_ability(battle: BattleState, side_id: str, events: list, weather_only: bool = False) -> None:
+    """Abilities that act as a Pokémon enters battle: weather, Intimidate,
+    Trace, Download, the announcements (Pressure, Frisk...)."""
     mon = battle.side(side_id).active
     weather = WEATHER_ABILITIES.get(ability_key(mon))
     if weather and not mon.is_fainted:
         set_weather(battle, weather, events, side_id, "ability", mon)
+    if not weather_only:
+        trigger_ability_on_entry(battle, side_id, events)
 
 
 def apply_opening_abilities(battle: BattleState) -> list:
@@ -1091,12 +1093,17 @@ def item_damage_multiplier(attacker: BattlerState, move: MoveData, eff: float) -
 def _consume_item(mon: BattlerState, side_id: str, events: list, **extra) -> None:
     events.append({"type": "item_used", "side": side_id, "name": mon.species_name,
                    "item": mon.item, "label": item_label(mon), **extra})
+    if (mon.item or "").endswith("-berry"):
+        mon.volatile["last_berry"] = mon.item  # Harvest can grow it back
     mon.item = None
+    if ability_key(mon) == "unburden":
+        mon.volatile["unburdened"] = True
 
 
 def _after_hp_loss(mon: BattlerState, side_id: str, events: list) -> None:
     """Sitrus Berry: once, when the holder falls to half HP or below."""
-    if mon.item == "sitrus-berry" and not mon.is_fainted and 0 < mon.current_hp <= mon.max_hp // 2:
+    if (mon.item == "sitrus-berry" and not mon.is_fainted and 0 < mon.current_hp <= mon.max_hp // 2
+            and not mon.volatile.get("unnerved")):
         heal = min(mon.max_hp // 4, mon.max_hp - mon.current_hp)
         mon.current_hp += heal
         _consume_item(mon, side_id, events, amount=heal, new_hp=mon.current_hp, max_hp=mon.max_hp)
@@ -1104,7 +1111,7 @@ def _after_hp_loss(mon: BattlerState, side_id: str, events: list) -> None:
 
 def _after_status(mon: BattlerState, side_id: str, events: list) -> None:
     """Lum Berry: cures a major status or confusion as soon as it lands."""
-    if mon.item != "lum-berry" or mon.is_fainted:
+    if mon.item != "lum-berry" or mon.is_fainted or mon.volatile.get("unnerved"):
         return
     cured = mon.status or ("confusion" if mon.confusion_counter else None)
     if not cured:
@@ -1170,10 +1177,10 @@ def variable_power(attacker: BattlerState, defender: BattlerState, move: MoveDat
     elif name in ("Eruption", "Water Spout"):
         power = max(1, int(150 * _hp_ratio(attacker)))
     elif name in ("Low Kick", "Grass Knot"):
-        w = defender.weight
+        w = _weight(defender)
         power = 20 if w < 10 else 40 if w < 25 else 60 if w < 50 else 80 if w < 100 else 100 if w < 200 else 120
     elif name in ("Heavy Slam", "Heat Crash"):
-        ratio = attacker.weight / max(defender.weight, 0.1)
+        ratio = _weight(attacker) / max(_weight(defender), 0.1)
         power = 120 if ratio >= 5 else 100 if ratio >= 4 else 80 if ratio >= 3 else 60 if ratio >= 2 else 40
     elif name == "Gyro Ball":
         power = min(150, int(25 * _effective_speed(defender, weather) / max(_effective_speed(attacker, weather), 1)) + 1)
@@ -1230,32 +1237,44 @@ def compute_damage(attacker: BattlerState, defender: BattlerState, move: MoveDat
     if move.category == "status" or not move.power:
         return 0
 
-    if move.category == "physical":
-        a_key, d_key = "attack", "defense"
-    else:
-        a_key, d_key = "sp_attack", "sp_defense"
-
-    a_stage = 0 if is_crit and attacker.stat_stages[a_key] < 0 else attacker.stat_stages[a_key]
-    d_stage = 0 if is_crit and defender.stat_stages[d_key] > 0 else defender.stat_stages[d_key]
-    A = (attacker.stats[a_key] * stat_stage_multiplier(a_stage) * weather_stat_multiplier(weather, attacker, a_key)
-         * item_stat_multiplier(attacker, a_key))
-    D = defender.stats[d_key] * stat_stage_multiplier(d_stage) * weather_stat_multiplier(weather, defender, d_key)
-
-    eff = type_effectiveness(move.type, defender.types)
+    A, D = _attack_and_defense(attacker, defender, move, is_crit, weather)
+    eff = move_effectiveness(attacker, move, defender)
     if eff == 0:
         return 0
 
     base = math.floor(LEVEL_100_STAGE_BASE * move.power * A / D / 50) + 2
-    stab = stab_multiplier(attacker, move)
-    crit_mult = 2.0 if is_crit else 1.0
+    crit_mult = (3.0 if ability_key(attacker) == "sniper" else 2.0) if is_crit else 1.0
     random_roll = rng.uniform(0.85, 1.00)
-    burn_mult = 0.5 if (attacker.status == "burn" and move.category == "physical") else 1.0
-    weather_mult = weather_damage_multiplier(weather, move, attacker)
-
-    item_mult = item_damage_multiplier(attacker, move, eff)
-
-    damage = math.floor(base * stab * eff * crit_mult * random_roll * burn_mult * weather_mult * item_mult)
+    damage = math.floor(base * _damage_multiplier(attacker, defender, move, eff, weather) * crit_mult * random_roll)
     return max(1, damage)
+
+
+def _attack_and_defense(attacker: BattlerState, defender: BattlerState, move: MoveData, is_crit: bool,
+                        weather: Optional[str]) -> tuple:
+    """The attacking and defending stat for a hit, with stages (a crit ignores
+    the bad ones; Unaware ignores the foe's), weather, items and abilities."""
+    a_key, d_key = ("attack", "defense") if move.category == "physical" else ("sp_attack", "sp_defense")
+    a_stage, d_stage = attacker.stat_stages[a_key], defender.stat_stages[d_key]
+    if _foe_ability(defender, attacker) == "unaware":
+        a_stage = 0
+    if ability_key(attacker) == "unaware":
+        d_stage = 0
+    if is_crit:
+        a_stage, d_stage = max(a_stage, 0), min(d_stage, 0)
+    A = (attacker.stats[a_key] * stat_stage_multiplier(a_stage) * weather_stat_multiplier(weather, attacker, a_key)
+         * item_stat_multiplier(attacker, a_key) * ability_stat_multiplier(attacker, a_key, weather))
+    D = defender.stats[d_key] * stat_stage_multiplier(d_stage) * weather_stat_multiplier(weather, defender, d_key)
+    if _foe_ability(defender, attacker):
+        D *= ability_stat_multiplier(defender, d_key, weather)
+    return A, D
+
+
+def _damage_multiplier(attacker: BattlerState, defender: BattlerState, move: MoveData, eff: float,
+                       weather: Optional[str]) -> float:
+    """Everything that scales damage besides the stats and the random roll."""
+    burn = 0.5 if (attacker.status == "burn" and move.category == "physical" and ability_key(attacker) != "guts") else 1.0
+    return (stab_multiplier(attacker, move) * eff * burn * weather_damage_multiplier(weather, move, attacker)
+            * item_damage_multiplier(attacker, move, eff) * ability_damage_multiplier(attacker, defender, move, eff))
 
 
 def compute_confusion_damage(mon: BattlerState, rng: random.Random) -> int:
@@ -1281,9 +1300,567 @@ def sample_multi_hit_count(move: MoveData, rng: random.Random) -> int:
     return candidates[-1]
 
 
-def crit_chance(move: MoveData, attacker: Optional[BattlerState] = None) -> float:
-    stage = move.crit_rate + (1 if attacker is not None and attacker.item == "scope-lens" else 0)
+def crit_chance(move: MoveData, attacker: Optional[BattlerState] = None,
+                defender: Optional[BattlerState] = None) -> float:
+    if defender is not None and _foe_ability(defender, attacker) in ("battle-armor", "shell-armor"):
+        return 0.0
+    stage = move.crit_rate
+    if attacker is not None:
+        stage += (1 if attacker.item == "scope-lens" else 0) + (1 if ability_key(attacker) == "super-luck" else 0)
     return CRIT_TABLE.get(min(3, max(0, stage)), CRIT_TABLE[0])
+
+
+# ---------------------------------------------------------------------------
+# Abilities
+# ---------------------------------------------------------------------------
+# What each ability does in a 1-on-1 battle. The weather ones live with the
+# weather code above; these are everything else. Each hook below is called
+# from the matching point of a turn (damage, accuracy, status, stat changes,
+# switching, end of turn). An ability that changes something emits an
+# "ability_activated" event (with a ready-to-show `message`) so the battle
+# log and the animations can show it.
+
+STATUS_IMMUNITIES = {
+    "immunity": {"poison", "toxic"}, "limber": {"paralysis"}, "insomnia": {"sleep"},
+    "vital-spirit": {"sleep"}, "water-veil": {"burn"}, "magma-armor": {"freeze"}, "own-tempo": {"confusion"},
+}
+ABSORB_HEAL = {"volt-absorb": "electric", "water-absorb": "water", "dry-skin": "water"}
+ABSORB_BOOST = {"motor-drive": ("electric", "speed"), "lightning-rod": ("electric", "sp_attack"),
+                "storm-drain": ("water", "sp_attack"), "sap-sipper": ("grass", "attack")}
+PINCH_TYPES = {"blaze": "fire", "torrent": "water", "overgrow": "grass", "swarm": "bug"}
+ATE_ABILITIES = {"aerilate": "flying", "pixilate": "fairy", "refrigerate": "ice"}
+FLAG_BOOSTS = {"iron-fist": ("punch", 1.2), "strong-jaw": ("bite", 1.5), "mega-launcher": ("pulse", 1.5),
+               "tough-claws": ("contact", 1.3), "sharpness": ("slicing", 1.5)}
+# Blocks stat drops caused by the foe: None = every stat, else just that one.
+STAT_DROP_BLOCKERS = {"clear-body": None, "white-smoke": None, "hyper-cutter": "attack",
+                      "big-pecks": "defense", "keen-eye": "accuracy"}
+INTIMIDATE_BLOCKERS = {"inner-focus", "oblivious", "own-tempo", "scrappy"}
+CONTACT_STATUS = {"static": "paralysis", "flame-body": "burn", "poison-point": "poison"}
+MOLD_BREAKERS = {"mold-breaker"}
+UNTRACEABLE = {"trace", "multitype", "imposter", "forecast", "flower-gift", "wonder-guard"}
+DAMP_BLOCKED = {"Explosion", "Self Destruct"}
+MOODY_STATS = ("attack", "defense", "sp_attack", "sp_defense", "speed")
+STAT_NAMES = {"attack": "Attack", "defense": "Defense", "sp_attack": "Sp. Atk", "sp_defense": "Sp. Def",
+              "speed": "Speed", "accuracy": "accuracy", "evasion": "evasiveness"}
+
+# Abilities with nothing to do in these battles: they only matter outside
+# battle (Pickup, Run Away...) or in double battles (Plus, Healer...), or rely
+# on mechanics this game doesn't have (genders, infatuation).
+NO_BATTLE_EFFECT_ABILITIES = {
+    "illuminate", "honey-gather", "pickup", "run-away", "plus", "minus", "friend-guard", "healer",
+    "telepathy", "cute-charm", "rivalry", "gluttony", "infiltrator", "unknown", "suction-cups",
+}
+# Have a battle effect that isn't simulated yet.
+UNSIMULATED_ABILITIES = {"klutz", "imposter", "multitype", "forecast", "neutralizing-gas", "wind-rider"}
+
+
+def _foe_ability(defender: BattlerState, attacker: Optional[BattlerState]) -> str:
+    """The defender's ability as it affects an attack: Mold Breaker ignores it."""
+    if attacker is not None and ability_key(attacker) in MOLD_BREAKERS:
+        return ""
+    return ability_key(defender)
+
+
+def _ability_event(events: list, mon: BattlerState, side_id: str, message: str, **extra) -> None:
+    events.append({"type": "ability_activated", "side": side_id, "name": mon.species_name,
+                   "ability": ability_label(mon), "message": message, **extra})
+
+
+def _set_types(mon: BattlerState, types: list) -> None:
+    """A type change (Protean, Color Change); kept in volatile so it lasts
+    until the Pokémon switches out, and survives a save/reload."""
+    mon.volatile.setdefault("base_types", list(mon.types))
+    mon.types = list(types)
+    mon.volatile["types"] = list(types)
+
+
+def _weight(mon: BattlerState) -> float:
+    abil = ability_key(mon)
+    return mon.weight * (2 if abil == "heavy-metal" else 0.5 if abil == "light-metal" else 1)
+
+
+def is_grounded(mon: BattlerState) -> bool:
+    return "flying" not in mon.types and ability_key(mon) != "levitate"
+
+
+def move_effectiveness(attacker: Optional[BattlerState], move: MoveData, defender: BattlerState) -> float:
+    """Type effectiveness, with Scrappy letting Normal/Fighting moves hit Ghosts."""
+    types = defender.types
+    if attacker is not None and ability_key(attacker) == "scrappy" and move.type in ("normal", "fighting"):
+        types = [t for t in types if t != "ghost"] or ["normal"]
+    return type_effectiveness(move.type, types)
+
+
+def ability_adjusted_move(attacker: BattlerState, move: MoveData) -> MoveData:
+    """The move as the user's ability changes it: Normalize, the -ate
+    abilities (Normal moves become their type, 1.2x), and Sheer Force
+    (drops the move's secondary effects for 1.3x power)."""
+    abil = ability_key(attacker)
+    changes: dict = {}
+    flags = set(move.flags)
+    if abil == "normalize" and move.type != "normal" and move.category != "status":
+        changes["type"] = "normal"
+        flags.add("ability_boost")
+    elif abil in ATE_ABILITIES and move.type == "normal" and move.category != "status":
+        changes["type"] = ATE_ABILITIES[abil]
+        flags.add("ability_boost")
+    if abil == "sheer-force" and has_secondary_effect(move):
+        changes.update(ailment=None, ailment_chance=0, flinch_chance=0)
+        if not (move.stat_self and all(c.get("change", 0) < 0 for c in move.stat_changes)):
+            changes.update(stat_changes=(), stat_chance=0)
+        flags.add("sheer_force")
+    if not changes and flags == set(move.flags):
+        return move
+    return dataclasses.replace(move, flags=frozenset(flags), **changes)
+
+
+def has_secondary_effect(move: MoveData) -> bool:
+    """A damaging move's extra chance effect (burn, flinch, stat change...),
+    not counting drawbacks like Close Combat's own drops."""
+    if move.category == "status" or not move.power:
+        return False
+    if move.ailment and move.ailment_chance:
+        return True
+    if move.flinch_chance:
+        return True
+    if move.stat_changes and move.stat_chance:
+        drawback = move.stat_self and all(c.get("change", 0) < 0 for c in move.stat_changes)
+        return not drawback
+    return False
+
+
+def ability_blocks_move(attacker: BattlerState, defender: BattlerState, move: MoveData) -> Optional[str]:
+    """Why the defender's ability stops this move outright, or None: the
+    absorbing abilities, Flash Fire, Levitate, Wonder Guard, Soundproof."""
+    if move.target == "self":
+        return None
+    abil = _foe_ability(defender, attacker)
+    if not abil:
+        return None
+    damaging = move.category != "status"
+    if ABSORB_HEAL.get(abil) == move.type:
+        return "absorb_heal"
+    if abil in ABSORB_BOOST and ABSORB_BOOST[abil][0] == move.type:
+        return "absorb_boost"
+    if abil == "flash-fire" and move.type == "fire":
+        return "flash_fire"
+    if abil == "levitate" and move.type == "ground" and damaging:
+        return "immune"
+    if abil == "soundproof" and "sound" in move.flags:
+        return "immune"
+    if abil == "wonder-guard" and damaging and move_effectiveness(attacker, move, defender) <= 1:
+        return "immune"
+    return None
+
+
+def ability_stat_multiplier(mon: BattlerState, stat: str, weather: Optional[str] = None) -> float:
+    abil = ability_key(mon)
+    mult = 1.0
+    if stat == "attack":
+        if abil in ("huge-power", "pure-power"):
+            mult *= 2
+        elif abil == "guts" and mon.status:
+            mult *= 1.5
+        elif abil == "hustle":
+            mult *= 1.5
+    if stat == "defense" and abil == "marvel-scale" and mon.status:
+        mult *= 1.5
+    if stat in ("attack", "speed") and abil == "slow-start" and mon.volatile.get("slow_start", 0) > 0:
+        mult *= 0.5
+    if stat in ("attack", "sp_defense") and abil == "flower-gift" and weather == "sun":
+        mult *= 1.5
+    return mult
+
+
+def ability_damage_multiplier(attacker: BattlerState, defender: BattlerState, move: MoveData,
+                              eff: float) -> float:
+    """Power/damage changes from the attacker's and the defender's abilities."""
+    abil = ability_key(attacker)
+    mult = 1.0
+    if abil == "technician" and move.power and move.power <= 60:
+        mult *= 1.5
+    if abil in FLAG_BOOSTS and FLAG_BOOSTS[abil][0] in move.flags:
+        mult *= FLAG_BOOSTS[abil][1]
+    if abil == "reckless" and (move.recoil_percent or "recoil" in move.flags):
+        mult *= 1.2
+    if "sheer_force" in move.flags:
+        mult *= 1.3
+    if "ability_boost" in move.flags:
+        mult *= 1.2
+    if abil == "tinted-lens" and 0 < eff < 1:
+        mult *= 2
+    if PINCH_TYPES.get(abil) == move.type and attacker.current_hp * 3 <= attacker.max_hp:
+        mult *= 1.5
+    if abil == "toxic-boost" and attacker.status in ("poison", "toxic") and move.category == "physical":
+        mult *= 1.5
+    if abil == "flare-boost" and attacker.status == "burn" and move.category == "special":
+        mult *= 1.5
+    if attacker.volatile.get("flash_fire") and move.type == "fire":
+        mult *= 1.5
+    if abil == "analytic" and attacker.volatile.get("moving_last"):
+        mult *= 1.3
+    d_abil = _foe_ability(defender, attacker)
+    if d_abil == "thick-fat" and move.type in ("fire", "ice"):
+        mult *= 0.5
+    elif d_abil == "heatproof" and move.type == "fire":
+        mult *= 0.5
+    elif d_abil == "dry-skin" and move.type == "fire":
+        mult *= 1.25
+    if d_abil in ("filter", "solid-rock") and eff > 1:
+        mult *= 0.75
+    if d_abil == "multiscale" and defender.current_hp >= defender.max_hp:
+        mult *= 0.5
+    return mult
+
+
+def ability_accuracy_multiplier(attacker: BattlerState, defender: BattlerState, move: MoveData) -> float:
+    abil = ability_key(attacker)
+    mult = 1.0
+    if abil == "compound-eyes":
+        mult *= 1.3
+    if abil == "hustle" and move.category == "physical":
+        mult *= 0.8
+    d_abil = _foe_ability(defender, attacker)
+    if d_abil == "tangled-feet" and defender.confusion_counter > 0:
+        mult *= 0.5
+    return mult
+
+
+def ability_chance(attacker: Optional[BattlerState], chance: float) -> float:
+    """Serene Grace doubles the odds of a move's added effects."""
+    if attacker is not None and ability_key(attacker) == "serene-grace" and 0 < chance < 100:
+        return min(100, chance * 2)
+    return chance
+
+
+def can_get_status(mon: BattlerState, status: str, attacker: Optional[BattlerState] = None,
+                   weather: Optional[str] = None) -> bool:
+    abil = _foe_ability(mon, attacker) if attacker is not None and attacker is not mon else ability_key(mon)
+    if status in STATUS_IMMUNITIES.get(abil, ()):
+        return False
+    if abil == "leaf-guard" and weather == "sun" and status != "confusion":
+        return False
+    return True
+
+
+def change_stat(mon: BattlerState, stat: str, change: int, events: list, side_id: str,
+                by_foe: bool = False) -> int:
+    """Raises/lowers one stat stage, with the abilities that affect that:
+    Simple (doubled), Contrary (reversed), Clear Body & co. (no drops from
+    the foe), and Defiant / Competitive (a drop from the foe sharply raises
+    Attack / Sp. Atk). Returns the change actually made."""
+    abil = ability_key(mon)
+    if abil == "contrary":
+        change = -change
+    if abil == "simple":
+        change *= 2
+    if by_foe and change < 0 and abil in STAT_DROP_BLOCKERS and STAT_DROP_BLOCKERS[abil] in (None, stat):
+        _ability_event(events, mon, side_id, f"prevents its {STAT_NAMES.get(stat, stat)} from being lowered!")
+        return 0
+    old = mon.stat_stages[stat]
+    new = max(-6, min(6, old + change))
+    mon.stat_stages[stat] = new
+    if new == old:
+        events.append({"type": "stat_change_fizzled", "side": side_id, "stat": stat})
+    else:
+        events.append({"type": "stat_changed", "side": side_id, "stat": stat, "change": new - old})
+    if by_foe and new < old and abil in ("defiant", "competitive") and not mon.is_fainted:
+        boost = "attack" if abil == "defiant" else "sp_attack"
+        _ability_event(events, mon, side_id, "")
+        change_stat(mon, boost, 2, events, side_id)
+    return new - old
+
+
+def apply_status(battle: BattleState, mon: BattlerState, side_id: str, status: str, events: list,
+                 source: Optional[BattlerState] = None, source_side: Optional[str] = None,
+                 reason: Optional[str] = None) -> bool:
+    """Gives `mon` a major status (or confusion) if nothing prevents it.
+    Synchronize passes burn / paralysis / poison back to the Pokémon that
+    inflicted it."""
+    if mon.is_fainted:
+        return False
+    weather = current_weather(battle)
+    if not can_get_status(mon, status, source, weather):
+        return False
+    if status == "confusion":
+        if mon.confusion_counter > 0:
+            return False
+        mon.confusion_counter = battle.rng.randint(2, 5)
+        events.append({"type": "status_applied", "side": side_id, "status": "confusion"})
+        _after_status(mon, side_id, events)
+        return True
+    if mon.status is not None:
+        return False
+    if weather == "sun" and status == "freeze":
+        return False
+    mon.status = status
+    if status == "sleep":
+        turns = battle.rng.randint(1, 3)
+        mon.status_counter = max(1, (turns + 1) // 2) if ability_key(mon) == "early-bird" else turns
+    elif status == "toxic":
+        mon.status_counter = 1
+    else:
+        mon.status_counter = 0
+    event = {"type": "status_applied", "side": side_id, "status": status}
+    if reason:
+        event["reason"] = reason
+    events.append(event)
+    if (ability_key(mon) == "synchronize" and source is not None and source is not mon and source_side
+            and status in ("burn", "paralysis", "poison", "toxic") and source.status is None):
+        _ability_event(events, mon, side_id, "")
+        apply_status(battle, source, source_side, status, events)
+    _after_status(mon, side_id, events)
+    return True
+
+
+def _ability_damage(mon: BattlerState, side_id: str, amount: int, events: list, message: str,
+                    owner: BattlerState) -> None:
+    """Damage dealt by an ability (Rough Skin, Aftermath, Liquid Ooze, Bad
+    Dreams). Magic Guard prevents it."""
+    if mon.is_fainted or ability_key(mon) == "magic-guard":
+        return
+    amount = max(1, min(amount, mon.current_hp))
+    mon.current_hp -= amount
+    events.append({"type": "ability_damage", "side": side_id, "name": mon.species_name,
+                   "ability": ability_label(owner), "message": message, "amount": amount,
+                   "new_hp": mon.current_hp, "max_hp": mon.max_hp})
+    _check_and_emit_faint(mon, side_id, events)
+    _after_hp_loss(mon, side_id, events)
+
+
+def ability_absorb(battle: BattleState, attacker: BattlerState, defender: BattlerState, move: MoveData,
+                   events: list, def_side: str, reason: str) -> None:
+    """What happens when a move hits an absorbing / immune ability."""
+    abil = ability_key(defender)
+    if reason == "absorb_heal":
+        if defender.current_hp < defender.max_hp:
+            heal = min(max(1, defender.max_hp // 4), defender.max_hp - defender.current_hp)
+            defender.current_hp += heal
+            events.append({"type": "heal", "side": def_side, "amount": heal, "reason": ability_label(defender),
+                           "new_hp": defender.current_hp, "max_hp": defender.max_hp})
+        else:
+            _ability_event(events, defender, def_side, "is unaffected!")
+    elif reason == "absorb_boost":
+        _ability_event(events, defender, def_side, "absorbed the move!")
+        change_stat(defender, ABSORB_BOOST[abil][1], 1, events, def_side)
+    elif reason == "flash_fire":
+        defender.volatile["flash_fire"] = True
+        _ability_event(events, defender, def_side, "powered up its Fire-type moves!")
+    else:
+        _ability_event(events, defender, def_side, f"isn't affected by {move.name}!")
+
+
+def after_contact(battle: BattleState, attacker: BattlerState, defender: BattlerState, move: MoveData,
+                  events: list, atk_side: str, def_side: str) -> None:
+    """Abilities triggered by a contact move landing."""
+    if "contact" not in move.flags:
+        return
+    d_abil = ability_key(defender)
+    if d_abil in CONTACT_STATUS and battle.rng.random() < 0.3 and attacker.status is None:
+        status = CONTACT_STATUS[d_abil]
+        if can_get_status(attacker, status, weather=current_weather(battle)):
+            _ability_event(events, defender, def_side, "")
+            apply_status(battle, attacker, atk_side, status, events, source=defender, source_side=def_side)
+    elif d_abil == "effect-spore" and battle.rng.random() < 0.3 and attacker.status is None:
+        if "grass" not in attacker.types and ability_key(attacker) != "overcoat":
+            status = battle.rng.choice(["poison", "paralysis", "sleep"])
+            if can_get_status(attacker, status, weather=current_weather(battle)):
+                _ability_event(events, defender, def_side, "")
+                apply_status(battle, attacker, atk_side, status, events, source=defender, source_side=def_side)
+    elif d_abil == "rough-skin":
+        _ability_damage(attacker, atk_side, attacker.max_hp // 8, events, "was hurt by", defender)
+    if d_abil == "aftermath" and defender.is_fainted and ability_key(attacker) != "damp":
+        _ability_damage(attacker, atk_side, attacker.max_hp // 4, events, "was caught in the", defender)
+    if (d_abil == "pickpocket" and not defender.is_fainted and not defender.item and attacker.item
+            and ability_key(attacker) != "sticky-hold"):
+        stolen = attacker.item
+        label = HELD_ITEMS.get(stolen, {}).get("label", stolen)
+        _consume_item(attacker, atk_side, events, reason="stolen")
+        defender.item = stolen
+        _ability_event(events, defender, def_side, f"stole {attacker.species_name}'s {label}!")
+    if (ability_key(attacker) == "poison-touch" and not defender.is_fainted and defender.status is None
+            and battle.rng.random() < 0.3 and can_get_status(defender, "poison", attacker, current_weather(battle))):
+        _ability_event(events, attacker, atk_side, "")
+        apply_status(battle, defender, def_side, "poison", events, source=attacker, source_side=atk_side)
+
+
+def after_hit(battle: BattleState, attacker: BattlerState, defender: BattlerState, move: MoveData,
+              events: list, atk_side: str, def_side: str, is_crit: bool, move_slot_name: Optional[str]) -> None:
+    """The defender's abilities that react to taking a hit (it's still standing)."""
+    if defender.is_fainted:
+        return
+    abil = ability_key(defender)
+    if abil == "anger-point" and is_crit and defender.stat_stages["attack"] < 6:
+        defender.stat_stages["attack"] = 6
+        _ability_event(events, defender, def_side, "maxed its Attack!")
+        events.append({"type": "stat_changed", "side": def_side, "stat": "attack", "change": 6})
+    elif abil == "justified" and move.type == "dark":
+        _ability_event(events, defender, def_side, "")
+        change_stat(defender, "attack", 1, events, def_side)
+    elif abil == "rattled" and move.type in ("bug", "ghost", "dark"):
+        _ability_event(events, defender, def_side, "")
+        change_stat(defender, "speed", 1, events, def_side)
+    elif abil == "weak-armor" and move.category == "physical":
+        _ability_event(events, defender, def_side, "")
+        change_stat(defender, "defense", -1, events, def_side)
+        change_stat(defender, "speed", 2, events, def_side)
+    elif abil == "color-change" and move.type and defender.types != [move.type]:
+        _set_types(defender, [move.type])
+        _ability_event(events, defender, def_side, f"turned into the {move.type.title()} type!")
+    elif (abil == "cursed-body" and move_slot_name and not attacker.is_fainted
+          and not attacker.volatile.get("disabled") and battle.rng.random() < 0.3):
+        attacker.volatile["disabled"] = {"move": move_slot_name, "turns": 4}
+        _ability_event(events, defender, def_side, f"disabled {attacker.species_name}'s {move_slot_name}!")
+
+
+def trigger_ability_on_entry(battle: BattleState, side_id: str, events: list, traced: bool = False) -> None:
+    """Abilities that announce or act as their Pokémon enters battle."""
+    mon = battle.side(side_id).active
+    if mon.is_fainted:
+        return
+    foe_side = "B" if side_id == "A" else "A"
+    foe = battle.side(foe_side).active
+    abil = ability_key(mon)
+    foe_up = not foe.is_fainted
+    if abil == "intimidate" and foe_up:
+        _ability_event(events, mon, side_id, f"intimidates {foe.species_name}!")
+        if ability_key(foe) in INTIMIDATE_BLOCKERS:
+            _ability_event(events, foe, foe_side, "isn't intimidated!")
+        else:
+            change_stat(foe, "attack", -1, events, foe_side, by_foe=True)
+            if ability_key(foe) == "rattled":
+                change_stat(foe, "speed", 1, events, foe_side)
+    elif abil == "download" and foe_up:
+        d = foe.stats["defense"] * stat_stage_multiplier(foe.stat_stages["defense"])
+        sd = foe.stats["sp_defense"] * stat_stage_multiplier(foe.stat_stages["sp_defense"])
+        _ability_event(events, mon, side_id, "")
+        change_stat(mon, "attack" if d < sd else "sp_attack", 1, events, side_id)
+    elif abil == "trace" and foe_up and not traced:
+        target = ability_key(foe)
+        if target and target not in UNTRACEABLE:
+            mon.volatile["ability_override"] = target
+            events.append({"type": "ability_activated", "side": side_id, "name": mon.species_name,
+                           "ability": "Trace", "message": f"traced {foe.species_name}'s {ability_label(foe)}!"})
+            trigger_ability_on_entry(battle, side_id, events, traced=True)
+            trigger_entry_ability(battle, side_id, events, weather_only=True)
+    elif abil == "pressure":
+        _ability_event(events, mon, side_id, "is exerting its pressure!")
+    elif abil == "mold-breaker":
+        _ability_event(events, mon, side_id, "breaks the mold!")
+    elif abil == "unnerve" and foe_up:
+        _ability_event(events, mon, side_id, f"makes {foe.species_name} too nervous to eat Berries!")
+    elif abil == "frisk" and foe_up and foe.item:
+        _ability_event(events, mon, side_id, f"frisked {foe.species_name} and found its {item_label(foe)}!")
+    elif abil == "forewarn" and foe_up and foe.moves:
+        best = max(foe.moves, key=lambda s: s.move.power or 0).move
+        _ability_event(events, mon, side_id, f"alerted it to {foe.species_name}'s {best.name}!")
+    elif abil == "anticipation" and foe_up:
+        if any(s.move.power and type_effectiveness(s.move.type, mon.types) > 1 for s in foe.moves):
+            _ability_event(events, mon, side_id, "made it shudder!")
+    elif abil == "slow-start":
+        mon.volatile["slow_start"] = 5
+        _ability_event(events, mon, side_id, "can't get it going!")
+    for m, s in ((mon, side_id), (foe, foe_side)):
+        m.volatile["unnerved"] = ability_key(battle.side("B" if s == "A" else "A").active) == "unnerve"
+
+
+def ability_on_switch_out(mon: BattlerState, side_id: str, events: list) -> None:
+    if mon.is_fainted:
+        return
+    abil = ability_key(mon)
+    if abil == "natural-cure" and mon.status:
+        mon.status = None
+        mon.status_counter = 0
+        _ability_event(events, mon, side_id, "cured its status!")
+    elif abil == "regenerator" and mon.current_hp < mon.max_hp:
+        heal = min(mon.max_hp // 3, mon.max_hp - mon.current_hp)
+        mon.current_hp += heal
+        events.append({"type": "heal", "side": side_id, "amount": heal, "reason": "Regenerator",
+                       "new_hp": mon.current_hp, "max_hp": mon.max_hp})
+
+
+def traps(foe: BattlerState, mon: BattlerState) -> bool:
+    """Whether `foe`'s ability keeps `mon` from switching out (Ghosts escape)."""
+    if foe.is_fainted or "ghost" in mon.types:
+        return False
+    abil = ability_key(foe)
+    if abil == "shadow-tag":
+        return ability_key(mon) != "shadow-tag"
+    if abil == "arena-trap":
+        return is_grounded(mon)
+    if abil == "magnet-pull":
+        return "steel" in mon.types
+    return False
+
+
+def apply_end_of_turn_ability(battle: BattleState, side_id: str) -> list:
+    events: list = []
+    mon = battle.side(side_id).active
+    if mon.is_fainted:
+        return events
+    abil = ability_key(mon)
+    v = mon.volatile
+    if abil == "speed-boost" and mon.stat_stages["speed"] < 6:
+        _ability_event(events, mon, side_id, "")
+        change_stat(mon, "speed", 1, events, side_id)
+    elif abil == "shed-skin" and mon.status and battle.rng.random() < 0.3:
+        mon.status = None
+        mon.status_counter = 0
+        _ability_event(events, mon, side_id, "shed its status!")
+    elif abil == "moody":
+        ups = [s for s in MOODY_STATS if mon.stat_stages[s] < 6]
+        if ups:
+            up = battle.rng.choice(ups)
+            downs = [s for s in MOODY_STATS if s != up and mon.stat_stages[s] > -6]
+            _ability_event(events, mon, side_id, "")
+            change_stat(mon, up, 2, events, side_id)
+            if downs:
+                change_stat(mon, battle.rng.choice(downs), -1, events, side_id)
+    elif abil == "bad-dreams":
+        foe_side = "B" if side_id == "A" else "A"
+        foe = battle.side(foe_side).active
+        if foe.status == "sleep":
+            _ability_damage(foe, foe_side, foe.max_hp // 8, events, "is tormented by", mon)
+    elif abil == "harvest" and not mon.item and v.get("last_berry"):
+        if current_weather(battle) == "sun" or battle.rng.random() < 0.5:
+            mon.item = v["last_berry"]
+            v["last_berry"] = None
+            _ability_event(events, mon, side_id, f"harvested its {item_label(mon)}!")
+    if v.get("slow_start", 0) > 0:
+        v["slow_start"] -= 1
+        if v["slow_start"] == 0:
+            _ability_event(events, mon, side_id, "finally got its act together!")
+    disabled = v.get("disabled")
+    if disabled:
+        disabled["turns"] -= 1
+        if disabled["turns"] <= 0:
+            v["disabled"] = None
+    return events
+
+
+# Every ability these battles simulate (the team page marks them "active in
+# battles"); see NO_BATTLE_EFFECT_ABILITIES / UNSIMULATED_ABILITIES for the rest.
+BATTLE_ABILITIES = (
+    set(WEATHER_ABILITIES) | WEATHER_NEGATING_ABILITIES | set(SPEED_DOUBLERS) | SAND_IMMUNE_ABILITIES
+    | HAIL_IMMUNE_ABILITIES | {"rain-dish", "dry-skin", "hydration", "solar-power", "leaf-guard", "sand-force"}
+    | set(STATUS_IMMUNITIES) | set(ABSORB_HEAL) | set(ABSORB_BOOST) | set(PINCH_TYPES) | set(ATE_ABILITIES)
+    | set(FLAG_BOOSTS) | set(STAT_DROP_BLOCKERS) | set(CONTACT_STATUS) | {
+        "adaptability", "flash-fire", "levitate", "soundproof", "wonder-guard", "huge-power", "pure-power",
+        "guts", "hustle", "marvel-scale", "slow-start", "flower-gift", "technician", "reckless", "sheer-force",
+        "normalize", "tinted-lens", "toxic-boost", "flare-boost", "analytic", "thick-fat", "heatproof",
+        "filter", "solid-rock", "multiscale", "compound-eyes", "tangled-feet", "no-guard", "unaware",
+        "wonder-skin", "serene-grace", "shield-dust", "stench", "inner-focus", "steadfast", "early-bird",
+        "synchronize", "simple", "contrary", "defiant", "competitive", "effect-spore", "rough-skin",
+        "aftermath", "pickpocket", "poison-touch", "sticky-hold", "anger-point", "justified", "rattled",
+        "weak-armor", "color-change", "cursed-body", "intimidate", "download", "trace", "pressure",
+        "mold-breaker", "unnerve", "frisk", "forewarn", "anticipation", "natural-cure", "regenerator",
+        "shadow-tag", "arena-trap", "magnet-pull", "speed-boost", "shed-skin", "moody", "bad-dreams",
+        "harvest", "quick-feet", "unburden", "sturdy", "battle-armor", "shell-armor", "super-luck",
+        "sniper", "skill-link", "prankster", "stall", "truant", "protean", "parental-bond", "liquid-ooze",
+        "magic-guard", "poison-heal", "damp", "magic-bounce", "heavy-metal", "light-metal", "scrappy",
+        "oblivious", "rock-head", "overcoat", "moxie",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -1297,13 +1874,22 @@ def _action_priority(battle: BattleState, side_id: str, action: Action) -> int:
     active = side.active
     if action.move_index is None or action.move_index >= len(active.moves):
         return 0  # Struggle
-    return active.moves[action.move_index].move.priority
+    move = active.moves[action.move_index].move
+    if ability_key(active) == "prankster" and move.category == "status":
+        return move.priority + 1
+    return move.priority
 
 
 def _effective_speed(mon: BattlerState, weather: Optional[str] = None) -> float:
     spd = mon.stats["speed"] * stat_stage_multiplier(mon.stat_stages["speed"])
-    if mon.status == "paralysis":
+    abil = ability_key(mon)
+    if abil == "quick-feet" and mon.status:
+        spd *= 1.5  # and paralysis doesn't slow it
+    elif mon.status == "paralysis":
         spd *= 0.5
+    if abil == "unburden" and mon.volatile.get("unburdened"):
+        spd *= 2
+    spd *= ability_stat_multiplier(mon, "speed", weather)
     if weather and SPEED_DOUBLERS.get(ability_key(mon)) == weather:
         spd *= 2
     return spd * item_stat_multiplier(mon, "speed")
@@ -1325,6 +1911,9 @@ def _order_actions(battle: BattleState, action_a: Action, action_b: Action, even
             events.append({"type": "item_activated", "side": side_id, "name": mon.species_name,
                            "item": "quick-claw", "label": item_label(mon)})
         return entries if side_id == "A" else [entries[1], entries[0]]
+    stall = [s for s, _ in entries if ability_key(battle.side(s).active) == "stall"]
+    if len(stall) == 1:
+        return [entries[1], entries[0]] if stall[0] == "A" else entries
     weather = current_weather(battle)
     spd_a = _effective_speed(battle.side_a.active, weather)
     spd_b = _effective_speed(battle.side_b.active, weather)
@@ -1337,7 +1926,10 @@ def do_switch(side: BattleSide, target_index: int, battle: Optional[BattleState]
     events = []
     outgoing = side.active
     wish = outgoing.volatile.get("healing_wish") if outgoing.is_fainted else None
+    ability_on_switch_out(outgoing, side.side_id, events)
     events.append({"type": "switch_out", "side": side.side_id, "dex_id": outgoing.dex_id, "name": outgoing.species_name})
+    if outgoing.volatile.get("types"):
+        outgoing.types = list(outgoing.volatile.get("base_types") or outgoing.types)
     outgoing.stat_stages = default_stat_stages()
     outgoing.volatile = default_volatile()
     outgoing.confusion_counter = 0
@@ -1379,12 +1971,19 @@ def apply_faint_and_check_winner(battle: BattleState) -> Optional[str]:
 
 
 def _apply_damage_and_emit(defender: BattlerState, amount: int, events: list, defender_side_id: str,
-                            move_name: str, is_crit: bool, move_type: Optional[str]) -> int:
-    eff = type_effectiveness(move_type, defender.types) if move_type is not None else 1.0
+                            move_name: str, is_crit: bool, move_type: Optional[str],
+                            attacker: Optional[BattlerState] = None) -> int:
+    if move_type is None:
+        eff = 1.0
+    elif attacker is not None and ability_key(attacker) == "scrappy" and move_type in ("normal", "fighting"):
+        eff = type_effectiveness(move_type, [t for t in defender.types if t != "ghost"] or ["normal"])
+    else:
+        eff = type_effectiveness(move_type, defender.types)
     amount = max(0, int(amount))
-    sash = (defender.item == "focus-sash" and defender.current_hp == defender.max_hp
-            and amount >= defender.current_hp and defender.max_hp > 1)
-    if sash:
+    full = defender.current_hp == defender.max_hp and amount >= defender.current_hp and defender.max_hp > 1
+    sturdy = full and _foe_ability(defender, attacker) == "sturdy"
+    sash = full and not sturdy and defender.item == "focus-sash"
+    if sash or sturdy:
         amount = defender.current_hp - 1
     defender.current_hp = max(0, defender.current_hp - amount)
     events.append({
@@ -1394,6 +1993,8 @@ def _apply_damage_and_emit(defender: BattlerState, amount: int, events: list, de
     })
     if sash:
         _consume_item(defender, defender_side_id, events)
+    if sturdy:
+        _ability_event(events, defender, defender_side_id, "endured the hit!")
     if defender.current_hp <= 0 and not defender.is_fainted:
         defender.is_fainted = True
         events.append({"type": "faint", "side": defender_side_id, "dex_id": defender.dex_id, "name": defender.species_name})
@@ -1407,38 +2008,25 @@ def _check_and_emit_faint(mon: BattlerState, side_id: str, events: list) -> None
         events.append({"type": "faint", "side": side_id, "dex_id": mon.dex_id, "name": mon.species_name})
 
 
-def _maybe_apply_ailment(battle: BattleState, move: MoveData, target: BattlerState, events: list, target_side_id: str) -> None:
+def _maybe_apply_ailment(battle: BattleState, move: MoveData, target: BattlerState, events: list, target_side_id: str,
+                         user: Optional[BattlerState] = None, user_side: Optional[str] = None) -> None:
     if not move.ailment:
         return
-    if move.ailment == "confusion":
-        if target.confusion_counter > 0:
-            return
-        if battle.rng.random() * 100 < move.ailment_chance:
-            target.confusion_counter = battle.rng.randint(2, 5)
-            events.append({"type": "status_applied", "side": target_side_id, "status": "confusion"})
-            _after_status(target, target_side_id, events)
+    if move.ailment == "confusion" and target.confusion_counter > 0:
         return
-    if target.status is not None:
+    if move.ailment != "confusion" and target.status is not None:
         return  # already has a major status; secondary status effects don't stack/overwrite
-    weather = current_weather(battle)
-    if weather == "sun" and (move.ailment == "freeze" or ability_key(target) == "leaf-guard"):
-        return
-    if battle.rng.random() * 100 < move.ailment_chance:
-        target.status = move.ailment
-        if move.ailment == "sleep":
-            target.status_counter = battle.rng.randint(1, 3)
-        elif move.ailment == "toxic":
-            target.status_counter = 1
-        else:
-            target.status_counter = 0
-        events.append({"type": "status_applied", "side": target_side_id, "status": move.ailment})
-        _after_status(target, target_side_id, events)
+    if battle.rng.random() * 100 < ability_chance(user, move.ailment_chance):
+        source = user if user is not target else None
+        apply_status(battle, target, target_side_id, move.ailment, events, source=source,
+                     source_side=user_side if source else None)
 
 
-def _maybe_apply_stat_changes(battle: BattleState, move: MoveData, target: BattlerState, events: list, target_side_id: str) -> None:
+def _maybe_apply_stat_changes(battle: BattleState, move: MoveData, target: BattlerState, events: list, target_side_id: str,
+                              user: Optional[BattlerState] = None) -> None:
     if not move.stat_changes:
         return
-    if battle.rng.random() * 100 >= move.stat_chance:
+    if battle.rng.random() * 100 >= ability_chance(user, move.stat_chance):
         return
     for sc in move.stat_changes:
         # Move data (PokeAPI) spells the special stats "special_attack"/
@@ -1449,22 +2037,32 @@ def _maybe_apply_stat_changes(battle: BattleState, move: MoveData, target: Battl
         change = sc.get("change", 0)
         if stat not in target.stat_stages:
             continue
-        old = target.stat_stages[stat]
-        new = max(-6, min(6, old + change))
-        target.stat_stages[stat] = new
-        if new == old:
-            events.append({"type": "stat_change_fizzled", "side": target_side_id, "stat": stat})
-        else:
-            events.append({"type": "stat_changed", "side": target_side_id, "stat": stat, "change": new - old})
+        change_stat(target, stat, change, events, target_side_id, by_foe=user is not None and user is not target)
 
 
-def _maybe_apply_flinch(battle: BattleState, move: MoveData, defender: BattlerState) -> None:
-    if move.flinch_chance and battle.rng.random() * 100 < move.flinch_chance:
+def _maybe_apply_flinch(battle: BattleState, move: MoveData, defender: BattlerState,
+                        attacker: Optional[BattlerState] = None) -> None:
+    if _foe_ability(defender, attacker) == "inner-focus":
+        return
+    chance = ability_chance(attacker, move.flinch_chance)
+    if not chance and attacker is not None and ability_key(attacker) == "stench" and move.power:
+        chance = 10
+    if chance and battle.rng.random() * 100 < chance:
         defender.volatile["flinched"] = True
 
 
 def _apply_end_of_turn_status(mon: BattlerState, side_id: str) -> list:
     events = []
+    abil = ability_key(mon)
+    if abil == "poison-heal" and mon.status in ("poison", "toxic"):
+        if mon.current_hp < mon.max_hp:
+            heal = min(max(1, mon.max_hp // 8), mon.max_hp - mon.current_hp)
+            mon.current_hp += heal
+            events.append({"type": "heal", "side": side_id, "amount": heal, "reason": "Poison Heal",
+                           "new_hp": mon.current_hp, "max_hp": mon.max_hp})
+        return events
+    if abil == "magic-guard":
+        return events
     if mon.status in ("burn", "poison"):
         dmg = max(1, mon.max_hp // 16)
         mon.current_hp = max(0, mon.current_hp - dmg)
@@ -1489,7 +2087,7 @@ def _execute_move_action(battle: BattleState, side: BattleSide, opp: BattleSide,
     active = side.active
     used = next((e for e in events if e["type"] == "move_used" and e["side"] == side.side_id), None)
     if used and used["move_name"] in SELF_KO_MOVES and not active.is_fainted:
-        spared = any(e["type"] == "move_failed" and e.get("reason") in ("no_teammates", "immune") for e in events)
+        spared = any(e["type"] == "move_failed" and e.get("reason") in ("no_teammates", "immune", "damp") for e in events)
         if not spared:
             # Explosion & co.: the user faints whether or not the move landed.
             active.current_hp = 0
@@ -1512,8 +2110,15 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
         events.append({"type": "cannot_act", "side": side.side_id, "reason": "recharge"})
         return events
 
+    if ability_key(active) == "truant":
+        if v.get("truant_loaf"):
+            v["truant_loaf"] = False
+            events.append({"type": "cannot_act", "side": side.side_id, "reason": "truant"})
+            return events
+        v["truant_loaf"] = True
+
     if active.status == "sleep":
-        active.status_counter -= 1
+        active.status_counter -= 2 if ability_key(active) == "early-bird" else 1
         if active.status_counter <= 0:
             active.status = None
             events.append({"type": "status_applied", "side": side.side_id, "status": "none", "reason": "woke_up"})
@@ -1532,6 +2137,9 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
     if v.get("flinched"):
         v["flinched"] = False
         events.append({"type": "cannot_act", "side": side.side_id, "reason": "flinched"})
+        if ability_key(active) == "steadfast":
+            _ability_event(events, active, side.side_id, "")
+            change_stat(active, "speed", 1, events, side.side_id)
         return events
 
     if active.confusion_counter > 0:
@@ -1584,10 +2192,11 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
             return events
 
         move_slot = active.moves[move_index]
-        move = weather_adjusted_move(move_slot.move, current_weather(battle))
+        move = ability_adjusted_move(active, weather_adjusted_move(move_slot.move, current_weather(battle)))
+        pp_cost = 2 if (ability_key(defender) == "pressure" and move.target != "self" and not defender.is_fainted) else 1
 
         if "charge" in move.flags:
-            move_slot.current_pp = max(0, move_slot.current_pp - 1)
+            move_slot.current_pp = max(0, move_slot.current_pp - pp_cost)
             v["charging_move"] = move.name
             # Fly/Dig/Dive/Bounce make the user unhittable for the rest of
             # THIS turn only — tagging it with the current turn number (not a
@@ -1600,16 +2209,25 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
                             "move_type": move.type})
             return events
 
-        move_slot.current_pp = max(0, move_slot.current_pp - 1)
+        move_slot.current_pp = max(0, move_slot.current_pp - pp_cost)
     else:
         # Release turn of a charging move (Solar Beam etc.) — move_index was
         # already resolved above from volatile["charging_move"]; no new PP cost.
-        move = weather_adjusted_move(active.moves[move_index].move, current_weather(battle))
+        move = ability_adjusted_move(active, weather_adjusted_move(active.moves[move_index].move, current_weather(battle)))
+    move_slot_name = active.moves[move_index].move.name if move_index is not None and move_index < len(active.moves) else None
 
     events.append({"type": "move_used", "side": side.side_id, "move_name": move.name,
                    "move_type": move.type, "category": move.category, "target": move.target})
     if active.item in CHOICE_ITEMS and not v.get("choice_lock"):
         v["choice_lock"] = move.name
+    if ability_key(active) == "protean" and move.type and active.types != [move.type]:
+        _set_types(active, [move.type])
+        _ability_event(events, active, side.side_id, f"turned into the {move.type.title()} type!")
+    if move.name in DAMP_BLOCKED and "damp" in (ability_key(active), ability_key(defender)):
+        damp_mon, damp_side = (active, side.side_id) if ability_key(active) == "damp" else (defender, opp.side_id)
+        _ability_event(events, damp_mon, damp_side, f"prevents {move.name}!")
+        events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "damp"})
+        return events
 
     if move.name in WEATHER_MOVES:
         if not set_weather(battle, WEATHER_MOVES[move.name], events, side.side_id, "move", active):
@@ -1686,11 +2304,19 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
             active.volatile["must_recharge"] = True
         return events
 
-    if "always_hit" not in move.flags and move.accuracy is not None:
-        acc_mult = stat_stage_multiplier(
-            active.stat_stages["accuracy"] - defender.stat_stages["evasion"], is_accuracy_or_evasion=True
-        )
-        effective_acc = move.accuracy * acc_mult * weather_evasion_multiplier(current_weather(battle), defender)
+    no_guard = "no-guard" in (ability_key(active), ability_key(defender))
+    if "always_hit" not in move.flags and move.accuracy is not None and not no_guard:
+        acc_stage, eva_stage = active.stat_stages["accuracy"], defender.stat_stages["evasion"]
+        if ability_key(active) in ("unaware", "keen-eye"):
+            eva_stage = min(eva_stage, 0) if ability_key(active) == "keen-eye" else 0
+        if _foe_ability(defender, active) == "unaware":
+            acc_stage = 0
+        acc_mult = stat_stage_multiplier(acc_stage - eva_stage, is_accuracy_or_evasion=True)
+        accuracy = move.accuracy
+        if move.category == "status" and _foe_ability(defender, active) == "wonder-skin" and move.target != "self":
+            accuracy = min(accuracy, 50)
+        effective_acc = (accuracy * acc_mult * weather_evasion_multiplier(current_weather(battle), defender)
+                         * ability_accuracy_multiplier(active, defender, move))
         if defender.item == "bright-powder":
             effective_acc *= 0.9
         if battle.rng.random() * 100 >= effective_acc:
@@ -1699,11 +2325,18 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
                 active.volatile["must_recharge"] = True
             return events
 
+    blocked = ability_blocks_move(active, defender, move)
+    if blocked:
+        ability_absorb(battle, active, defender, move, events, opp.side_id, blocked)
+        if "recharge" in move.flags:
+            active.volatile["must_recharge"] = True
+        return events
+
     dmg = 0
     total_dealt = 0
     is_crit = False
 
-    immune = type_effectiveness(move.type, defender.types) == 0
+    immune = move_effectiveness(active, move, defender) == 0
     if move.name == "Final Gambit":
         if immune:
             events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "immune"})
@@ -1734,7 +2367,10 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
         # own accuracy field (PokeAPI encodes OHKO moves' ~30% hit chance
         # there directly) — reaching here means it already hit, so the only
         # remaining condition is mainline's "fails if the target is faster."
-        if _effective_speed(defender, current_weather(battle)) > _effective_speed(active, current_weather(battle)):
+        if _foe_ability(defender, active) == "sturdy":
+            _ability_event(events, defender, opp.side_id, "can't be knocked out in one hit!")
+            events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "immune"})
+        elif _effective_speed(defender, current_weather(battle)) > _effective_speed(active, current_weather(battle)):
             events.append({"type": "move_failed", "side": side.side_id, "move_name": move.name, "reason": "outsped"})
         else:
             total_dealt = _apply_damage_and_emit(defender, defender.current_hp, events, opp.side_id, move.name, False, move.type)
@@ -1750,26 +2386,40 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
             powers = [5 + max(1, (b.stats["attack"] - 36) // 2) // 10
                       for b in side.roster if not b.is_fainted and b.status is None] or [10]
         else:
-            powers = [move.power] * sample_multi_hit_count(move, battle.rng)
+            count = (move.max_hits or 2) if ability_key(active) == "skill-link" else sample_multi_hit_count(move, battle.rng)
+            powers = [move.power] * count
         hits = 0
         for hit_power in powers:
             if defender.is_fainted:
                 break
             hit_move = move if hit_power == move.power else dataclasses.replace(move, power=hit_power)
-            hit_crit = battle.rng.random() < crit_chance(move, active)
+            hit_crit = battle.rng.random() < crit_chance(move, active, defender)
             hit_dmg = compute_damage(active, defender, hit_move, hit_crit, battle.rng, current_weather(battle))
-            total_dealt += _apply_damage_and_emit(defender, hit_dmg, events, opp.side_id, move.name, hit_crit, move.type)
+            total_dealt += _apply_damage_and_emit(defender, hit_dmg, events, opp.side_id, move.name, hit_crit, move.type, active)
+            is_crit = is_crit or hit_crit
             hits += 1
         events.append({"type": "multi_hit_summary", "side": side.side_id, "hits": hits, "total_damage": total_dealt})
     else:
-        is_crit = battle.rng.random() < crit_chance(move, active)
+        is_crit = battle.rng.random() < crit_chance(move, active, defender)
         dmg = compute_damage(active, defender, move, is_crit, battle.rng, current_weather(battle))
-        total_dealt = _apply_damage_and_emit(defender, dmg, events, opp.side_id, move.name, is_crit, move.type)
+        total_dealt = _apply_damage_and_emit(defender, dmg, events, opp.side_id, move.name, is_crit, move.type, active)
+        if ability_key(active) == "parental-bond" and not defender.is_fainted and total_dealt > 0:
+            # Parental Bond: a second hit at a quarter power.
+            second = dataclasses.replace(move, power=max(1, move.power // 4))
+            crit2 = battle.rng.random() < crit_chance(move, active, defender)
+            dmg2 = compute_damage(active, defender, second, crit2, battle.rng, current_weather(battle))
+            total_dealt += _apply_damage_and_emit(defender, dmg2, events, opp.side_id, move.name, crit2, move.type, active)
+            events.append({"type": "multi_hit_summary", "side": side.side_id, "hits": 2, "total_damage": total_dealt})
 
     if total_dealt > 0 and move.category in ("physical", "special"):
         defender.volatile["last_hit"] = {"turn": battle.turn_number, "amount": total_dealt, "category": move.category}
         if defender.volatile.get("bide"):
             defender.volatile["bide"]["stored"] += total_dealt
+        after_hit(battle, active, defender, move, events, side.side_id, opp.side_id, is_crit, move_slot_name)
+        after_contact(battle, active, defender, move, events, side.side_id, opp.side_id)
+        if defender.is_fainted and ability_key(active) == "moxie" and not active.is_fainted:
+            _ability_event(events, active, side.side_id, "")
+            change_stat(active, "attack", 1, events, side.side_id)
     if move.name == "Spit Up":
         stock = v.get("stockpile", 0)
         v["stockpile"] = 0
@@ -1779,11 +2429,14 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
 
     if move.drain_percent and total_dealt > 0:
         heal = max(1, math.floor(total_dealt * move.drain_percent / 100))
-        active.current_hp = min(active.max_hp, active.current_hp + heal)
-        events.append({"type": "drain", "side": side.side_id, "amount": heal,
-                        "new_hp": active.current_hp, "max_hp": active.max_hp})
+        if ability_key(defender) == "liquid-ooze":
+            _ability_damage(active, side.side_id, heal, events, "sucked up the", defender)
+        else:
+            active.current_hp = min(active.max_hp, active.current_hp + heal)
+            events.append({"type": "drain", "side": side.side_id, "amount": heal,
+                            "new_hp": active.current_hp, "max_hp": active.max_hp})
 
-    if move.recoil_percent and total_dealt > 0:
+    if move.recoil_percent and total_dealt > 0 and ability_key(active) not in ("rock-head", "magic-guard"):
         recoil = max(1, math.floor(total_dealt * move.recoil_percent / 100))
         active.current_hp = max(0, active.current_hp - recoil)
         events.append({"type": "recoil", "side": side.side_id, "amount": recoil,
@@ -1792,7 +2445,7 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
         _after_hp_loss(active, side.side_id, events)
 
     if (active.item == "life-orb" and total_dealt > 0 and move.power and not active.is_fainted
-            and move.name not in SELF_KO_MOVES):
+            and move.name not in SELF_KO_MOVES and ability_key(active) != "magic-guard"):
         cost = max(1, active.max_hp // 10)
         active.current_hp = max(0, active.current_hp - cost)
         events.append({"type": "item_damage", "side": side.side_id, "name": active.species_name,
@@ -1810,17 +2463,23 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
     if move.category == "status":
         target_mon = active if move.target == "self" else defender
         target_side_id = side.side_id if move.target == "self" else opp.side_id
-        _maybe_apply_ailment(battle, move, target_mon, events, target_side_id)
-        _maybe_apply_stat_changes(battle, move, target_mon, events, target_side_id)
+        user, user_side = active, side.side_id
+        if move.target != "self" and _foe_ability(defender, active) == "magic-bounce" and (move.ailment or move.stat_changes):
+            _ability_event(events, defender, opp.side_id, f"bounced the {move.name} back!")
+            target_mon, target_side_id, user, user_side = active, side.side_id, defender, opp.side_id
+        _maybe_apply_ailment(battle, move, target_mon, events, target_side_id, user, user_side)
+        _maybe_apply_stat_changes(battle, move, target_mon, events, target_side_id, user)
     else:
-        if not defender.is_fainted:
-            _maybe_apply_ailment(battle, move, defender, events, opp.side_id)
+        shielded = _foe_ability(defender, active) == "shield-dust"
+        if not defender.is_fainted and not shielded:
+            _maybe_apply_ailment(battle, move, defender, events, opp.side_id, active, side.side_id)
         if move.stat_self:
             if not active.is_fainted:
-                _maybe_apply_stat_changes(battle, move, active, events, side.side_id)
-        elif not defender.is_fainted:
-            _maybe_apply_stat_changes(battle, move, defender, events, opp.side_id)
-        _maybe_apply_flinch(battle, move, defender)
+                _maybe_apply_stat_changes(battle, move, active, events, side.side_id, active)
+        elif not defender.is_fainted and not shielded:
+            _maybe_apply_stat_changes(battle, move, defender, events, opp.side_id, active)
+        if not shielded:
+            _maybe_apply_flinch(battle, move, defender, active)
 
     if "multi_turn_lock" in move.flags:
         if not v.get("locked_move"):
@@ -1830,7 +2489,7 @@ def _execute_move_core(battle: BattleState, side: BattleSide, opp: BattleSide, a
             v["lock_turns_remaining"] -= 1
             if v["lock_turns_remaining"] <= 0:
                 v["locked_move"] = None
-                if not active.is_fainted:
+                if not active.is_fainted and can_get_status(active, "confusion"):
                     active.confusion_counter = battle.rng.randint(2, 3)
                     events.append({"type": "status_applied", "side": side.side_id, "status": "confusion", "reason": "fatigue"})
                     _after_status(active, side.side_id, events)
@@ -1866,6 +2525,8 @@ def mega_evolve(battle: BattleState, side_id: str) -> list:
     abilities = mega.get("abilities") or []
     mon.dex_id, mon.species_name = mega["id"], mega["name"]
     mon.types = list(mega.get("types", mon.types))
+    mon.volatile.pop("types", None)
+    mon.volatile.pop("ability_override", None)
     mon.ability = abilities[0]["name"] if abilities else mon.ability
     mon.weight = float(mega.get("weight") or mon.weight)
     events = [{"type": "mega_evolution", "side": side_id, "name": old_name, "dex_id": old_dex,
@@ -1883,7 +2544,11 @@ def resolve_turn(battle: BattleState, action_a: Action, action_b: Action) -> Tur
     for action in (action_a, action_b):
         if action.kind == "move":
             events.extend(mega_evolve(battle, action.side))
+    for s in ("A", "B"):
+        battle.side(s).active.volatile["unnerved"] = ability_key(battle.other(s).active) == "unnerve"
     order = _order_actions(battle, action_a, action_b, events)
+    for position, (side_id, _) in enumerate(order):
+        battle.side(side_id).active.volatile["moving_last"] = position == 1
 
     battle_over = False
     winner = None
@@ -1920,6 +2585,7 @@ def resolve_turn(battle: BattleState, action_a: Action, action_b: Action) -> Tur
                 continue
             events.extend(_apply_end_of_turn_status(side.active, side_id))
             events.extend(_apply_end_of_turn_item(side.active, side_id))
+            events.extend(apply_end_of_turn_ability(battle, side_id))
         if battle.weather:
             battle.weather_turns -= 1
             if battle.weather_turns <= 0:

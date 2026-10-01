@@ -177,7 +177,9 @@ window.MoveTooltip = (function () {
     if (!a) return null;
     return {
       title: a.label, kicker: "Ability", description: a.description,
-      note: a.in_battle ? "✓ Active in battles" : "Its battle effect isn't simulated yet",
+      note: a.in_battle ? "✓ Active in battles"
+        : a.no_battle_effect ? "No effect in these battles (it only matters outside battle or in double battles)"
+        : "Its battle effect isn't simulated yet",
       noteMuted: !a.in_battle,
     };
   }

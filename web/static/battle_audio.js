@@ -314,6 +314,9 @@ window.BattleAudio = (function () {
         else if (event.effectiveness === "not_very_effective") playSfx("not_very_effective");
         else playSfx("hit");
         break;
+      case "ability_damage":
+        playSfx("hit");
+        break;
       case "faint":
         playSfx("faint");
         break;

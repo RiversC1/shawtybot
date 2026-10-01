@@ -424,15 +424,13 @@ def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster
         {"type": "switch_in", "side": "B", "dex_id": roster_b[0].dex_id, "name": roster_b[0].species_name},
     ])
 
-    # The leads' entry abilities (e.g. Drought, Sand Stream) take effect as
-    # the battle begins.
+    # The leads' entry abilities (Drought, Intimidate, Download, Trace...)
+    # take effect as the battle begins; save everything they changed
+    # (weather, stat stages, a traced ability...).
     opening = be.build_battle_state(battle_id, "A", roster_a, "B", roster_b)
     ability_events = be.apply_opening_abilities(opening)
     if ability_events:
-        with db() as conn:
-            ensure_weather_columns(conn)
-            conn.execute("UPDATE poke_battles SET weather = ?, weather_turns = ? WHERE battle_id = ?",
-                         (opening.weather, opening.weather_turns, battle_id))
+        persist_battle_state(battle_id, opening)
         append_battle_events(battle_id, 1, ability_events)
 
 

@@ -6148,3 +6148,16 @@ img[src*="/sprites/items/dream-world/"] {
 .buy-actions button {
     flex: 1;
 }
+
+/* Battle log: the ability that just activated ("[Intimidate] Gyarados ...") */
+.ability-tag {
+    display: inline-block;
+    padding: 0 7px;
+    margin-right: 2px;
+    border-radius: 6px;
+    font-size: 0.82em;
+    font-weight: 700;
+    color: #ede9fe;
+    background: rgba(139, 92, 246, 0.35);
+    border: 1px solid rgba(167, 139, 250, 0.55);
+}

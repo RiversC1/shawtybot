@@ -1084,6 +1084,7 @@ def ability_info(name: str) -> dict:
         "name": name, "label": format_ability_name(name),
         "description": ABILITY_DESCRIPTIONS.get(name),
         "in_battle": name in be.BATTLE_ABILITIES,
+        "no_battle_effect": name in be.NO_BATTLE_EFFECT_ABILITIES,
     }
 
 
