@@ -1452,6 +1452,54 @@
     });
   }
 
+  // Elite Four / Champion battles open with the Platinum-style "VS" intro,
+  // once per battle per browser tab; the battle music starts with it.
+  const INTRO_BATTLE_TYPES = new Set(["elite_four", "champion"]);
+  const FULL_ART_CHARACTERS = new Set(["red", "leaf", "gold", "kris", "brendan", "may", "lucas", "dawn"]);
+
+  function introArtFor(avatarUrl) {
+    const m = /\/static\/trainers\/([a-z]+)\.png$/.exec(avatarUrl || "");
+    return m && FULL_ART_CHARACTERS.has(m[1]) ? `/static/trainers/full/${m[1]}.png` : avatarUrl;
+  }
+
+  async function playLeagueIntro() {
+    if (!window.BattleIntro || !INTRO_BATTLE_TYPES.has(truth.battle_type)) return;
+    const key = `sb_intro_${truth.battle_id}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch (e) {
+      // No storage: the intro just plays again on a reload.
+    }
+    const mySide = truth.you && truth.you.side;
+    const meA = mySide !== "B";
+    const playerAvatar = meA ? truth.avatar_a : truth.avatar_b;
+    const foeAvatar = meA ? truth.avatar_b : truth.avatar_a;
+    sceneEl.classList.add("intro-playing");
+    // Music has to start with the effect; if the browser blocks sound until
+    // a click on this page, a "Start battle" button provides that click.
+    let musicOk = BattleAudio.isMuted();
+    if (!musicOk) musicOk = await BattleAudio.startMusicNow();
+    if (!musicOk) {
+      BattleAudio.stopMusic();
+      await BattleIntro.gate(sceneEl);
+      BattleAudio.ensureCtx();
+    }
+    await BattleIntro.play({
+      scene: sceneEl,
+      playerArt: introArtFor(playerAvatar),
+      foeArt: foeAvatar,
+      playerName: meA ? truth.name_a : truth.name_b,
+      foeName: meA ? truth.name_b : truth.name_a,
+      motion: BattleFX.isMotionOn(),
+      onStart: () => {
+        if (!BattleAudio.isMuted()) BattleAudio.startMusic();
+        updateMuteBtn();
+      },
+    });
+    sceneEl.classList.remove("intro-playing");
+  }
+
   // Initial render: normally shows the full existing history immediately,
   // with no playback delay, so reopening a battle already many turns in
   // doesn't replay all of it — only events that arrive AFTER this point get
@@ -1459,8 +1507,9 @@
   // acted in yet (just the opening send-outs): that gets the same animated
   // beat a live switch-in gets, so the very first "X sends out Y!" throw
   // isn't the one send-out in the whole battle that never plays.
-  const onlyOpeningSendOuts =
-    truth.events.length > 0 && truth.events.every((e) => e.type === "turn_start" || e.type === "switch_in" || e.type === "weather_start");
+  // (Entry abilities like Intimidate or Drought also fire at the start.)
+  const OPENING_EVENTS = new Set(["turn_start", "switch_in", "weather_start", "ability_activated", "stat_changed", "stat_change_fizzled"]);
+  const onlyOpeningSendOuts = truth.events.length > 0 && truth.events.every((e) => OPENING_EVENTS.has(e.type));
 
   if (onlyOpeningSendOuts) {
     visibleA = null;
@@ -1474,7 +1523,7 @@
     pendingEvents = truth.events.slice();
     renderFrame(null, null);
     playing = true;
-    playQueue().finally(() => {
+    playLeagueIntro().then(playQueue).finally(() => {
       playing = false;
     });
   } else {

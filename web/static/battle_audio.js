@@ -263,6 +263,18 @@ window.BattleAudio = (function () {
     notifyState();
   }
 
+  // Starts the theme right now and reports whether it's actually playing:
+  // resolves false when muted or when the browser blocks it (no click on
+  // this page yet), so the caller can ask for a click first.
+  function startMusicNow() {
+    wantMusic = true;
+    notifyState();
+    if (muted) return Promise.resolve(false);
+    const el = ensureMusicEl();
+    if (!el.paused) return Promise.resolve(true);
+    return el.play().then(() => true, () => { notifyState(); return false; });
+  }
+
   // Attempts to actually play the theme if it's supposed to be playing but
   // isn't (blocked pending a user gesture) — safe to call from any click,
   // since it never changes whether music is wanted, only whether it's
@@ -336,7 +348,7 @@ window.BattleAudio = (function () {
   }
 
   return {
-    ensureCtx, isMuted, setMuted, startMusic, stopMusic, retryMusic, isMusicPlaying, onStateChange, playVictoryMusic,
+    ensureCtx, isMuted, setMuted, startMusic, startMusicNow, stopMusic, retryMusic, isMusicPlaying, onStateChange, playVictoryMusic,
     getVolumes, setMusicVolume, setEffectsVolume,
     playSfx, playCry, handleEvent,
   };
