@@ -54,6 +54,8 @@ XP_SHINY_BONUS = 50
 XP_LEGENDARY_BONUS = 30
 XP_PER_EVOLUTION = 20
 XP_PER_STARTER = 10
+# What a new trainer gets alongside their starter.
+STARTER_ITEMS = {"pokeball": 15, "greatball": 5}
 XP_PER_COFFER = {"silver": 5, "golden": 10, "diamond": 15, "master": 40}
 
 
@@ -749,7 +751,8 @@ class StarterSelectView(discord.ui.View):
 
         mon = find_by_name(self.cog.pokedex, name)
         self.cog.create_trainer(self.user_id, mon["id"])
-        self.cog.add_item(self.user_id, "pokeball", 10)
+        for item, qty in STARTER_ITEMS.items():
+            self.cog.add_item(self.user_id, item, qty)
         self.cog.add_to_collection(self.user_id, mon["id"])
         self.cog.add_xp(self.user_id, XP_PER_STARTER)
         self.cog.set_character(self.user_id, DEFAULT_CHARACTER)
@@ -757,13 +760,120 @@ class StarterSelectView(discord.ui.View):
 
         embed = discord.Embed(
             title=f"You chose {mon['name']}!",
-            description="You received **10 Poké Balls**. Good luck on your journey, trainer!",
+            description=(
+                f"You received **{STARTER_ITEMS['pokeball']} Poké Balls** and "
+                f"**{STARTER_ITEMS['greatball']} Great Balls**. Good luck on your journey, trainer!\n\n"
+                "New here? Use `/poke tutorial` to learn how everything works."
+            ),
             color=discord.Color.gold(),
         )
         embed.set_thumbnail(url=mon["artwork"])
         for child in self.children:
             child.disabled = True
         await interaction.response.edit_message(content=None, embed=embed, view=self)
+
+
+# /poke tutorial: one page per topic, flipped with Back / Next buttons.
+TUTORIAL_PAGES = [
+    (
+        "👋 Welcome, trainer!",
+        "Catch Pokémon, build a team, beat Gym Leaders and climb all the way to the Poké League.\n\n"
+        "**1. Pick your starter:** `/poke start`. You also get "
+        f"**{STARTER_ITEMS['pokeball']} Poké Balls** and **{STARTER_ITEMS['greatball']} Great Balls**.\n"
+        "**2. Open the website:** `/poke web` gives you a private login link. Battles, your team, "
+        "trades and the store all live there.\n\n"
+        "Use the buttons below to read the rest of the guide.",
+    ),
+    (
+        "🎯 Catching Pokémon",
+        "**Wild spawns** show up in this server's spawn channel every few minutes. Anyone can try to catch them, "
+        "but they flee after 10 minutes.\n"
+        f"**`/poke spawn-daily`** spawns one just for you, up to {SPAWN_LIMIT} times every 5 hours.\n\n"
+        "Better balls catch more often: Poké Ball < Great Ball < Ultra Ball < Master Ball (never misses). "
+        "Legendaries are rare and hard to catch, and about 1 in 200 spawns is ✨ shiny.\n\n"
+        "**Coffers** also pop up in the spawn channel. Open them for free balls, candy and coins.",
+    ),
+    (
+        "🍬 Growing your collection",
+        "Every catch gives you **candy** for that Pokémon's family.\n"
+        f"**`/poke evolve`** evolves a Pokémon for {EVOLUTION_CANDY_COST} family candy.\n"
+        "**`/poke pokedex`** shows what you've caught.\n"
+        "**`/poke inventory`** shows your balls, candy and items.\n"
+        "**`/poke store`** sells balls, evolution stones and held items for Poké Coins.\n\n"
+        "Each Pokémon has random IVs (0-31 per stat). Higher IVs mean a stronger Pokémon, "
+        "so catching duplicates is worth it.",
+    ),
+    (
+        "⚔️ Battling",
+        "**`/poke team`** sets your team of up to 6. You need one before any battle.\n"
+        "**`/poke trainer`** fights a random trainer for XP and coins, which is great for getting started.\n"
+        "**`/poke challenge`** battles another player.\n\n"
+        "Battles are played on the website. The command gives you the link. Pick moves, switch Pokémon "
+        "and use held items. Type matchups and abilities matter!",
+    ),
+    (
+        "🏅 Gyms",
+        "There are **32 Gym Leaders** across Kanto, Johto, Hoenn and Sinnoh.\n"
+        "**`/poke gym`** challenges the next Gym Leader in a region (they go in order).\n"
+        "**`/poke gyms`** shows your badges.\n\n"
+        "Gyms get tougher as you go, so level up your team, give them held items and cover their weaknesses. "
+        "The website's Gyms page also has custom gyms built by other players.",
+    ),
+    (
+        "👑 Poké League & beyond",
+        "Earn all 32 badges to open the **Poké League**.\n"
+        "**`/poke elite4`** fights each region's Elite Four in order, then "
+        "**`/poke champion`** takes on its Champion. **`/poke league`** shows your progress.\n"
+        "**`/poke rewards`**: beat every Elite Four member and Champion to claim a Mega Evolution "
+        "and open **your own gym** for other players to challenge.\n\n"
+        "Beat all 4 Champions and the **Legends** unlock on the website. They're the hardest fights in the game.",
+    ),
+    (
+        "🤝 Trading & more",
+        "**`/poke trade`** (or the website's Trades page) swaps Pokémon with other players. "
+        "Both sides must offer something before the trade can go through.\n\n"
+        "On the website you can also customize your trainer, see rankings and achievements, "
+        "and visit other trainers' profiles.\n\n"
+        "That's it. Go catch 'em all! 🎉",
+    ),
+]
+
+
+class TutorialView(discord.ui.View):
+    def __init__(self, user_id: int):
+        super().__init__(timeout=600)
+        self.user_id = user_id
+        self.page = 0
+        self._sync_buttons()
+
+    def build_embed(self) -> discord.Embed:
+        title, body = TUTORIAL_PAGES[self.page]
+        embed = discord.Embed(title=title, description=body, color=discord.Color.gold())
+        embed.set_footer(text=f"Page {self.page + 1} of {len(TUTORIAL_PAGES)}")
+        return embed
+
+    def _sync_buttons(self):
+        self.back.disabled = self.page == 0
+        self.next.disabled = self.page == len(TUTORIAL_PAGES) - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Use `/poke tutorial` to open your own guide!", ephemeral=True)
+            return False
+        return True
+
+    async def _turn(self, interaction: discord.Interaction, step: int):
+        self.page = max(0, min(len(TUTORIAL_PAGES) - 1, self.page + step))
+        self._sync_buttons()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(label="Back", emoji="◀️", style=discord.ButtonStyle.secondary)
+    async def back(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._turn(interaction, -1)
+
+    @discord.ui.button(label="Next", emoji="▶️", style=discord.ButtonStyle.primary)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._turn(interaction, 1)
 
 
 class QuantityModal(discord.ui.Modal):
@@ -1897,6 +2007,11 @@ class Pokemon(commands.Cog):
 
         view = StarterSelectView(self, interaction.user.id)
         await interaction.response.send_message("Choose your starter Pokémon!", view=view, ephemeral=True)
+
+    @poke.command(name="tutorial", description="New here? A quick guide to catching, battling and everything else")
+    async def poke_tutorial(self, interaction: discord.Interaction):
+        view = TutorialView(interaction.user.id)
+        await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=True)
 
     @poke.command(name="spawn-daily", description="Spawn a wild Pokémon (up to 10 times every 5 hours)")
     async def poke_spawn_daily(self, interaction: discord.Interaction):
