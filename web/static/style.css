@@ -5241,6 +5241,72 @@ img[src$="/trainers/nowa.png"] {
     font-size: 1.5em;
 }
 
+.mega-unlocks {
+    margin-bottom: 18px;
+}
+
+.mega-unlocks .reward-status.is-on {
+    color: #1a1a26;
+    background: var(--yellow);
+}
+
+.mega-unlock-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.mega-unlock {
+    --t: var(--yellow);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--t) 45%, transparent);
+    background: color-mix(in srgb, var(--t) 10%, transparent);
+    min-width: 0;
+}
+
+.mega-unlock .muted {
+    font-size: 0.85em;
+}
+
+.mega-unlock-art {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.mega-unlock-art img {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+}
+
+.mega-unlock-art img:first-child {
+    width: 52px;
+    height: 52px;
+    opacity: 0.8;
+}
+
+.mega-unlock-arrow {
+    color: var(--t);
+    font-weight: 700;
+}
+
+.mega-unlock.tint-normal { --t: #A8A878; } .mega-unlock.tint-fire { --t: #F08030; }
+.mega-unlock.tint-water { --t: #6890F0; } .mega-unlock.tint-grass { --t: #78C850; }
+.mega-unlock.tint-electric { --t: #F8D030; } .mega-unlock.tint-ice { --t: #98D8D8; }
+.mega-unlock.tint-fighting { --t: #C03028; } .mega-unlock.tint-poison { --t: #A040A0; }
+.mega-unlock.tint-ground { --t: #E0C068; } .mega-unlock.tint-flying { --t: #A890F0; }
+.mega-unlock.tint-psychic { --t: #F85888; } .mega-unlock.tint-bug { --t: #A8B820; }
+.mega-unlock.tint-rock { --t: #B8A038; } .mega-unlock.tint-ghost { --t: #705898; }
+.mega-unlock.tint-dragon { --t: #7038F8; } .mega-unlock.tint-dark { --t: #705848; }
+.mega-unlock.tint-steel { --t: #B8B8D0; } .mega-unlock.tint-fairy { --t: #EE99AC; }
+
 .mega-teaser {
     display: flex;
     gap: 6px;
@@ -6352,4 +6418,68 @@ img[src*="/sprites/items/dream-world/"] {
 /* While the intro plays, the empty HP boxes ("No Pokémon") stay hidden. */
 .battle-scene.intro-playing .battle-hp-label {
     visibility: hidden;
+}
+
+/* ---- Mega Evolve toggle (battle action panel) ---- */
+.br-mega-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.br-mega-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px 7px 8px;
+    border-radius: 999px;
+    border: 2px solid rgba(126, 200, 255, 0.55);
+    background: linear-gradient(135deg, rgba(60, 90, 160, 0.35), rgba(150, 60, 170, 0.35));
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.br-mega-toggle:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 14px rgba(126, 200, 255, 0.45);
+}
+
+.br-mega-toggle small {
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.br-mega-symbol {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+}
+
+.br-mega-symbol svg {
+    width: 100%;
+    height: 100%;
+}
+
+.br-mega-toggle.is-on {
+    border-color: #fff;
+    background: linear-gradient(135deg, #3d7bff, #b24bd8 55%, #ff7ad9);
+    box-shadow: 0 0 18px rgba(196, 120, 255, 0.75);
+    animation: br-mega-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes br-mega-pulse {
+    50% { box-shadow: 0 0 26px rgba(196, 120, 255, 0.95); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .br-mega-toggle.is-on { animation: none; }
+}
+
+.br-mega-hint {
+    font-size: 0.85em;
 }

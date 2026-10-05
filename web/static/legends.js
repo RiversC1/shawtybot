@@ -45,7 +45,7 @@
     } else {
       status = l.beaten
         ? `🏆 You've defeated ${esc(l.name)}${l.wins > 1 ? ` ${l.wins} times` : ""}. Rematches still pay out.`
-        : `First win: <strong>${esc(l.reward.name)}</strong> with perfect IVs, plus coins and a Master Ball.`;
+        : `First win: unlocks <strong>${esc(l.reward.name)}</strong> for your ${esc(l.reward.base_name || "Pokémon")} (plus a perfect-IV ${esc(l.reward.base_name || "one")}), coins and a Master Ball.`;
       actions = `
         <div class="gym-hero-actions" id="lg-actions">
           <button id="lg-fight" class="btn-primary legend-fight-btn">Challenge ${esc(l.name)}</button>
@@ -65,7 +65,7 @@
         <p class="muted">${esc(l.flavor)}</p>
         <div class="legend-reward-row">
           <img src="${artThumb(l.reward.artwork)}" alt="">
-          <div><div class="muted">Signature reward</div><strong>${esc(l.reward.name)}</strong></div>
+          <div><div class="muted">Signature reward: Mega Evolution</div><strong>${esc(l.reward.name)}</strong></div>
         </div>
         <p class="muted">${status}</p>
         ${actions}

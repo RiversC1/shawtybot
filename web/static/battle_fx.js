@@ -626,6 +626,6 @@ window.BattleFX = (function () {
   return {
     isMotionOn: () => motionOn, setMotion,
     init, playMove, floatText, showBadge, statusEffect, statArrows, healSparkles, glowSprite,
-    caption, fadeCaption, colorForType, STATUS_FX, kit, megaEvolve,
+    caption, fadeCaption, colorForType, STATUS_FX, kit, megaEvolve, MEGA_SYMBOL_SVG,
   };
 })();

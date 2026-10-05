@@ -1,4 +1,4 @@
-// Rewards page: pick your one Mega Evolution (POST /api/rewards/mega).
+// Rewards page: pick the one Mega Evolution to unlock (POST /api/rewards/mega).
 (function () {
   const options = JSON.parse(document.getElementById("mega-data").textContent || "[]");
   const grid = document.getElementById("mega-grid");
@@ -53,7 +53,7 @@
   claimBtn.addEventListener("click", async () => {
     if (!selected) return;
     claimBtn.disabled = true;
-    claimBtn.textContent = "Claiming...";
+    claimBtn.textContent = "Unlocking...";
     try {
       const res = await fetch("/api/proxy/rewards/mega", {
         method: "POST",
@@ -61,13 +61,13 @@
         body: JSON.stringify({ dex_id: selected.dex_id }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "Couldn't claim that Mega.");
+      if (!res.ok) throw new Error(data.detail || "Couldn't unlock that Mega.");
       window.location.reload();
     } catch (err) {
       errorEl.textContent = err.message;
       errorEl.hidden = false;
       claimBtn.disabled = false;
-      claimBtn.textContent = "Claim this Mega";
+      claimBtn.textContent = "Unlock this Mega";
     }
   });
 

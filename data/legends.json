@@ -17,41 +17,45 @@
       {
         "dex_id": 25,
         "ability": "static",
+        "item": "focus-sash",
         "moves": [
           "Thunderbolt",
+          "Surf",
           "Iron Tail",
-          "Wild Charge",
-          "Discharge"
+          "Fake Out"
         ]
       },
       {
         "dex_id": 142,
         "ability": "rock-head",
+        "item": "expert-belt",
         "moves": [
           "Stone Edge",
           "Earthquake",
-          "Crunch",
-          "Brave Bird"
+          "Brave Bird",
+          "Ice Fang"
         ],
         "mega": 10042
       },
       {
         "dex_id": 143,
         "ability": "thick-fat",
+        "item": "leftovers",
         "moves": [
           "Body Slam",
-          "Crunch",
           "Earthquake",
-          "Rest"
+          "Crunch",
+          "Fire Punch"
         ]
       },
       {
         "dex_id": 3,
         "ability": "chlorophyll",
+        "item": "sitrus-berry",
         "moves": [
-          "Petal Blizzard",
+          "Giga Drain",
           "Sludge Bomb",
-          "Earthquake",
+          "Earth Power",
           "Sleep Powder"
         ],
         "mega": 10033
@@ -59,19 +63,21 @@
       {
         "dex_id": 9,
         "ability": "torrent",
+        "item": "wise-glasses",
         "moves": [
-          "Hydro Pump",
+          "Surf",
           "Ice Beam",
-          "Flash Cannon",
-          "Dark Pulse"
+          "Dark Pulse",
+          "Aura Sphere"
         ],
         "mega": 10036
       },
       {
         "dex_id": 6,
         "ability": "blaze",
+        "item": "life-orb",
         "moves": [
-          "Flamethrower",
+          "Fire Blast",
           "Solar Beam",
           "Air Slash",
           "Dragon Pulse"
@@ -97,62 +103,68 @@
       {
         "dex_id": 461,
         "ability": "pressure",
+        "item": "focus-sash",
         "moves": [
           "Night Slash",
           "Ice Punch",
           "Swords Dance",
-          "Dark Pulse"
+          "Ice Shard"
         ]
       },
       {
         "dex_id": 169,
         "ability": "inner-focus",
+        "item": "leftovers",
         "moves": [
-          "Cross Poison",
-          "Air Slash",
           "Brave Bird",
-          "Leech Life"
+          "Cross Poison",
+          "Super Fang",
+          "Roost"
         ]
       },
       {
         "dex_id": 462,
         "ability": "sturdy",
+        "item": "expert-belt",
         "moves": [
           "Thunderbolt",
           "Flash Cannon",
           "Thunder Wave",
-          "Discharge"
+          "Hidden Power"
         ]
       },
       {
         "dex_id": 160,
         "ability": "torrent",
+        "item": "sitrus-berry",
         "moves": [
           "Waterfall",
           "Crunch",
-          "Ice Fang",
+          "Ice Punch",
           "Dragon Dance"
         ]
       },
       {
         "dex_id": 65,
         "ability": "inner-focus",
+        "item": "lum-berry",
         "moves": [
           "Psychic",
           "Shadow Ball",
-          "Calm Mind",
-          "Future Sight"
+          "Dazzling Gleam",
+          "Calm Mind"
         ],
         "mega": 10037
       },
       {
         "dex_id": 94,
         "ability": "cursed-body",
+        "item": "life-orb",
         "moves": [
           "Shadow Ball",
-          "Sludge Bomb",
-          "Hypnosis",
-          "Dream Eater"
+          "Sludge Wave",
+          "Thunderbolt",
+          "Hypnosis"
         ],
         "mega": 10038
       }
@@ -175,16 +187,18 @@
       {
         "dex_id": 227,
         "ability": "sturdy",
+        "item": "leftovers",
         "moves": [
           "Brave Bird",
           "Iron Head",
           "Roost",
-          "Night Slash"
+          "Toxic"
         ]
       },
       {
         "dex_id": 248,
         "ability": "sand-stream",
+        "item": "smooth-rock",
         "moves": [
           "Stone Edge",
           "Crunch",
@@ -196,10 +210,11 @@
       {
         "dex_id": 212,
         "ability": "technician",
+        "item": "life-orb",
         "moves": [
           "X Scissor",
           "Iron Head",
-          "Night Slash",
+          "Superpower",
           "Swords Dance"
         ],
         "mega": 10046
@@ -207,32 +222,35 @@
       {
         "dex_id": 464,
         "ability": "solid-rock",
+        "item": "expert-belt",
         "moves": [
           "Stone Edge",
           "Earthquake",
           "Megahorn",
-          "Hammer Arm"
+          "Ice Punch"
         ]
       },
       {
         "dex_id": 306,
         "ability": "rock-head",
+        "item": "sitrus-berry",
         "moves": [
-          "Iron Tail",
-          "Stone Edge",
+          "Head Smash",
+          "Heavy Slam",
           "Earthquake",
-          "Heavy Slam"
+          "Ice Punch"
         ],
         "mega": 10053
       },
       {
         "dex_id": 376,
         "ability": "clear-body",
+        "item": "muscle-band",
         "moves": [
           "Meteor Mash",
           "Zen Headbutt",
           "Earthquake",
-          "Hammer Arm"
+          "Ice Punch"
         ],
         "mega": 10076
       }
@@ -255,47 +273,52 @@
       {
         "dex_id": 169,
         "ability": "inner-focus",
+        "item": "focus-sash",
         "moves": [
-          "Cross Poison",
-          "Air Slash",
           "Brave Bird",
-          "Leech Life"
+          "Cross Poison",
+          "Super Fang",
+          "Roost"
         ]
       },
       {
         "dex_id": 461,
         "ability": "pressure",
+        "item": "life-orb",
         "moves": [
           "Night Slash",
           "Ice Punch",
           "Swords Dance",
-          "Dark Pulse"
+          "Ice Shard"
         ]
       },
       {
         "dex_id": 430,
         "ability": "super-luck",
+        "item": "scope-lens",
         "moves": [
           "Brave Bird",
           "Night Slash",
-          "Heat Wave",
-          "Foul Play"
+          "Sucker Punch",
+          "Heat Wave"
         ]
       },
       {
         "dex_id": 359,
         "ability": "super-luck",
+        "item": "lum-berry",
         "moves": [
           "Night Slash",
           "Psycho Cut",
-          "Swords Dance",
-          "Future Sight"
+          "Sucker Punch",
+          "Swords Dance"
         ],
         "mega": 10057
       },
       {
         "dex_id": 229,
         "ability": "flash-fire",
+        "item": "wise-glasses",
         "moves": [
           "Flamethrower",
           "Dark Pulse",
@@ -307,6 +330,7 @@
       {
         "dex_id": 130,
         "ability": "intimidate",
+        "item": "sitrus-berry",
         "moves": [
           "Waterfall",
           "Crunch",
@@ -332,18 +356,31 @@
     ],
     "roster": [
       {
-        "dex_id": 149,
-        "ability": "inner-focus",
+        "dex_id": 25,
+        "ability": "static",
+        "item": "focus-sash",
         "moves": [
-          "Outrage",
-          "Hurricane",
+          "Thunderbolt",
+          "Iron Tail",
+          "Quick Attack",
+          "Wild Charge"
+        ]
+      },
+      {
+        "dex_id": 149,
+        "ability": "multiscale",
+        "item": "lum-berry",
+        "moves": [
+          "Dragon Claw",
           "Extreme Speed",
+          "Earthquake",
           "Dragon Dance"
         ]
       },
       {
         "dex_id": 254,
         "ability": "overgrow",
+        "item": "life-orb",
         "moves": [
           "Leaf Blade",
           "Dragon Claw",
@@ -355,6 +392,7 @@
       {
         "dex_id": 94,
         "ability": "cursed-body",
+        "item": "wise-glasses",
         "moves": [
           "Shadow Ball",
           "Sludge Bomb",
@@ -366,6 +404,7 @@
       {
         "dex_id": 448,
         "ability": "inner-focus",
+        "item": "expert-belt",
         "moves": [
           "Aura Sphere",
           "Flash Cannon",
@@ -377,6 +416,7 @@
       {
         "dex_id": 6,
         "ability": "blaze",
+        "item": "sitrus-berry",
         "moves": [
           "Flare Blitz",
           "Dragon Claw",
@@ -384,16 +424,6 @@
           "Dragon Dance"
         ],
         "mega": 10034
-      },
-      {
-        "dex_id": 25,
-        "ability": "static",
-        "moves": [
-          "Thunderbolt",
-          "Iron Tail",
-          "Quick Attack",
-          "Wild Charge"
-        ]
       }
     ]
   }

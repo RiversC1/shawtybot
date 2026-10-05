@@ -237,8 +237,54 @@ ELITE_FOUR_IV_RANGE = (25, 31)
 ELITE_FOUR_ITEM_HOLDERS = 6
 
 
+def boss_evs(mon: dict, moves) -> dict:
+    """A boss Pokémon's EVs, the way a competitive player trains: 252 in its
+    attacking stat (whichever its moves use more) and 252 in Speed, or in HP
+    if it's too slow for Speed to matter, and the last 4 in HP."""
+    s = mon["base_stats"]
+    pool = {m["name"]: m for m in mon.get("moves", [])}
+    power = {"physical": 0, "special": 0}
+    for name in moves or []:
+        mv = pool.get(name) or ALL_MOVES.get(name) or {}
+        if mv.get("category") in power:
+            power[mv["category"]] += mv.get("power") or 60
+    if not any(power.values()):
+        power = {"physical": s["attack"], "special": s["sp_attack"]}
+    attack = "attack" if power["physical"] >= power["special"] else "sp_attack"
+    if s["speed"] >= 70:
+        return {attack: 252, "speed": 252, "hp": 4}
+    return {"hp": 252, attack: 252, "sp_defense" if attack == "attack" else "defense": 4}
+
+
+def build_boss_roster(roster: list[dict]) -> list["be.BattlerState"]:
+    """Cynthia's and the Legends' teams: perfect IVs, EVs, TM/tutor moves
+    beyond the level-up list, and each Pokémon's item as listed in the data
+    (filled in by champion_held_items where none is given)."""
+    auto = champion_held_items(roster)
+    used = {m["item"] for m in roster if m.get("item")}
+    out = []
+    for i, m in enumerate(roster):
+        item = m.get("item") or (auto[i] if auto[i] not in used else None)
+        mon = battle_mon(m["dex_id"], m["moves"])
+        out.append(be.build_battler_state(mon, m["moves"], m.get("ability"), item=item, evs=boss_evs(mon, m["moves"])))
+    return out
+
+
+# The boss AI (battle_engine.pick_npc_action_boss) and boss rosters: the
+# final Champion and every Legend.
+BOSS_TRAINERS = {"sinnoh:cynthia"}
+
+
+def is_boss_battle(battle_row) -> bool:
+    if _row_get(battle_row, "battle_type") == LEGEND_BATTLE_TYPE:
+        return True
+    return _row_get(battle_row, "battle_type") == "champion" and _row_get(battle_row, "side_b_npc_key") in BOSS_TRAINERS
+
+
 def build_roster_for_league(league_key: str) -> list["be.BattlerState"]:
     entry = LEAGUE[league_key]
+    if league_key in BOSS_TRAINERS:
+        return build_boss_roster(entry["roster"])
     if entry["role"] == "champion":
         items = champion_held_items(entry["roster"])
         return [
@@ -399,14 +445,14 @@ def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster
                 conn.execute(
                     "INSERT INTO poke_battle_sides (battle_id, side, slot, dex_id, ability, current_hp, max_hp, "
                     "status, status_counter, stat_stages, confusion_counter, moves, is_active, is_fainted, volatile, ivs, "
-                    "held_item) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "held_item, evs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         battle_id, side_label, slot, fields["dex_id"], b.ability, fields["current_hp"],
                         fields["max_hp"], fields["status"], fields["status_counter"],
                         json.dumps(fields["stat_stages"]), fields["confusion_counter"],
                         json.dumps(fields["moves"]), 1 if slot == 0 else 0,
                         1 if fields["is_fainted"] else 0, json.dumps(fields["volatile"]),
-                        json.dumps(fields["ivs"]), fields["item"],
+                        json.dumps(fields["ivs"]), fields["item"], json.dumps(fields["evs"]) if fields["evs"] else None,
                     ),
                 )
         conn.execute(
@@ -494,6 +540,7 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
             "moves": json.loads(r["moves"]), "is_fainted": r["is_fainted"], "volatile": json.loads(r["volatile"]),
             "ivs": json.loads(r["ivs"]) if r["ivs"] else dict(be.MAX_IVS),
             "item": _row_get(r, "held_item"),
+            "evs": json.loads(_row_get(r, "evs") or "{}"),
         }
         battler = be.battler_state_from_row(mon, row_dict, ability=r["ability"])
         if r["side"] == "A":
@@ -515,6 +562,14 @@ def load_battle_state(battle_id: int) -> tuple["be.BattleState", sqlite3.Row] | 
         side_b.mega_forms = legend_mega_forms(battle_row["side_b_npc_key"])
     elif battle_row["battle_type"] == CUSTOM_GYM_BATTLE_TYPE and _custom_gym_owner(battle_row):
         side_b.mega_forms = custom_gym_mega_forms(_custom_gym_owner(battle_row), {b.dex_id for b in roster_b})
+    # Players Mega Evolve by choice (once per battle) into the Megas they've
+    # unlocked; a side that already has a Mega on its team has used its one.
+    for side, user_id in ((side_a, battle_row["side_a_user_id"]), (side_b, battle_row["side_b_user_id"])):
+        side.mega_used = any(POKEDEX.get(b.dex_id, {}).get("is_mega") for b in side.roster)
+        if user_id:
+            side.player_megas = player_mega_forms(user_id)
+    if is_boss_battle(battle_row) and roster_b:
+        side_b.ace_index = len(roster_b) - 1
     forced = battle_row["forced_switch_side"].split(",") if battle_row["forced_switch_side"] else []
     battle = be.BattleState(
         battle_id=battle_id, side_a=side_a, side_b=side_b,
@@ -585,27 +640,30 @@ def append_battle_events(battle_id: int, turn_number: int, events: list[dict]):
 
 def record_pending_action(battle_id: int, side: str, turn_number: int, action: "be.Action"):
     with db() as conn:
+        ensure_form_column(conn)
         conn.execute(
             "INSERT OR REPLACE INTO poke_battle_pending_actions "
-            "(battle_id, side, turn_number, action_kind, move_slot, switch_to_slot, submitted_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "(battle_id, side, turn_number, action_kind, move_slot, switch_to_slot, submitted_at, mega_dex_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 battle_id, side, turn_number, action.kind, action.move_index, action.switch_to_index,
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(timezone.utc).isoformat(), action.mega,
             ),
         )
 
 
 def get_pending_action(battle_id: int, side: str, turn_number: int) -> "be.Action | None":
     with db() as conn:
+        ensure_form_column(conn)
         row = conn.execute(
-            "SELECT action_kind, move_slot, switch_to_slot FROM poke_battle_pending_actions "
+            "SELECT action_kind, move_slot, switch_to_slot, mega_dex_id FROM poke_battle_pending_actions "
             "WHERE battle_id = ? AND side = ? AND turn_number = ?",
             (battle_id, side, turn_number),
         ).fetchone()
     if not row:
         return None
-    return be.Action(kind=row["action_kind"], side=side, move_index=row["move_slot"], switch_to_index=row["switch_to_slot"])
+    return be.Action(kind=row["action_kind"], side=side, move_index=row["move_slot"],
+                     switch_to_index=row["switch_to_slot"], mega=row["mega_dex_id"])
 
 
 def clear_pending_actions(battle_id: int, turn_number: int):
@@ -748,7 +806,14 @@ def ensure_form_column(conn: sqlite3.Connection):
     side_cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_battle_sides)").fetchall()]
     if side_cols and "held_item" not in side_cols:
         conn.execute("ALTER TABLE poke_battle_sides ADD COLUMN held_item TEXT")
-    _form_column_ready = True
+    if side_cols and "evs" not in side_cols:
+        conn.execute("ALTER TABLE poke_battle_sides ADD COLUMN evs TEXT")
+    pending_cols = [r[1] for r in conn.execute("PRAGMA table_info(poke_battle_pending_actions)").fetchall()]
+    if pending_cols and "mega_dex_id" not in pending_cols:
+        conn.execute("ALTER TABLE poke_battle_pending_actions ADD COLUMN mega_dex_id INTEGER")
+    # Run again next time if a table didn't exist yet (the bot creates the
+    # battle tables after its first call here).
+    _form_column_ready = bool(side_cols and pending_cols)
 
 
 # ---------- Held items ----------
@@ -881,11 +946,135 @@ def league_team_problem(user_id: int) -> str | None:
             f"yours has {len(legends)} ({', '.join(legends)}). Swap some out on the Team page.")
 
 
-# Poké League completionist's second reward: the trainer picks ONE Mega
-# Evolution (non-legendary, Gen 1-4 bases; see scripts/fetch_mega_data.py)
-# and receives it as a Pokémon in their collection. The pick is permanent,
-# and Megas can't be traded, so each trainer only ever has the one they chose.
+# Mega Evolution works like in the games: it unlocks once a trainer has
+# conquered the whole Poké League, and then any Pokémon of a species whose
+# Mega they've unlocked can Mega Evolve mid-battle (once per battle, by
+# choice). Megas are never Pokémon in a collection. Unlocks come from the
+# League completionist reward (pick ONE Mega; non-legendary, Gen 1-4 bases,
+# see scripts/fetch_mega_data.py) and each Legend's first win. Each comes
+# with a perfect-IV Pokémon of the species, so the Mega can be used at once.
 MEGA_REWARD_DEX_IDS: list[int] = sorted(d for d, m in POKEDEX.items() if m.get("is_mega"))
+
+_mega_unlocks_ready = False
+
+
+def ensure_mega_unlocks(conn: sqlite3.Connection):
+    """Creates poke_mega_unlocks and, once, turns the Mega Pokémon from the
+    old rewards (Megas used to be Pokémon in a collection) into unlocks: each
+    becomes its base species (same IVs, nickname and catch date) and its
+    Mega is unlocked. Teams, configs and custom gyms follow."""
+    global _mega_unlocks_ready
+    if _mega_unlocks_ready:
+        return
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS poke_mega_unlocks (
+            user_id INTEGER NOT NULL,
+            mega_dex_id INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            unlocked_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, mega_dex_id)
+        )
+    """)
+    now = datetime.now(timezone.utc).isoformat()
+    megas = {d: m["mega_of"] for d, m in POKEDEX.items() if m.get("is_mega") and m.get("mega_of")}
+    marks = ",".join("?" * len(megas)) or "NULL"
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "poke_mega_choice" in tables:
+        conn.execute("INSERT OR IGNORE INTO poke_mega_unlocks (user_id, mega_dex_id, source, unlocked_at) "
+                     "SELECT user_id, dex_id, 'league', chosen_at FROM poke_mega_choice")
+    if "poke_collection" in tables:
+        for user_id, mega_id in conn.execute(
+                f"SELECT DISTINCT user_id, dex_id FROM poke_collection WHERE dex_id IN ({marks})", list(megas)).fetchall():
+            conn.execute("INSERT OR IGNORE INTO poke_mega_unlocks (user_id, mega_dex_id, source, unlocked_at) "
+                         "VALUES (?, ?, 'reward', ?)", (user_id, mega_id, now))
+            base_id = megas[mega_id]
+            conn.execute("UPDATE poke_collection SET dex_id = ? WHERE user_id = ? AND dex_id = ?", (base_id, user_id, mega_id))
+            if "poke_dex_seen" in tables:
+                conn.execute("INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
+                             (user_id, base_id, now))
+            if "poke_team" in tables:
+                conn.execute("UPDATE poke_team SET dex_id = ? WHERE user_id = ? AND dex_id = ?", (base_id, user_id, mega_id))
+            if "poke_pokemon_config" in tables:
+                has_base = conn.execute("SELECT 1 FROM poke_pokemon_config WHERE user_id = ? AND dex_id = ?",
+                                        (user_id, base_id)).fetchone()
+                if has_base:
+                    conn.execute("DELETE FROM poke_pokemon_config WHERE user_id = ? AND dex_id = ?", (user_id, mega_id))
+                else:
+                    row = conn.execute("SELECT moves FROM poke_pokemon_config WHERE user_id = ? AND dex_id = ?",
+                                       (user_id, mega_id)).fetchone()
+                    pool = {m["name"] for m in POKEDEX[base_id].get("moves", [])}
+                    moves = [n for n in json.loads(row[0] or "[]") if n in pool] if row else []
+                    conn.execute("UPDATE poke_pokemon_config SET dex_id = ?, ability = NULL, moves = ? "
+                                 "WHERE user_id = ? AND dex_id = ?",
+                                 (base_id, json.dumps(moves) if moves else None, user_id, mega_id))
+    if "poke_custom_gyms" in tables:
+        for owner, roster_json in conn.execute("SELECT owner_user_id, roster FROM poke_custom_gyms").fetchall():
+            roster = json.loads(roster_json or "[]")
+            changed = False
+            for m in roster:
+                if m.get("dex_id") in megas:
+                    conn.execute("INSERT OR IGNORE INTO poke_mega_unlocks (user_id, mega_dex_id, source, unlocked_at) "
+                                 "VALUES (?, ?, 'reward', ?)", (owner, m["dex_id"], now))
+                    base_id = megas[m["dex_id"]]
+                    pool = {mv["name"] for mv in POKEDEX[base_id].get("moves", [])}
+                    m.update(dex_id=base_id, form_dex_id=base_id, ability=None,
+                             moves=[n for n in m.get("moves") or [] if n in pool])
+                    changed = True
+            if changed:
+                conn.execute("UPDATE poke_custom_gyms SET roster = ? WHERE owner_user_id = ?", (json.dumps(roster), owner))
+    _mega_unlocks_ready = True
+
+
+def get_mega_unlocks(user_id: int) -> list[int]:
+    """Every Mega this trainer has unlocked (dex ids), oldest first."""
+    with db() as conn:
+        ensure_mega_unlocks(conn)
+        rows = conn.execute("SELECT mega_dex_id FROM poke_mega_unlocks WHERE user_id = ? ORDER BY unlocked_at, mega_dex_id",
+                            (user_id,)).fetchall()
+    return [r[0] for r in rows if r[0] in POKEDEX]
+
+
+def get_mega_unlock_details(user_id: int) -> list[dict]:
+    """Each unlocked Mega with where it came from ("league", "legend:<key>",
+    or "reward" for Megas converted from the old reward Pokémon)."""
+    with db() as conn:
+        ensure_mega_unlocks(conn)
+        rows = conn.execute("SELECT mega_dex_id, source, unlocked_at FROM poke_mega_unlocks WHERE user_id = ? "
+                            "ORDER BY unlocked_at, mega_dex_id", (user_id,)).fetchall()
+    return [{"dex_id": r[0], "source": r[1], "unlocked_at": r[2]} for r in rows if r[0] in POKEDEX]
+
+
+def mega_evolution_unlocked(user_id: int) -> bool:
+    """The Key Stone: Mega Evolution itself works once the League is conquered."""
+    return league_fully_completed(user_id)
+
+
+def player_mega_forms(user_id: int) -> dict[int, list[dict]]:
+    """base dex_id -> the Megas this trainer's Pokémon of that species can
+    become in battle (empty until the League is conquered)."""
+    if not mega_evolution_unlocked(user_id):
+        return {}
+    forms: dict[int, list[dict]] = {}
+    for mega_id in sorted(get_mega_unlocks(user_id)):  # Charizard: X before Y
+        mega = POKEDEX[mega_id]
+        if mega.get("mega_of"):
+            forms.setdefault(mega["mega_of"], []).append(mega)
+    return forms
+
+
+def _unlock_mega_with_pokemon(conn: sqlite3.Connection, user_id: int, mega_id: int, source: str, now: str):
+    """Unlocks a Mega and gives the trainer a perfect-IV Pokémon of its species."""
+    base_id = POKEDEX[mega_id]["mega_of"]
+    conn.execute("INSERT OR IGNORE INTO poke_mega_unlocks (user_id, mega_dex_id, source, unlocked_at) VALUES (?, ?, ?, ?)",
+                 (user_id, mega_id, source, now))
+    conn.execute(
+        "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, "
+        "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
+        "VALUES (?, ?, ?, 0, 31, 31, 31, 31, 31, 31)",
+        (user_id, base_id, now),
+    )
+    conn.execute("INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
+                 (user_id, base_id, now))
 
 
 def is_mega(dex_id: int) -> bool:
@@ -899,7 +1088,8 @@ def get_mega_choice(user_id: int) -> int | None:
 
 
 def claim_mega_reward(user_id: int, dex_id: int) -> str | None:
-    """Grants the chosen Mega. Returns an error message, or None on success."""
+    """Unlocks the chosen Mega (plus a perfect-IV Pokémon of its species).
+    Returns an error message, or None on success."""
     if dex_id not in MEGA_REWARD_DEX_IDS:
         return "That isn't one of the available Mega Evolutions."
     if not league_fully_completed(user_id):
@@ -914,12 +1104,8 @@ def claim_mega_reward(user_id: int, dex_id: int) -> str | None:
         )
         if cur.rowcount == 0:
             return "You've already chosen your Mega Evolution."
-        conn.execute(
-            "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, "
-            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
-            "VALUES (?, ?, ?, 0, 31, 31, 31, 31, 31, 31)",
-            (user_id, dex_id, now),
-        )
+        ensure_mega_unlocks(conn)
+        _unlock_mega_with_pokemon(conn, user_id, dex_id, "league", now)
     return None
 
 
@@ -992,12 +1178,7 @@ def legend_mon(entry: dict) -> dict:
 
 
 def build_roster_for_legend(legend_key: str) -> list["be.BattlerState"]:
-    roster = LEGENDS[legend_key]["roster"]
-    items = champion_held_items(roster)
-    return [
-        be.build_battler_state(legend_mon(m), m["moves"], m.get("ability"), item=items[i])
-        for i, m in enumerate(roster)
-    ]
+    return build_boss_roster(LEGENDS[legend_key]["roster"])
 
 
 def legend_mega_forms(legend_key: str) -> dict[int, dict]:
@@ -1024,8 +1205,9 @@ def record_legend_win(user_id: int, legend_key: str) -> bool:
 
 
 def grant_legend_first_win(user_id: int, legend_key: str) -> str:
-    """The first-win prize: the legend's signature Mega with perfect IVs,
-    coins, XP and a Master Ball. Returns the Mega's name."""
+    """The first-win prize: the legend's signature Mega Evolution unlocked
+    (with a perfect-IV Pokémon of its species), coins, XP and a Master Ball.
+    Returns the Mega's name."""
     entry = LEGENDS[legend_key]
     reward = POKEDEX[entry["reward_mega"]]
     now = datetime.now(timezone.utc).isoformat()
@@ -1036,16 +1218,8 @@ def grant_legend_first_win(user_id: int, legend_key: str) -> str:
             "ON CONFLICT(user_id, item) DO UPDATE SET qty = qty + ?",
             (user_id, LEGEND_FIRST_WIN["masterball"], LEGEND_FIRST_WIN["masterball"]),
         )
-        conn.execute(
-            "INSERT INTO poke_collection (user_id, dex_id, caught_at, is_shiny, "
-            "iv_hp, iv_attack, iv_defense, iv_sp_attack, iv_sp_defense, iv_speed) "
-            "VALUES (?, ?, ?, 0, 31, 31, 31, 31, 31, 31)",
-            (user_id, reward["id"], now),
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO poke_dex_seen (user_id, dex_id, first_caught_at) VALUES (?, ?, ?)",
-            (user_id, reward["id"], now),
-        )
+        ensure_mega_unlocks(conn)
+        _unlock_mega_with_pokemon(conn, user_id, reward["id"], f"legend:{legend_key}", now)
     return reward["name"]
 
 
@@ -1139,16 +1313,8 @@ def snapshot_custom_gym_roster(owner_user_id: int, dex_ids: list[int]) -> list[d
 
 def custom_gym_mega_forms(owner_user_id: int, dex_ids) -> dict[int, dict]:
     """base dex_id -> Mega, for each of the gym's Pokémon whose Mega the
-    owner owns: those Mega Evolve mid-battle, like a Champion's."""
-    with db() as conn:
-        owned = {r[0] for r in conn.execute(
-            "SELECT DISTINCT dex_id FROM poke_collection WHERE user_id = ?", (owner_user_id,))}
-    forms: dict[int, dict] = {}
-    for mega_id in sorted(owned):
-        mega = POKEDEX.get(mega_id, {})
-        if mega.get("is_mega") and mega.get("mega_of") in dex_ids:
-            forms.setdefault(mega["mega_of"], mega)
-    return forms
+    owner has unlocked: those Mega Evolve mid-battle, like a Champion's."""
+    return {base: megas[0] for base, megas in player_mega_forms(owner_user_id).items() if base in dex_ids}
 
 
 def build_roster_for_custom_gym(owner_user_id: int) -> list["be.BattlerState"] | None:
@@ -1378,8 +1544,10 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         if legend_key in LEGENDS and record_legend_win(winner_user_id, legend_key):
             reward = grant_legend_first_win(winner_user_id, legend_key)
             _announce_legend_defeat(battle_row, battle, legend_key, reward)
+            base = POKEDEX.get(POKEDEX.get(LEGENDS[legend_key]["reward_mega"], {}).get("mega_of"), {}).get("name", "its Pokémon")
             summary = (f"🌟 You defeated {name}! +{LEGEND_FIRST_WIN['xp']} XP, +{LEGEND_FIRST_WIN['coin']} coins, "
-                       f"a Master Ball, and {reward} (perfect IVs) joined your collection!")
+                       f"a Master Ball, and {reward} unlocked: your {base} can now Mega Evolve "
+                       f"(a perfect-IV {base} joined your collection)!")
         else:
             add_xp_and_coins(winner_user_id, LEGEND_REMATCH["xp"], LEGEND_REMATCH["coin"])
             _announce_legend_defeat(battle_row, battle, legend_key, None)
@@ -1407,6 +1575,8 @@ MEDIUM_AI_BATTLE_TYPES = {"gym"}
 
 
 def npc_pick_action(battle: "be.BattleState", side_id: str, battle_row: sqlite3.Row) -> "be.Action":
+    if is_boss_battle(battle_row):
+        return be.pick_npc_action_boss(battle, side_id)
     if battle_row["battle_type"] in HARD_AI_BATTLE_TYPES:
         return be.pick_npc_action_hard(battle, side_id)
     if battle_row["battle_type"] in MEDIUM_AI_BATTLE_TYPES:
@@ -1415,6 +1585,8 @@ def npc_pick_action(battle: "be.BattleState", side_id: str, battle_row: sqlite3.
 
 
 def npc_pick_forced_switch(battle: "be.BattleState", side_id: str, battle_row: sqlite3.Row) -> int:
+    if is_boss_battle(battle_row):
+        return be.pick_npc_forced_switch_boss(battle, side_id)
     if battle_row["battle_type"] in HARD_AI_BATTLE_TYPES | MEDIUM_AI_BATTLE_TYPES:
         return be.pick_npc_forced_switch_hard(battle, side_id)
     return be.pick_npc_forced_switch(battle, side_id)
@@ -1561,6 +1733,8 @@ def get_viewer_info(battle: "be.BattleState", battle_row: sqlite3.Row, user_id: 
     info["usable_move_indices"] = legal["usable_move_indices"]
     info["can_switch"] = legal["can_switch"]
     info["switchable_indices"] = legal["switchable_indices"]
+    info["mega_options"] = [{"dex_id": m["id"], "name": m["name"], "artwork": m.get("artwork"), "types": m.get("types", [])}
+                            for m in be.mega_options(battle.side(side))]
     return info
 
 
@@ -1781,7 +1955,7 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
         name = mon.get("name", f"#{r['dex_id']}")
         sprite_front, sprite_back = animated_sprite_urls(name)
         pre_mega = None
-        if mon.get("is_mega") and _row_get(battle_row, "battle_type") in ("champion", LEGEND_BATTLE_TYPE, CUSTOM_GYM_BATTLE_TYPE):
+        if mon.get("is_mega"):
             # How it looked before Mega Evolving, so a replayed turn can show
             # the base form until the Mega Evolution event plays.
             base = POKEDEX.get(mon.get("mega_of"), {})

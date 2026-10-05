@@ -1471,61 +1471,67 @@
       {
         "dex_id": 442,
         "ability": "pressure",
+        "item": "lum-berry",
         "moves": [
-          "Dark Pulse",
           "Shadow Ball",
-          "Dream Eater",
-          "Hypnosis"
+          "Dark Pulse",
+          "Calm Mind",
+          "Thunder Wave"
         ]
       },
       {
         "dex_id": 407,
         "ability": "natural-cure",
+        "item": "focus-sash",
         "moves": [
-          "Petal Dance",
-          "Poison Jab",
-          "Energy Ball",
-          "Venoshock"
+          "Leaf Storm",
+          "Sludge Bomb",
+          "Shadow Ball",
+          "Sleep Powder"
         ]
       },
       {
         "dex_id": 350,
         "ability": "marvel-scale",
+        "item": "leftovers",
         "moves": [
           "Surf",
-          "Hydro Pump",
-          "Aqua Tail",
-          "Rain Dance"
+          "Ice Beam",
+          "Recover",
+          "Toxic"
         ]
       },
       {
         "dex_id": 448,
-        "ability": "steadfast",
+        "ability": "justified",
+        "item": "expert-belt",
         "moves": [
           "Close Combat",
           "Meteor Mash",
-          "Dragon Pulse",
-          "Extreme Speed"
+          "Extreme Speed",
+          "Swords Dance"
         ]
       },
       {
         "dex_id": 468,
-        "ability": "hustle",
+        "ability": "serene-grace",
+        "item": "sitrus-berry",
         "moves": [
-          "Moonblast",
           "Air Slash",
-          "Extrasensory",
-          "Air Cutter"
+          "Moonblast",
+          "Aura Sphere",
+          "Thunder Wave"
         ]
       },
       {
         "dex_id": 445,
-        "ability": "sand-veil",
+        "ability": "rough-skin",
+        "item": "life-orb",
         "moves": [
-          "Outrage",
-          "Double Edge",
-          "Crunch",
-          "Dragon Claw"
+          "Earthquake",
+          "Dragon Claw",
+          "Stone Edge",
+          "Swords Dance"
         ]
       }
     ],

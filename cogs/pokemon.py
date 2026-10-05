@@ -824,9 +824,11 @@ TUTORIAL_PAGES = [
         "Earn all 32 badges to open the **Poké League**.\n"
         "**`/poke elite4`** fights each region's Elite Four in order, then "
         "**`/poke champion`** takes on its Champion. **`/poke league`** shows your progress.\n"
-        "**`/poke rewards`**: beat every Elite Four member and Champion to claim a Mega Evolution "
-        "and open **your own gym** for other players to challenge.\n\n"
-        "Beat all 4 Champions and the **Legends** unlock on the website. They're the hardest fights in the game.",
+        "Beat every Elite Four member and Champion to unlock **Mega Evolution**: pick one Mega "
+        "(**`/poke rewards`**), and Pokémon of that species can Mega Evolve once per battle. "
+        "You can also open **your own gym** for other players to challenge.\n\n"
+        "Beat all 4 Champions and the **Legends** unlock on the website. They're the hardest fights in the game, "
+        "and each one unlocks another Mega Evolution.",
     ),
     (
         "🤝 Trading & more",
@@ -1362,6 +1364,10 @@ class Pokemon(commands.Cog):
                     PRIMARY KEY (user_id, owner_user_id)
                 )
             """)
+            # Mega Evolutions are unlocks, not Pokémon (converts the old reward
+            # Megas once), and the battle tables' newer columns.
+            battle_store.ensure_mega_unlocks(conn)
+            battle_store.ensure_form_column(conn)
 
             # ---------- Trading ----------
             # side_a is always the initiator. side_a/b_catch_id name a specific
@@ -2705,7 +2711,9 @@ class Pokemon(commands.Cog):
         embed = discord.Embed(title="Poké League Completionist Reward", color=discord.Color.purple())
         embed.description = (
             "Defeat every Elite Four member and Champion across all 4 regions "
-            "(`/poke elite4`, `/poke champion`) to choose one Mega Evolution."
+            "(`/poke elite4`, `/poke champion`) to unlock Mega Evolution and choose one Mega. "
+            "Pokémon of that species can then Mega Evolve once per battle (the Mega Evolve button "
+            "in the battle screen). Each Legend you beat unlocks another."
         )
         embed.add_field(name="Progress", value=f"{earned} / {total} League battles won", inline=False)
         mega_id = battle_store.get_mega_choice(interaction.user.id)
@@ -2714,8 +2722,12 @@ class Pokemon(commands.Cog):
         elif earned >= total:
             mega_text = "✨ **Ready to claim!** Pick your one Mega Evolution on the web Rewards page (`/poke web`)."
         else:
-            mega_text = "🔒 Complete the Poké League to pick one Mega Evolution (e.g. Mega Charizard X) as a reward."
-        embed.add_field(name="Mega Evolution", value=mega_text, inline=False)
+            mega_text = "🔒 Complete the Poké League to unlock Mega Evolution and pick one Mega (e.g. Mega Charizard X)."
+        embed.add_field(name="League reward", value=mega_text, inline=False)
+        unlocked = [self.pokedex.get(d, {}).get("name", "?") for d in battle_store.get_mega_unlocks(interaction.user.id)]
+        if unlocked:
+            status = "" if earned >= total else "\n🔒 They work once you've conquered the Poké League."
+            embed.add_field(name="Your Mega Evolutions", value=", ".join(unlocked) + status, inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 

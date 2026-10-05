@@ -69,12 +69,20 @@ IV_STAT_KEYS = ("hp", "attack", "defense", "sp_attack", "sp_defense", "speed")
 MAX_IVS: dict[str, int] = {k: 31 for k in IV_STAT_KEYS}
 
 
-def stat_at_level_100(base: int, iv: int, is_hp: bool) -> int:
-    """Mirrors webapi.py's stat_at_level_100 — no EVs, neutral nature, level
-    100, real per-individual IV (0-31). Duplicated here (not imported) so
-    this module stays free of any dependency on webapi.py's FastAPI app
-    construction."""
-    return 2 * base + iv + 110 if is_hp else 2 * base + iv + 5
+def stat_at_level_100(base: int, iv: int, is_hp: bool, ev: int = 0) -> int:
+    """Mirrors webapi.py's stat_at_level_100 — neutral nature, level 100,
+    real per-individual IV (0-31). Players' Pokémon have no EVs; only boss
+    trainers' do (0-252 per stat, +1 stat point per 4). Duplicated here (not
+    imported) so this module stays free of any dependency on webapi.py's
+    FastAPI app construction."""
+    bonus = max(0, min(252, int(ev or 0))) // 4
+    return 2 * base + iv + 110 + bonus if is_hp else 2 * base + iv + 5 + bonus
+
+
+def stats_at_level_100(base_stats: dict, ivs: dict, evs: dict | None = None) -> dict:
+    evs = evs or {}
+    return {key: stat_at_level_100(base_stats.get(key, 1), ivs.get(key, 31), key == "hp", evs.get(key, 0))
+            for key in IV_STAT_KEYS}
 
 
 def type_effectiveness(move_type: str | None, defender_types: list[str]) -> float:
@@ -229,6 +237,7 @@ class BattlerState:
     current_hp: int
     ability: Optional[str] = None
     ivs: dict = field(default_factory=lambda: dict(MAX_IVS))  # same 6 keys, 0-31 each
+    evs: dict = field(default_factory=dict)  # boss trainers only: stat -> 0-252
     moves: list = field(default_factory=list)  # list[MoveSlot], up to 4
     stat_stages: dict = field(default_factory=default_stat_stages)
     status: Optional[str] = None  # burn|paralysis|poison|toxic|sleep|freeze
@@ -246,9 +255,15 @@ class BattleSide:
     controller: object  # Discord user id (int) or "npc"
     roster: list  # list[BattlerState], up to 6
     active_index: int = 0
-    # Mega Evolutions this side may use: base dex_id -> the Mega's pokedex
-    # entry. Only set for boss trainers (see battle_store.MEGA_TRAINERS).
+    # Mega Evolutions an NPC side uses automatically: base dex_id -> the
+    # Mega's pokedex entry (boss trainers, see battle_store.MEGA_TRAINERS).
     mega_forms: dict = field(default_factory=dict)
+    # A player's unlocked Megas: base dex_id -> [Mega entries] (Charizard can
+    # have X and Y). Used only when the player chooses to, once per battle.
+    player_megas: dict = field(default_factory=dict)
+    mega_used: bool = False
+    # The boss AI keeps this Pokémon (its ace) for last.
+    ace_index: Optional[int] = None
 
     @property
     def active(self) -> BattlerState:
@@ -281,6 +296,7 @@ class Action:
     side: str
     move_index: Optional[int] = None
     switch_to_index: Optional[int] = None
+    mega: Optional[int] = None  # dex_id of the Mega a player evolves into this turn
 
 
 @dataclass
@@ -297,22 +313,15 @@ class TurnResult:
 # ---------------------------------------------------------------------------
 
 def build_battler_state(mon: dict, moves: list[str] | None, ability: str | None,
-                         ivs: dict | None = None, item: str | None = None) -> BattlerState:
+                         ivs: dict | None = None, item: str | None = None, evs: dict | None = None) -> BattlerState:
     """mon: one entry from data/pokemon.json (POKEDEX[dex_id]). moves: up to 4
     move names to load from that species' own embedded move pool (falls back
     to its first 4 known moves if not given/found). ivs: that individual's
     real 0-31-per-stat values; defaults to max (31) for gym/trainer NPCs,
     which have no owned Pokémon row to draw real IVs from."""
     ivs = ivs or MAX_IVS
-    base_stats = mon.get("base_stats", {})
-    stats = {
-        "hp": stat_at_level_100(base_stats.get("hp", 1), ivs.get("hp", 31), True),
-        "attack": stat_at_level_100(base_stats.get("attack", 1), ivs.get("attack", 31), False),
-        "defense": stat_at_level_100(base_stats.get("defense", 1), ivs.get("defense", 31), False),
-        "sp_attack": stat_at_level_100(base_stats.get("sp_attack", 1), ivs.get("sp_attack", 31), False),
-        "sp_defense": stat_at_level_100(base_stats.get("sp_defense", 1), ivs.get("sp_defense", 31), False),
-        "speed": stat_at_level_100(base_stats.get("speed", 1), ivs.get("speed", 31), False),
-    }
+    evs = dict(evs or {})
+    stats = stats_at_level_100(mon.get("base_stats", {}), ivs, evs)
     pool_by_name = {m["name"]: m for m in mon.get("moves", [])}
     chosen = [n for n in (moves or []) if n in pool_by_name]
     if not chosen:
@@ -326,7 +335,7 @@ def build_battler_state(mon: dict, moves: list[str] | None, ability: str | None,
     return BattlerState(
         dex_id=mon["id"], species_name=mon["name"], types=list(mon.get("types", [])),
         stats=stats, max_hp=stats["hp"], current_hp=stats["hp"], ability=ability,
-        ivs=dict(ivs), moves=move_slots, item=item if item in HELD_ITEMS else None,
+        ivs=dict(ivs), evs=evs, moves=move_slots, item=item if item in HELD_ITEMS else None,
         weight=float(mon.get("weight") or 100.0),
     )
 
@@ -363,6 +372,7 @@ def battler_state_to_row_fields(b: BattlerState) -> dict:
         "is_fainted": b.is_fainted,
         "volatile": dict(b.volatile),
         "ivs": dict(b.ivs),
+        "evs": dict(b.evs),
         "item": b.item,
     }
 
@@ -372,15 +382,8 @@ def battler_state_from_row(mon: dict, row: dict, ability: str | None = None) -> 
     (already JSON-decoded) plus the species' pokedex entry. IVs are written
     once at battle start and never change, so they're just read back here."""
     ivs = row.get("ivs") or MAX_IVS
-    base_stats = mon.get("base_stats", {})
-    stats = {
-        "hp": stat_at_level_100(base_stats.get("hp", 1), ivs.get("hp", 31), True),
-        "attack": stat_at_level_100(base_stats.get("attack", 1), ivs.get("attack", 31), False),
-        "defense": stat_at_level_100(base_stats.get("defense", 1), ivs.get("defense", 31), False),
-        "sp_attack": stat_at_level_100(base_stats.get("sp_attack", 1), ivs.get("sp_attack", 31), False),
-        "sp_defense": stat_at_level_100(base_stats.get("sp_defense", 1), ivs.get("sp_defense", 31), False),
-        "speed": stat_at_level_100(base_stats.get("speed", 1), ivs.get("speed", 31), False),
-    }
+    evs = row.get("evs") or {}
+    stats = stats_at_level_100(mon.get("base_stats", {}), ivs, evs)
     pool_by_name = {m["name"]: m for m in mon.get("moves", [])}
     move_slots = []
     for entry in row.get("moves", []):
@@ -397,7 +400,7 @@ def battler_state_from_row(mon: dict, row: dict, ability: str | None = None) -> 
 
     return BattlerState(
         dex_id=row["dex_id"], species_name=mon.get("name", f"#{row['dex_id']}"), types=types,
-        stats=stats, ivs=dict(ivs), max_hp=row.get("max_hp", stats["hp"]), current_hp=row.get("current_hp", stats["hp"]),
+        stats=stats, ivs=dict(ivs), evs=dict(evs), max_hp=row.get("max_hp", stats["hp"]), current_hp=row.get("current_hp", stats["hp"]),
         ability=ability, moves=move_slots, stat_stages=stages,
         status=row.get("status"), status_counter=row.get("status_counter", 0) or 0,
         confusion_counter=row.get("confusion_counter", 0) or 0, volatile=volatile,
@@ -824,6 +827,128 @@ def _pick_npc_action_hard(battle: BattleState, side_id: str) -> Action:
     # Pick among the near-best options so the League isn't fully predictable.
     top = [i for i, v in scored if v >= best_v - 0.03]
     return Action(kind="move", side=side_id, move_index=battle.rng.choice(top))
+
+
+# ---------------------------------------------------------------------------
+# Boss AI: Cynthia and the Legends. The League AI plus three habits of a
+# strong human player:
+#  - it reads switches: when the player's Pokémon is losing its matchup and
+#    has a clearly better teammate to bring in, the boss expects the switch
+#    and weighs each move against that teammate too (so it doesn't waste a
+#    super-effective hit on a resist the player was always going to bring);
+#  - it leaves a losing matchup sooner than the League AI does;
+#  - it saves its ace (the last Pokémon) until its other Pokémon are down.
+# ---------------------------------------------------------------------------
+
+BOSS_SWITCH_MARGIN = 0.15
+BOSS_ACE_PENALTY = 0.35
+BOSS_MAX_READ = 0.55  # never bets more than this on a predicted switch
+
+
+def _ace_penalty(side: BattleSide, index: int) -> float:
+    if side.ace_index is None or index != side.ace_index:
+        return 0.0
+    others = [b for i, b in enumerate(side.roster)
+              if i not in (index, side.active_index) and not b.is_fainted]
+    return BOSS_ACE_PENALTY if others else 0.0
+
+
+def _value_switch_in(battle: BattleState, side_id: str, index: int) -> float:
+    """A switch, valued properly: the newcomer takes one free hit on the
+    way in, then the two trade blows as usual. (_value_switch, the League
+    AI's version, also skips the newcomer's first attack, which makes
+    every switch look worse than it is.)"""
+    cand = battle.side(side_id).roster[index]
+    foe = battle.other(side_id).active
+    hit = _best_attack(foe, cand)
+    if hit >= cand.current_hp:
+        return -1.0
+    return _race(cand, foe, cand.current_hp - hit, foe.current_hp, my_first_hit=_best_attack(cand, foe))
+
+
+def _with_foe_active(battle: BattleState, side_id: str, foe_index: int, fn):
+    """Evaluates fn() as if the foe had `foe_index` on the field."""
+    foe_side = battle.other(side_id)
+    saved = foe_side.active_index
+    foe_side.active_index = foe_index
+    try:
+        return fn()
+    finally:
+        foe_side.active_index = saved
+
+
+def predict_switch(battle: BattleState, side_id: str) -> tuple[float, Optional[int]]:
+    """(chance, team index): how likely `side_id`'s opponent is to switch
+    out this turn, and to whom. Judged from the opponent's point of view:
+    how badly their current Pokémon is losing, and how much better their
+    best switch-in would do."""
+    foe_id = battle.other(side_id).side_id
+    la = legal_actions(battle, foe_id)
+    if not la["can_switch"] or not la["usable_move_indices"]:
+        return 0.0, None
+    foe = battle.side(foe_id)
+    stay = max(_value_move(battle, foe_id, foe.active.moves[i].move) for i in la["usable_move_indices"])
+    if stay >= -0.1:
+        return 0.0, None
+    idx, val = max(((i, _value_switch_in(battle, foe_id, i)) for i in la["switchable_indices"]), key=lambda s: s[1])
+    gain = val - stay
+    if gain < 0.3:
+        return 0.0, None
+    return min(BOSS_MAX_READ, 0.2 + 0.35 * gain), idx
+
+
+def pick_npc_action_boss(battle: BattleState, side_id: str) -> Action:
+    token = _AI_WEATHER.set(current_weather(battle))
+    try:
+        return _pick_npc_action_boss(battle, side_id)
+    finally:
+        _AI_WEATHER.reset(token)
+
+
+def _pick_npc_action_boss(battle: BattleState, side_id: str) -> Action:
+    la = legal_actions(battle, side_id)
+    side = battle.side(side_id)
+
+    def switch_value(i):
+        return _value_switch_in(battle, side_id, i) - _ace_penalty(side, i)
+
+    if not la["usable_move_indices"]:
+        if la["can_switch"]:
+            return Action(kind="switch", side=side_id, switch_to_index=max(la["switchable_indices"], key=switch_value))
+        return Action(kind="move", side=side_id, move_index=None)
+
+    read, switch_in = predict_switch(battle, side_id)
+    scored = []
+    for i in la["usable_move_indices"]:
+        move = side.active.moves[i].move
+        v = _value_move(battle, side_id, move)
+        if read:
+            v_switch = _with_foe_active(battle, side_id, switch_in, lambda m=move: _value_move(battle, side_id, m))
+            v = (1 - read) * v + read * v_switch
+        scored.append((i, v))
+    best_i, best_v = max(scored, key=lambda s: s[1])
+
+    if la["can_switch"] and best_v < 0:
+        sw_i, sw_v = max(((i, switch_value(i)) for i in la["switchable_indices"]), key=lambda s: s[1])
+        if sw_v > best_v + BOSS_SWITCH_MARGIN:
+            return Action(kind="switch", side=side_id, switch_to_index=sw_i)
+
+    top = [i for i, v in scored if v >= best_v - 0.02]
+    return Action(kind="move", side=side_id, move_index=battle.rng.choice(top))
+
+
+def pick_npc_forced_switch_boss(battle: BattleState, side_id: str) -> int:
+    la = legal_actions(battle, side_id)
+    if not la["switchable_indices"]:
+        raise ValueError("No switchable Pokémon left")
+    side = battle.side(side_id)
+    foe = battle.other(side_id).active
+    token = _AI_WEATHER.set(current_weather(battle))
+    try:
+        return max(la["switchable_indices"],
+                   key=lambda i: _race(side.roster[i], foe, side.roster[i].current_hp, foe.current_hp) - _ace_penalty(side, i))
+    finally:
+        _AI_WEATHER.reset(token)
 
 
 MEDIUM_AI_SMART_SHARE = 0.65
@@ -2508,19 +2633,30 @@ def stab_multiplier(attacker: BattlerState, move: MoveData) -> float:
     return 2.0 if ability_key(attacker) == "adaptability" else 1.5
 
 
-def mega_evolve(battle: BattleState, side_id: str) -> list:
-    """Mega Evolves `side_id`'s active Pokémon if its side has a Mega for
-    it. Happens at the start of the turn, before anyone moves, so the new
-    Speed already counts. It keeps its HP, moves, item, status and stat
-    changes; its species, types, stats and ability become the Mega's."""
+def mega_options(side: BattleSide) -> list:
+    """The Megas a player's active Pokémon can become right now: one Mega
+    Evolution per battle, like in the games, and only species they've
+    unlocked (Charizard can have both X and Y)."""
+    if side.mega_used or not side.player_megas or side.active.is_fainted:
+        return []
+    return list(side.player_megas.get(side.active.dex_id, []))
+
+
+def mega_evolve(battle: BattleState, side_id: str, mega: dict | None = None) -> list:
+    """Mega Evolves `side_id`'s active Pokémon: into `mega` (a player's
+    choice), or into its NPC side's Mega for it. Happens at the start of the
+    turn, before anyone moves, so the new Speed already counts. It keeps its
+    HP, moves, item, status and stat changes; its species, types, stats and
+    ability become the Mega's."""
     side = battle.side(side_id)
     mon = side.active
-    mega = side.mega_forms.get(mon.dex_id)
+    mega = mega or side.mega_forms.get(mon.dex_id)
     if not mega or mon.is_fainted:
         return []
-    base = mega.get("base_stats", {})
+    side.mega_used = True
+    new_stats = stats_at_level_100(mega.get("base_stats", {}), mon.ivs, mon.evs)
     for key in ("attack", "defense", "sp_attack", "sp_defense", "speed"):
-        mon.stats[key] = stat_at_level_100(base.get(key, 1), mon.ivs.get(key, 31), False)
+        mon.stats[key] = new_stats[key]
     old_name, old_dex = mon.species_name, mon.dex_id
     abilities = mega.get("abilities") or []
     mon.dex_id, mon.species_name = mega["id"], mega["name"]
@@ -2542,8 +2678,15 @@ def resolve_turn(battle: BattleState, action_a: Action, action_b: Action) -> Tur
     the mutated state and the returned events afterward."""
     events: list = [{"type": "turn_start", "turn_number": battle.turn_number}]
     for action in (action_a, action_b):
-        if action.kind == "move":
+        if action.kind != "move":
+            continue
+        side = battle.side(action.side)
+        if side.mega_forms:
             events.extend(mega_evolve(battle, action.side))
+        elif action.mega:
+            chosen = next((m for m in mega_options(side) if m.get("id") == action.mega), None)
+            if chosen:
+                events.extend(mega_evolve(battle, action.side, chosen))
     for s in ("A", "B"):
         battle.side(s).active.volatile["unnerved"] = ability_key(battle.other(s).active) == "unnerve"
     order = _order_actions(battle, action_a, action_b, events)

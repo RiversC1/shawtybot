@@ -401,6 +401,14 @@ async def _trade_sweep_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    def _migrate():
+        with battle_store.db() as conn:
+            battle_store.ensure_mega_unlocks(conn)  # old reward Megas -> unlocks, once
+
+    try:
+        await asyncio.to_thread(_migrate)
+    except Exception as e:
+        log.error(f"Mega unlock migration failed: {e}", exc_info=True)
     tasks = [asyncio.create_task(_battle_sweep_loop()), asyncio.create_task(_trade_sweep_loop())]
     yield
     for task in tasks:
@@ -1874,6 +1882,7 @@ class BattleActionRequest(BaseModel):
     kind: str  # "move" | "switch"
     move_index: int | None = None
     switch_to_index: int | None = None
+    mega: int | None = None  # dex id of the Mega to evolve into before moving
 
 
 @app.post("/api/battles/{battle_id}/action")
@@ -1892,7 +1901,11 @@ async def submit_battle_action(battle_id: int, body: BattleActionRequest, user_i
         if battle_store.get_pending_action(battle_id, side, battle.turn_number) is not None:
             return "You've already locked in your move this turn.", None
 
-        action = be.Action(kind=body.kind, side=side, move_index=body.move_index, switch_to_index=body.switch_to_index)
+        mega = body.mega if body.kind == "move" else None
+        if mega and mega not in {m["id"] for m in be.mega_options(battle.side(side))}:
+            return "That Pokémon can't Mega Evolve right now.", None
+        action = be.Action(kind=body.kind, side=side, move_index=body.move_index, switch_to_index=body.switch_to_index,
+                           mega=mega)
         legal = be.legal_actions(battle, side)
         if body.kind == "move" and legal["usable_move_indices"] and body.move_index not in legal["usable_move_indices"]:
             return "That move can't be used right now.", None
@@ -2605,12 +2618,14 @@ async def start_champion_battle(generation: str, user_id: int = Depends(get_curr
 def _legend_card(key: str, wins: dict) -> dict:
     entry = battle_store.LEGENDS[key]
     reward = POKEDEX.get(entry["reward_mega"], {})
+    reward_base = POKEDEX.get(reward.get("mega_of"), {})
     megas = [POKEDEX[m["mega"]]["name"] for m in entry["roster"] if m.get("mega") in POKEDEX]
     return {
         "key": key, "name": entry["name"], "title": entry["title"], "region": entry["region"],
         "order": entry["order"], "flavor": entry["flavor"], "portrait": entry.get("portrait"),
         "megas": megas,
-        "reward": {"dex_id": reward.get("id"), "name": reward.get("name"), "artwork": reward.get("artwork")},
+        "reward": {"dex_id": reward.get("id"), "name": reward.get("name"), "artwork": reward.get("artwork"),
+                   "base_name": reward_base.get("name")},
         "beaten": key in wins, "wins": wins.get(key, {}).get("wins", 0),
         "first_won_at": wins.get(key, {}).get("first_won_at"),
     }
@@ -2681,6 +2696,13 @@ async def start_legend_battle(legend_key: str, user_id: int = Depends(get_curren
 @app.get("/api/rewards")
 def get_rewards(user_id: int = Depends(get_current_user_id)):
     earned, total = battle_store.league_completion(user_id)
+    legend_names = {f"legend:{k}": e["name"] for k, e in battle_store.LEGENDS.items()}
+    unlocked = []
+    for u in battle_store.get_mega_unlock_details(user_id):
+        card = _mega_card(u["dex_id"])
+        card["source"] = ("Poké League reward" if u["source"] == "league"
+                          else f"Beat {legend_names[u['source']]}" if u["source"] in legend_names else "Reward")
+        unlocked.append(card)
     return {
         "league_earned": earned,
         "league_total": total,
@@ -2688,6 +2710,8 @@ def get_rewards(user_id: int = Depends(get_current_user_id)):
         "mega": {
             "chosen": _mega_card(battle_store.get_mega_choice(user_id)),
             "options": [_mega_card(d) for d in battle_store.MEGA_REWARD_DEX_IDS],
+            "unlocked": unlocked,
+            "can_mega_evolve": battle_store.mega_evolution_unlocked(user_id),
         },
     }
 
@@ -2701,6 +2725,7 @@ def _mega_card(dex_id: int | None) -> dict | None:
         "dex_id": dex_id,
         "name": mon["name"],
         "base_name": base.get("name"),
+        "base_artwork": base.get("artwork"),
         "types": mon["types"],
         "artwork": mon["artwork"],
         "ability": format_ability_name(mon["abilities"][0]["name"]) if mon.get("abilities") else None,

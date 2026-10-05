@@ -17,7 +17,16 @@
     ability_activated: 700, ability_damage: 600,
   };
   // Mega Stones whose name isn't just "<species>ite" (Garchomp -> Garchompite).
-  const MEGA_STONES = { Lucario: "Lucarionite" };
+  const MEGA_STONES = {
+    Lucario: "Lucarionite", Blastoise: "Blastoisinite", Alakazam: "Alakazite", Houndoom: "Houndoominite",
+    Heracross: "Heracronite", Manectric: "Manectite", Abomasnow: "Abomasite", Glalie: "Glalitite",
+    Altaria: "Altarianite", Gallade: "Galladite", Sableye: "Sablenite", Sharpedo: "Sharpedonite",
+    Slowbro: "Slowbronite", Banette: "Banettite",
+  };
+  function megaStoneName(name, megaName) {
+    const xy = / ([XY])$/.exec(megaName || "");
+    return (MEGA_STONES[name] || `${name}ite`) + (xy ? ` ${xy[1]}` : "");
+  }
   const DEFAULT_EVENT_DELAY = 250; // structural events with no on-screen effect (turn_start, switch_out, battle_end)
 
   // switch_in plays as its own two-phase mini-sequence (see playSwitchIn)
@@ -564,6 +573,11 @@
     return `<span class="type-badge type-${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</span>`;
   }
 
+  // The Mega a player has armed for their next move (like the games' Mega
+  // Evolution toggle): kept across re-renders within the turn, sent with the
+  // move, and dropped once it's no longer an option.
+  let megaChoice = null;
+
   function renderActionPanel(battle) {
     if (window.MoveTooltip) window.MoveTooltip.hide();
     const you = battle.you;
@@ -656,8 +670,21 @@
         .filter(({ i }) => you.switchable_indices.includes(i))
         .map(({ m, i }) => `<button class="btn-secondary br-switch-option" data-index="${i}">${m.name}</button>`)
         .join("");
+      const megaOptions = you.mega_options || [];
+      if (!megaOptions.some((o) => o.dex_id === megaChoice)) megaChoice = null;
+      const megaButtons = megaOptions
+        .map((o) => {
+          const on = o.dex_id === megaChoice;
+          return `<button type="button" class="br-mega-toggle${on ? " is-on" : ""}" data-mega="${o.dex_id}" aria-pressed="${on}"
+                title="${on ? "Mega Evolving before this move. Click to cancel." : `Mega Evolve into ${esc(o.name)} before your move (once per battle)`}">
+              <span class="br-mega-symbol" aria-hidden="true">${window.BattleFX && BattleFX.MEGA_SYMBOL_SVG ? BattleFX.MEGA_SYMBOL_SVG : "✦"}</span>
+              <span>${on ? "Mega Evolving" : "Mega Evolve"}${megaOptions.length > 1 ? ` <small>${esc(o.name.replace(/^Mega \S+ ?/, "") || o.name)}</small>` : ""}</span>
+          </button>`;
+        })
+        .join("");
 
       actionPanel.innerHTML = `
+          ${megaButtons ? `<div class="br-mega-row">${megaButtons}<span class="muted br-mega-hint">${megaChoice ? "Now pick a move." : "Once per battle"}</span></div>` : ""}
           <div class="battle-action-section-label">Attack</div>
           <div class="battle-action-buttons battle-move-grid">${moveButtons || "<p class='muted'>No moves available.</p>"}</div>
           ${
@@ -671,13 +698,23 @@
         const move = (active.moves || [])[parseInt(btn.dataset.index, 10)];
         if (move && window.MoveTooltip) window.MoveTooltip.attach(btn, move);
       });
+      actionPanel.querySelectorAll(".br-mega-toggle").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const id = parseInt(btn.dataset.mega, 10);
+          megaChoice = megaChoice === id ? null : id;
+          renderActionPanel(truth);
+        })
+      );
       actionPanel.querySelectorAll(".br-move-option").forEach((btn) =>
         btn.addEventListener("click", async () => {
           if (window.MoveTooltip) window.MoveTooltip.hide();
-          const data = await postAction(`/api/proxy/battles/${window.BATTLE_ID}/action`, {
-            kind: "move", move_index: parseInt(btn.dataset.index, 10),
-          });
-          if (data) applyUpdate(data);
+          const body = { kind: "move", move_index: parseInt(btn.dataset.index, 10) };
+          if (megaChoice) body.mega = megaChoice;
+          const data = await postAction(`/api/proxy/battles/${window.BATTLE_ID}/action`, body);
+          if (data) {
+            megaChoice = null;
+            applyUpdate(data);
+          }
         })
       );
       actionPanel.querySelectorAll(".br-switch-option").forEach((btn) =>
@@ -755,7 +792,7 @@
       case "ability_damage":
         return `<strong>${owned(event.side, esc(event.name))}</strong> ${esc(event.message)} ${esc(event.ability)}! (-${event.amount})`;
       case "mega_evolution":
-        return `💎 <strong>${owned(event.side, event.name)}</strong>'s ${esc(MEGA_STONES[event.name] || `${event.name}ite`)} is reacting to ${side}'s Key Stone!<br>`
+        return `💎 <strong>${owned(event.side, event.name)}</strong>'s ${esc(megaStoneName(event.name, event.mega_name))} is reacting to ${side}'s Key Stone!<br>`
           + `✨ <strong>${owned(event.side, event.name)}</strong> has <span class="mega-line">Mega Evolved</span> into <strong>${esc(event.mega_name)}</strong>!`;
       case "cannot_act": {
         const reasons = {

@@ -7,8 +7,9 @@
     <span class="legend-warning-icon" aria-hidden="true">⚠️</span>
     <div>
         <strong>Do this at your own risk.</strong>
-        <span>These trainers are harder than any Champion: perfect IVs, a held item on every Pokémon,
-        TM movesets, and every Pokémon that can Mega Evolve <em>will</em>. Expect to lose. A lot.</span>
+        <span>These trainers are harder than any Champion: perfect IVs and fully trained stats, a held item on
+        every Pokémon, TM movesets, and every Pokémon that can Mega Evolve <em>will</em>. They read your switches
+        and save their ace for last. Expect to lose. A lot.</span>
     </div>
 </div>
 
@@ -41,7 +42,8 @@
     </div>
 </div>
 <p class="muted legend-rewards-note">
-    First win against each Legend: their signature <strong>Mega Evolution with perfect IVs</strong>,
+    First win against each Legend: their signature <strong>Mega Evolution, unlocked for your own Pokémon</strong>
+    (plus a perfect-IV Pokémon of that species),
     {{ "{:,}".format(legends.first_win.coin) }} coins, {{ "{:,}".format(legends.first_win.xp) }} XP and a Master Ball.
     Rematches pay {{ "{:,}".format(legends.rematch.coin) }} coins and {{ legends.rematch.xp }} XP.
 </p>
@@ -61,7 +63,7 @@
         <span class="legend-card-megas">{{ l.megas|length }} Mega Evolution{{ '' if l.megas|length == 1 else 's' }}</span>
         <span class="legend-card-reward">
             <img src="{{ l.reward.artwork|thumb }}" alt="" loading="lazy">
-            {% if l.beaten %}🏆 Defeated{% if l.wins > 1 %} ×{{ l.wins }}{% endif %}{% else %}Reward: {{ l.reward.name }}{% endif %}
+            {% if l.beaten %}🏆 Defeated{% if l.wins > 1 %} ×{{ l.wins }}{% endif %}{% else %}Unlocks {{ l.reward.name }}{% endif %}
         </span>
     </button>
     {% endfor %}
