@@ -80,9 +80,15 @@ def stat_at_level_100(base: int, iv: int, is_hp: bool, ev: int = 0) -> int:
 
 
 def stats_at_level_100(base_stats: dict, ivs: dict, evs: dict | None = None) -> dict:
+    """All six stats. A super-boss's EVs can also carry "boost_pct" (every
+    stat but HP) and "hp_boost_pct": stats no trainer's Pokémon could have."""
     evs = evs or {}
-    return {key: stat_at_level_100(base_stats.get(key, 1), ivs.get(key, 31), key == "hp", evs.get(key, 0))
-            for key in IV_STAT_KEYS}
+    stats = {key: stat_at_level_100(base_stats.get(key, 1), ivs.get(key, 31), key == "hp", evs.get(key, 0))
+             for key in IV_STAT_KEYS}
+    boost, hp_boost = evs.get("boost_pct", 0), evs.get("hp_boost_pct", 0)
+    if boost or hp_boost:
+        stats = {k: int(v * (1 + (hp_boost if k == "hp" else boost) / 100)) for k, v in stats.items()}
+    return stats
 
 
 def type_effectiveness(move_type: str | None, defender_types: list[str]) -> float:
@@ -264,6 +270,8 @@ class BattleSide:
     mega_used: bool = False
     # The boss AI keeps this Pokémon (its ace) for last.
     ace_index: Optional[int] = None
+    # Super-boss: its last Pokémon powers up when it comes out (Final Stand).
+    final_stand: bool = False
 
     @property
     def active(self) -> BattlerState:
@@ -843,6 +851,11 @@ def _pick_npc_action_hard(battle: BattleState, side_id: str) -> Action:
 BOSS_SWITCH_MARGIN = 0.15
 BOSS_ACE_PENALTY = 0.35
 BOSS_MAX_READ = 0.55  # never bets more than this on a predicted switch
+# The super-boss: trusts its reads further, switches out at the first sign
+# of a losing matchup, and almost never picks anything but its best option.
+GIGA_SWITCH_MARGIN = 0.08
+GIGA_MAX_READ = 0.8
+GIGA_SPREAD = 0.005
 
 
 def _ace_penalty(side: BattleSide, index: int) -> float:
@@ -877,7 +890,7 @@ def _with_foe_active(battle: BattleState, side_id: str, foe_index: int, fn):
         foe_side.active_index = saved
 
 
-def predict_switch(battle: BattleState, side_id: str) -> tuple[float, Optional[int]]:
+def predict_switch(battle: BattleState, side_id: str, max_read: float = BOSS_MAX_READ) -> tuple[float, Optional[int]]:
     """(chance, team index): how likely `side_id`'s opponent is to switch
     out this turn, and to whom. Judged from the opponent's point of view:
     how badly their current Pokémon is losing, and how much better their
@@ -894,7 +907,7 @@ def predict_switch(battle: BattleState, side_id: str) -> tuple[float, Optional[i
     gain = val - stay
     if gain < 0.3:
         return 0.0, None
-    return min(BOSS_MAX_READ, 0.2 + 0.35 * gain), idx
+    return min(max_read, 0.2 + 0.35 * gain), idx
 
 
 def pick_npc_action_boss(battle: BattleState, side_id: str) -> Action:
@@ -905,7 +918,17 @@ def pick_npc_action_boss(battle: BattleState, side_id: str) -> Action:
         _AI_WEATHER.reset(token)
 
 
-def _pick_npc_action_boss(battle: BattleState, side_id: str) -> Action:
+def pick_npc_action_giga(battle: BattleState, side_id: str) -> Action:
+    """The super-boss's AI: the boss AI at its most ruthless."""
+    token = _AI_WEATHER.set(current_weather(battle))
+    try:
+        return _pick_npc_action_boss(battle, side_id, GIGA_MAX_READ, GIGA_SWITCH_MARGIN, GIGA_SPREAD)
+    finally:
+        _AI_WEATHER.reset(token)
+
+
+def _pick_npc_action_boss(battle: BattleState, side_id: str, max_read: float = BOSS_MAX_READ,
+                          switch_margin: float = BOSS_SWITCH_MARGIN, spread: float = 0.02) -> Action:
     la = legal_actions(battle, side_id)
     side = battle.side(side_id)
 
@@ -917,7 +940,7 @@ def _pick_npc_action_boss(battle: BattleState, side_id: str) -> Action:
             return Action(kind="switch", side=side_id, switch_to_index=max(la["switchable_indices"], key=switch_value))
         return Action(kind="move", side=side_id, move_index=None)
 
-    read, switch_in = predict_switch(battle, side_id)
+    read, switch_in = predict_switch(battle, side_id, max_read)
     scored = []
     for i in la["usable_move_indices"]:
         move = side.active.moves[i].move
@@ -930,10 +953,10 @@ def _pick_npc_action_boss(battle: BattleState, side_id: str) -> Action:
 
     if la["can_switch"] and best_v < 0:
         sw_i, sw_v = max(((i, switch_value(i)) for i in la["switchable_indices"]), key=lambda s: s[1])
-        if sw_v > best_v + BOSS_SWITCH_MARGIN:
+        if sw_v > best_v + switch_margin:
             return Action(kind="switch", side=side_id, switch_to_index=sw_i)
 
-    top = [i for i, v in scored if v >= best_v - 0.02]
+    top = [i for i, v in scored if v >= best_v - spread]
     return Action(kind="move", side=side_id, move_index=battle.rng.choice(top))
 
 
@@ -2070,7 +2093,29 @@ def do_switch(side: BattleSide, target_index: int, battle: Optional[BattleState]
                        "new_hp": incoming.current_hp, "max_hp": incoming.max_hp})
     if battle is not None:
         trigger_entry_ability(battle, side.side_id, events)
+        trigger_final_stand(battle, side.side_id, events)
     return events
+
+
+FINAL_STAND_BOOSTS = {"attack": 1, "sp_attack": 1, "speed": 1}
+
+
+def trigger_final_stand(battle: BattleState, side_id: str, events: list) -> None:
+    """A super-boss's second phase: when its last Pokémon comes out, it
+    shakes off any status and gets +1 Attack, Sp. Atk and Speed."""
+    side = battle.side(side_id)
+    mon = side.active
+    if not side.final_stand or mon.is_fainted or any(not b.is_fainted for b in side.roster if b is not mon):
+        return
+    events.append({"type": "ability_activated", "side": side_id, "name": mon.species_name, "ability": "Final Stand",
+                   "message": "refuses to fall! Its trainer's will is surging through it!"})
+    if mon.status:
+        mon.status = None
+        mon.status_counter = 0
+        events.append({"type": "status_applied", "side": side_id, "status": "none", "reason": "final_stand",
+                       "name": mon.species_name})
+    for stat, change in FINAL_STAND_BOOSTS.items():
+        change_stat(mon, stat, change, events, side_id)
 
 
 def apply_forced_switch(battle: BattleState, side_id: str, team_index: int) -> list:

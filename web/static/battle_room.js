@@ -898,7 +898,13 @@
           return `${speech}👑 Congratulations! ${isYou ? "You are" : `${side} is`} the new <strong>${esc(region)} Champion</strong>!`;
         }
         if (event.role === "legend") {
-          const prize = event.reward ? `<br>🎁 <strong>${esc(event.reward)}</strong> (perfect IVs) joins ${isYou ? "your" : "their"} collection!` : "";
+          const prize = event.reward
+            ? `<br>🎁 <strong>${esc(event.reward)}</strong> unlocked: ${isYou ? "your" : "their"} ${esc(event.reward_base || "Pokémon")} can now Mega Evolve!`
+            : "";
+          if (event.superboss) {
+            return `${speech}👑 ${isYou ? "You" : side} defeated <strong>${esc(event.title || "")} ${esc(event.name)}</strong>! `
+              + `${isYou ? "You are" : `${side} is`} the <strong>True Champion</strong>!${prize}`;
+          }
           return `${speech}🌟 ${isYou ? "You" : side} defeated the Legend <strong>${esc(event.name)}</strong>!${prize}`;
         }
         return `${speech}🏆 ${isYou ? "You" : side} defeated Elite Four <strong>${esc(event.name)}</strong>!`;
@@ -1054,8 +1060,12 @@
     const roster = isA ? truth.roster_a : truth.roster_b;
     const match = roster.find((m) => sameMon(m, event) && !m.is_fainted) || roster.find((m) => sameMon(m, event));
     const shown = match && match.dex_id !== event.dex_id && match.pre_mega ? { ...match, ...match.pre_mega } : match;
-    if (isA) visibleA = shown ? { ...shown } : visibleA;
-    else visibleB = shown ? { ...shown } : visibleB;
+    // It comes in with no stat changes or confusion; any it gets this turn
+    // (Final Stand, an opponent's Intimidate...) arrive as later events. The
+    // roster entry already includes them, so starting from it double counts.
+    const fresh = shown ? { ...shown, stat_stages: {}, confused: false } : null;
+    if (isA) visibleA = fresh || visibleA;
+    else visibleB = fresh || visibleB;
 
     BattleAudio.handleEvent(event); // the cry plays as the Pokémon itself appears
     renderFrame(isA ? "anim-switch-in" : null, !isA ? "anim-switch-in" : null);

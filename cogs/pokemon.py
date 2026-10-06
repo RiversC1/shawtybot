@@ -164,6 +164,17 @@ ACHIEVEMENTS = {
             "diamond": {"threshold": 5, "rewards": {"masterball": 3, "coin": 5000}},
         },
     },
+    "true_champion": {
+        "label": "True Champion", "description": "Defeat True Champion Cynthia, the hardest battle in the game",
+        "stat": "true_champion_wins",
+        "tiers": {
+            "bronze": {"threshold": 1, "rewards": {"masterball": 3, "coin": 10000}},
+            "silver": {"threshold": 2, "rewards": {"masterball": 2, "coin": 5000}},
+            "gold": {"threshold": 3, "rewards": {"masterball": 3, "coin": 7500}},
+            "platinum": {"threshold": 5, "rewards": {"masterball": 3, "coin": 10000}},
+            "diamond": {"threshold": 10, "rewards": {"masterball": 5, "coin": 25000}},
+        },
+    },
 }
 
 TOTAL_ACHIEVEMENT_TIERS = sum(len(cat["tiers"]) for cat in ACHIEVEMENTS.values())
@@ -1591,7 +1602,9 @@ class Pokemon(commands.Cog):
             "evolution_count": self.get_evolution_count(user_id),
             "level": level,
             "battle_wins": self.get_battle_wins(user_id),
-            "legends_beaten": len(battle_store.get_legend_wins(user_id)),
+            "legends_beaten": len(set(battle_store.get_legend_wins(user_id)) & set(battle_store.REGULAR_LEGEND_KEYS)),
+            "true_champion_wins": sum(w["wins"] for k, w in battle_store.get_legend_wins(user_id).items()
+                                      if k in battle_store.SUPERBOSS_KEYS),
         }
 
     def get_unlocked_achievements(self, user_id: int) -> set[str]:

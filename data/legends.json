@@ -426,5 +426,103 @@
         "mega": 10034
       }
     ]
+  },
+  {
+    "key": "cynthia",
+    "name": "Cynthia",
+    "title": "True Champion",
+    "region": "Sinnoh",
+    "order": 6,
+    "superboss": true,
+    "flavor": "Sinnoh's Champion was holding back. This is Cynthia at full strength, with a team trained past any limit you know. She has never lost at this level. Nobody expects you to win.",
+    "portrait": "/static/legends/cynthia.png",
+    "reward_mega": 10058,
+    "stat_boost": {
+      "boost_pct": 15,
+      "hp_boost_pct": 25
+    },
+    "first_win": {
+      "xp": 5000,
+      "coin": 20000,
+      "masterball": 3
+    },
+    "rematch": {
+      "xp": 1000,
+      "coin": 2500
+    },
+    "defeat_quotes": [
+      "...So this is what it feels like. I've imagined this moment for years, and it's more beautiful than I ever pictured. You and your Pokémon have climbed somewhere no one has stood before. There's nothing left for me to teach you. From now on, I'll be the one chasing you.",
+      "Every battle I've ever fought was leading to this one. I gave you everything I have, every last bit of it, and it still wasn't enough. Thank you. You've shown me that there's always a higher peak. Wear this victory proudly, True Champion."
+    ],
+    "roster": [
+      {
+        "dex_id": 442,
+        "ability": "pressure",
+        "item": "lum-berry",
+        "moves": [
+          "Shadow Ball",
+          "Dark Pulse",
+          "Calm Mind",
+          "Thunder Wave"
+        ]
+      },
+      {
+        "dex_id": 407,
+        "ability": "natural-cure",
+        "item": "focus-sash",
+        "moves": [
+          "Leaf Storm",
+          "Sludge Bomb",
+          "Shadow Ball",
+          "Sleep Powder"
+        ]
+      },
+      {
+        "dex_id": 468,
+        "ability": "serene-grace",
+        "item": "leftovers",
+        "moves": [
+          "Air Slash",
+          "Moonblast",
+          "Nasty Plot",
+          "Aura Sphere"
+        ]
+      },
+      {
+        "dex_id": 350,
+        "ability": "marvel-scale",
+        "item": "sitrus-berry",
+        "moves": [
+          "Surf",
+          "Ice Beam",
+          "Recover",
+          "Toxic"
+        ]
+      },
+      {
+        "dex_id": 448,
+        "ability": "justified",
+        "item": "expert-belt",
+        "mega": 10059,
+        "moves": [
+          "Close Combat",
+          "Meteor Mash",
+          "Extreme Speed",
+          "Swords Dance"
+        ]
+      },
+      {
+        "dex_id": 445,
+        "ability": "rough-skin",
+        "item": "life-orb",
+        "mega": 10058,
+        "moves": [
+          "Earthquake",
+          "Dragon Claw",
+          "Stone Edge",
+          "Swords Dance"
+        ]
+      }
+    ]
   }
 ]

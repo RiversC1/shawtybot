@@ -6483,3 +6483,118 @@ img[src*="/sprites/items/dream-world/"] {
 .br-mega-hint {
     font-size: 0.85em;
 }
+
+/* ---- Legends: the super-boss card ---- */
+.superboss-card {
+    --sb: #c0263d;
+    display: flex;
+    align-items: stretch;
+    gap: 22px;
+    width: 100%;
+    margin-top: 22px;
+    padding: 0;
+    overflow: hidden;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--sb) 60%, transparent);
+    background:
+        radial-gradient(120% 140% at 0% 100%, rgba(192, 38, 61, 0.35), transparent 60%),
+        radial-gradient(90% 120% at 100% 0%, rgba(110, 40, 160, 0.3), transparent 60%),
+        #120c14;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 10px 40px rgba(192, 38, 61, 0.18);
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.superboss-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 14px 50px rgba(192, 38, 61, 0.35);
+}
+
+.superboss-art {
+    flex: 0 0 auto;
+    width: clamp(120px, 24%, 220px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: linear-gradient(180deg, transparent, rgba(192, 38, 61, 0.25));
+}
+
+.superboss-art img {
+    width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+    object-position: bottom;
+    filter: drop-shadow(0 0 18px rgba(255, 70, 90, 0.45));
+}
+
+.superboss-card.is-locked .superboss-art img {
+    filter: brightness(0) drop-shadow(0 0 14px rgba(255, 60, 80, 0.7));
+}
+
+.superboss-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px 20px 20px 0;
+    min-width: 0;
+}
+
+.superboss-eyebrow {
+    color: #ff5a6e;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 0.8em;
+}
+
+.superboss-name {
+    font-size: 1.7em;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.superboss-flavor {
+    color: var(--text-muted, #a9a3b8);
+}
+
+.superboss-traits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.superboss-traits span {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 90, 110, 0.3);
+    font-size: 0.85em;
+}
+
+.superboss-status {
+    margin-top: 4px;
+    font-weight: 700;
+}
+
+.superboss-card.is-beaten .superboss-status {
+    color: var(--yellow);
+}
+
+@media (max-width: 600px) {
+    .superboss-card {
+        flex-direction: column;
+        gap: 0;
+    }
+    .superboss-art {
+        width: 100%;
+        max-height: 220px;
+    }
+    .superboss-art img {
+        max-height: 220px;
+    }
+    .superboss-info {
+        padding: 16px;
+    }
+}

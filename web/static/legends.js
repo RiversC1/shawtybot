@@ -27,7 +27,8 @@
       return;
     }
     const l = await res.json();
-    title.textContent = `${l.name} — ${l.title}`;
+    title.textContent = l.superboss ? `${l.title} ${l.name}` : `${l.name} — ${l.title}`;
+    modal.classList.toggle("is-superboss", Boolean(l.superboss));
 
     // Each Pokémon, and what it Mega Evolves into.
     const roster = l.roster.map((m) => `
@@ -41,11 +42,12 @@
     let status;
     let actions = "";
     if (!l.unlocked) {
-      status = "🔒 Defeat all 4 regional Champions to challenge the Legends.";
+      status = `🔒 ${esc(l.lock_reason || "Defeat all 4 regional Champions to challenge the Legends.")}`;
     } else {
+      const balls = l.reward.masterball === 1 ? "a Master Ball" : `${l.reward.masterball} Master Balls`;
       status = l.beaten
         ? `🏆 You've defeated ${esc(l.name)}${l.wins > 1 ? ` ${l.wins} times` : ""}. Rematches still pay out.`
-        : `First win: unlocks <strong>${esc(l.reward.name)}</strong> for your ${esc(l.reward.base_name || "Pokémon")} (plus a perfect-IV ${esc(l.reward.base_name || "one")}), coins and a Master Ball.`;
+        : `First win: unlocks <strong>${esc(l.reward.name)}</strong> for your ${esc(l.reward.base_name || "Pokémon")} (plus a perfect-IV ${esc(l.reward.base_name || "one")}), ${Number(l.reward.coin).toLocaleString()} coins and ${balls}.`;
       actions = `
         <div class="gym-hero-actions" id="lg-actions">
           <button id="lg-fight" class="btn-primary legend-fight-btn">Challenge ${esc(l.name)}</button>
@@ -60,7 +62,7 @@
         </div>
       </div>
       <div class="gym-hero-info">
-        <div class="gym-hero-eyebrow">${esc(l.region)} · Legend</div>
+        <div class="gym-hero-eyebrow">${esc(l.region)} · ${l.superboss ? "☠ Final trial" : "Legend"}</div>
         <h2 class="gym-hero-title">${esc(l.name)}</h2>
         <p class="muted">${esc(l.flavor)}</p>
         <div class="legend-reward-row">
@@ -83,7 +85,7 @@
     const actions = document.getElementById("lg-actions");
     actions.innerHTML = `
       <div class="legend-confirm">
-        <p><strong>No turning back.</strong> ${esc(l.name)} fights at full power. Ready?</p>
+        <p><strong>No turning back.</strong> ${l.superboss ? `${esc(l.name)} has never lost at this level. Ready to die trying?` : `${esc(l.name)} fights at full power. Ready?`}</p>
         <div class="legend-confirm-buttons">
           <button id="lg-go" class="btn-primary legend-fight-btn">Let's do this</button>
           <button id="lg-back" class="btn-secondary">Not yet</button>

@@ -69,6 +69,30 @@
     {% endfor %}
 </div>
 
+{% set beaten_count = (legends.legends or [])|selectattr("beaten")|list|length %}
+{% for sb in legends.superbosses or [] %}
+<button type="button" class="card superboss-card{{ ' is-locked' if not sb.unlocked else '' }}{{ ' is-beaten' if sb.beaten else '' }}"
+        data-legend-key="{{ sb.key }}">
+    <span class="superboss-art"><img src="{{ sb.portrait }}" alt="{{ sb.name }}" loading="lazy"></span>
+    <span class="superboss-info">
+        <span class="superboss-eyebrow">☠ Final trial</span>
+        <span class="superboss-name">{{ sb.title }} {{ sb.name }}</span>
+        <span class="superboss-flavor">{{ sb.flavor }}</span>
+        <span class="superboss-traits">
+            <span>💀 Stats beyond any trainer's limit</span>
+            <span>🧠 Her most ruthless AI: reads every switch</span>
+            <span>🔥 Final Stand: her last Pokémon powers up</span>
+            <span>💎 {{ sb.megas|join(" and ") }}</span>
+        </span>
+        <span class="superboss-status">
+            {% if not sb.unlocked %}🔒 Defeat all 5 Legends to face her ({{ beaten_count }} / {{ (legends.legends or [])|length }})
+            {% elif sb.beaten %}🏆 Defeated{% if sb.wins > 1 %} ×{{ sb.wins }}{% endif %}. You are the True Champion.
+            {% else %}First win: unlocks {{ sb.reward.name }}, {{ "{:,}".format(sb.reward.coin) }} coins and {{ sb.reward.masterball }} Master Balls{% endif %}
+        </span>
+    </span>
+</button>
+{% endfor %}
+
 <div id="legend-modal" class="modal-overlay" hidden>
     <div class="modal collection-modal">
         <div class="modal-header">
