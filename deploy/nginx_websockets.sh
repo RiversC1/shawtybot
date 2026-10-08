@@ -14,20 +14,23 @@ command -v nginx >/dev/null 2>&1 || { echo "nginx not installed, skipping"; exit
 changed=0
 created_map=0
 backups=()
-if ! sudo grep -rqs 'connection_upgrade' /etc/nginx/nginx.conf /etc/nginx/conf.d /etc/nginx/sites-enabled; then
+if ! sudo grep -Rqs 'connection_upgrade' /etc/nginx/nginx.conf /etc/nginx/conf.d /etc/nginx/sites-enabled; then
   printf 'map $http_upgrade $connection_upgrade {\n    default upgrade;\n    %s      close;\n}\n' "''" | sudo tee "$MAP_FILE" >/dev/null
   changed=1
   created_map=1
 fi
 
-for link in $(sudo grep -lrE "proxy_pass +http://(127\.0\.0\.1|localhost):$PORT" /etc/nginx/sites-enabled/ 2>/dev/null); do
-  f=$(readlink -f "$link")
+# -R (not -r): the files in sites-enabled are usually symlinks, which -r skips.
+PASS_RE="proxy_pass +https?://[^;]*:$PORT"
+found=$(sudo grep -lRE "$PASS_RE" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ /etc/nginx/nginx.conf 2>/dev/null | xargs -r -n1 readlink -f | sort -u)
+echo "nginx: configs proxying to :$PORT: ${found:-none found}"
+for f in $found; do
   sudo grep -q 'proxy_set_header Upgrade' "$f" && continue
   sudo cp "$f" "/var/backups/$(basename "$f").bak-ws"
   backups+=("$f")
   extra='\1proxy_set_header Upgrade $http_upgrade;\n\1proxy_set_header Connection $connection_upgrade;'
   sudo grep -q 'proxy_http_version' "$f" || extra='\1proxy_http_version 1.1;\n'"$extra"
-  sudo sed -i -E "s#^([[:space:]]*)(proxy_pass +http://(127\.0\.0\.1|localhost):$PORT[^;]*;)#\1\2\n$extra#" "$f"
+  sudo sed -i -E "s#^([[:space:]]*)($PASS_RE[^;]*;)#\1\2\n$extra#" "$f"
   changed=1
 done
 

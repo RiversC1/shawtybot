@@ -6,6 +6,7 @@ on:
     paths:
       - "web/**"
       - ".github/workflows/deploy-web.yml"
+      - "deploy/nginx_websockets.sh"
 
 jobs:
   deploy:
