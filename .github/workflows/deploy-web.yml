@@ -23,6 +23,8 @@ jobs:
             git pull origin main
             source venv/bin/activate
             pip install -r web/requirements.txt
+            # Let nginx pass WebSocket upgrades through (live battle/trade updates).
+            bash deploy/nginx_websockets.sh 8080
             sudo systemctl restart shawtybot-web
             sleep 2
             sudo systemctl is-active shawtybot-web

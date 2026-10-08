@@ -30,6 +30,8 @@ jobs:
             git pull origin main
             source venv/bin/activate
             pip install -r requirements.txt
+            # Let nginx pass WebSocket upgrades through (live battle/trade updates).
+            bash deploy/nginx_websockets.sh 8000
             # On a failed restart, print why (status + recent log) so the
             # Actions log shows the cause without SSHing in.
             for svc in shawtybot shawtybot-api; do
