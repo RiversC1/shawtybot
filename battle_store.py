@@ -468,8 +468,10 @@ def start_battle_sides(battle_id: int, roster_a: list["be.BattlerState"], roster
     # web room's send-out animation — would have nothing to show for how
     # the first two Pokémon got there.
     append_battle_events(battle_id, 1, [
-        {"type": "switch_in", "side": "A", "dex_id": roster_a[0].dex_id, "name": roster_a[0].species_name},
-        {"type": "switch_in", "side": "B", "dex_id": roster_b[0].dex_id, "name": roster_b[0].species_name},
+        {"type": "switch_in", "side": "A", "dex_id": roster_a[0].dex_id, "name": roster_a[0].species_name,
+         "hp": roster_a[0].current_hp, "max_hp": roster_a[0].max_hp, "status": roster_a[0].status},
+        {"type": "switch_in", "side": "B", "dex_id": roster_b[0].dex_id, "name": roster_b[0].species_name,
+         "hp": roster_b[0].current_hp, "max_hp": roster_b[0].max_hp, "status": roster_b[0].status},
     ])
 
     # The leads' entry abilities (Drought, Intimidate, Download, Trace...)
