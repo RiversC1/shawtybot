@@ -1,6 +1,11 @@
 (function () {
-  const POLL_INTERVAL_MS = 2000;
+  // Without a live connection the page polls: often while it's waiting on
+  // someone else (the opponent's move should show up quickly), rarely when
+  // it's this player's turn and nothing can change until they act.
+  const POLL_FAST_MS = 1000;
+  const POLL_SLOW_MS = 3000;
   const WS_CONNECT_TIMEOUT_MS = 3000;
+  const WS_RETRY_MAX_MS = 60000;
 
   // How long to hold each individual event on screen before advancing to the
   // next one — this is what makes a turn play out like the real games (one
@@ -146,6 +151,30 @@
 
   function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // Sprites are downloaded and decoded ahead of time, so a Pokémon is on
+  // screen the moment it's sent out instead of popping in once its image
+  // arrives (which could be after it was already knocked out).
+  const spriteCache = new Map();
+  function preloadSprite(url) {
+    if (!url) return Promise.resolve();
+    if (!spriteCache.has(url)) {
+      const img = new Image();
+      img.src = url;
+      const ready = img.decode ? img.decode() : new Promise((resolve) => { img.onload = img.onerror = resolve; });
+      spriteCache.set(url, { img, ready: ready.catch(() => {}) });
+    }
+    return spriteCache.get(url).ready;
+  }
+
+  function preloadBattleArt(battle) {
+    preloadSprite(battle.avatar_a);
+    preloadSprite(battle.avatar_b);
+    for (const m of [...(battle.roster_a || []), ...(battle.roster_b || [])]) {
+      preloadSprite(m.sprite);
+      if (m.pre_mega) preloadSprite(m.pre_mega.sprite);
+    }
   }
 
   // "Audible" means the user can actually hear the battle right now: sound
@@ -303,11 +332,17 @@
   });
 
   async function postAction(path, body) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}),
-    });
+    let res;
+    try {
+      res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+    } catch (e) {
+      alert("Couldn't reach the server. Check your connection and try again.");
+      return null;
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       alert(data.detail || "That action couldn't be completed.");
@@ -448,27 +483,51 @@
       )
       .join("");
     panelEl.classList.toggle("is-winner", !!isWinner);
-    panelEl.innerHTML = `
+    setHtml(panelEl, `
         ${avatarHtml}
         <div class="battle-trainer-name">${name}</div>
         <div class="battle-roster-strip">${rosterStrip}</div>
         ${cheers ? `<div class="battle-trainer-cheers" title="Cheers from spectators">📣 ${cheers}</div>` : ""}
-    `;
+    `);
+  }
+
+  // Most playback steps change one HP bar; rebuilding everything else
+  // (portraits, roster icons, the whole log) each step is wasted work.
+  function setHtml(el, html) {
+    if (el._html === html) return;
+    el._html = html;
+    el.innerHTML = html;
   }
 
   function renderHpLabel(labelEl, activeMon, isWinner) {
     labelEl.classList.toggle("is-winner", !!isWinner);
     if (!activeMon) {
+      labelEl.dataset.key = "";
       labelEl.innerHTML = `<p class="muted">No Pokémon</p>`;
       return;
     }
     const pct = activeMon.max_hp > 0 ? Math.max(0, Math.min(100, (activeMon.current_hp / activeMon.max_hp) * 100)) : 0;
+    const hpText = `${Math.max(0, activeMon.current_hp)}/${activeMon.max_hp} HP`;
+    const fillClass = `hp-bar-fill ${hpClass(activeMon.current_hp, activeMon.max_hp)}`;
+    const top = `<div class="battle-hp-name">${activeMon.name}${statusBadgeHtml(activeMon.status)}${activeMon.is_fainted ? " (fainted)" : ""}</div>`;
+    const bottom = `${conditionChipsHtml(activeMon)}
+        ${activeMon.item ? `<div class="battle-held-item" title="${esc(activeMon.item.description)}"><img src="${activeMon.item.icon}" alt="">${esc(activeMon.item.label)}</div>` : ""}`;
+    const key = `${activeMon.dex_id}|${top}|${bottom}`;
+    const fill = labelEl.querySelector(".hp-bar-fill");
+    if (labelEl.dataset.key === key && fill) {
+      // Same Pokémon, only its HP changed: move the existing bar so the CSS
+      // transition drains it smoothly instead of the bar jumping.
+      fill.style.width = `${pct}%`;
+      fill.className = fillClass;
+      labelEl.querySelector(".battle-hp-text").textContent = hpText;
+      return;
+    }
+    labelEl.dataset.key = key;
     labelEl.innerHTML = `
-        <div class="battle-hp-name">${activeMon.name}${statusBadgeHtml(activeMon.status)}${activeMon.is_fainted ? " (fainted)" : ""}</div>
-        <div class="hp-bar-track"><div class="hp-bar-fill ${hpClass(activeMon.current_hp, activeMon.max_hp)}" style="width:${pct}%"></div></div>
-        <div class="muted">${Math.max(0, activeMon.current_hp)}/${activeMon.max_hp} HP</div>
-        ${conditionChipsHtml(activeMon)}
-        ${activeMon.item ? `<div class="battle-held-item" title="${esc(activeMon.item.description)}"><img src="${activeMon.item.icon}" alt="">${esc(activeMon.item.label)}</div>` : ""}
+        ${top}
+        <div class="hp-bar-track"><div class="${fillClass}" style="width:${pct}%"></div></div>
+        <div class="muted battle-hp-text">${hpText}</div>
+        ${bottom}
     `;
   }
 
@@ -577,8 +636,49 @@
   // Evolution toggle): kept across re-renders within the turn, sent with the
   // move, and dropped once it's no longer an option.
   let megaChoice = null;
+  let submitting = false;
+  let panelSig = null;
+
+  // Locks the panel the moment a choice is made (and while a turn plays
+  // out): every button is disabled, so a second click can't send another
+  // action, possibly for the next turn, and a note shows the choice went
+  // through while the server answers.
+  function lockActionPanel(note) {
+    actionPanel.classList.add("is-busy");
+    actionPanel.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    if (window.MoveTooltip) window.MoveTooltip.hide();
+    if (!note) return;
+    let el = actionPanel.querySelector(".br-busy-note");
+    if (!el) {
+      el = document.createElement("p");
+      el.className = "br-busy-note";
+      actionPanel.prepend(el);
+    }
+    el.textContent = note;
+  }
+
+  async function submitChoice(path, body, note) {
+    if (submitting) return;
+    submitting = true;
+    lockActionPanel(note);
+    const data = await postAction(path, body);
+    submitting = false;
+    if (data) {
+      megaChoice = null;
+      applyUpdate(data);
+    } else {
+      renderActionPanel(truth);
+    }
+  }
 
   function renderActionPanel(battle) {
+    // Rebuilding identical buttons can eat a click that lands mid-redraw
+    // (a spectator's cheer arriving, say), so only redraw on a real change.
+    const mine = battle.you && battle.you.side === "B" ? battle.roster_b : battle.roster_a;
+    const sig = JSON.stringify([battle.status, battle.you, mine, megaChoice]);
+    if (sig === panelSig && !actionPanel.classList.contains("is-busy")) return;
+    panelSig = sig;
+    actionPanel.classList.remove("is-busy");
     if (window.MoveTooltip) window.MoveTooltip.hide();
     const you = battle.you;
     forfeitBtn.hidden = true;
@@ -605,10 +705,8 @@
                 <button id="br-accept" class="btn-primary">Accept</button>
                 <button id="br-decline" class="btn-secondary">Decline</button>
             </div>`;
-        document.getElementById("br-accept").addEventListener("click", async () => {
-          const data = await postAction(`/api/proxy/battles/${window.BATTLE_ID}/accept`);
-          if (data) applyUpdate(data);
-        });
+        document.getElementById("br-accept").addEventListener("click", () =>
+          submitChoice(`/api/proxy/battles/${window.BATTLE_ID}/accept`, {}, "Accepting..."));
         document.getElementById("br-decline").addEventListener("click", async () => {
           await postAction(`/api/proxy/battles/${window.BATTLE_ID}/decline`);
           location.reload();
@@ -634,12 +732,10 @@
       actionPanel.innerHTML = `<p><strong>Your Pokémon fainted!</strong> Choose your next Pokémon:</p>
           <div class="battle-action-buttons">${options}</div>`;
       actionPanel.querySelectorAll(".br-switch-option").forEach((btn) =>
-        btn.addEventListener("click", async () => {
-          const data = await postAction(`/api/proxy/battles/${window.BATTLE_ID}/forced-switch`, {
+        btn.addEventListener("click", () =>
+          submitChoice(`/api/proxy/battles/${window.BATTLE_ID}/forced-switch`, {
             team_index: parseInt(btn.dataset.index, 10),
-          });
-          if (data) applyUpdate(data);
-        })
+          }, `Sending out ${btn.textContent.trim()}...`))
       );
       return;
     }
@@ -696,7 +792,7 @@
       `;
       actionPanel.querySelectorAll(".br-move-option").forEach((btn) => {
         const move = (active.moves || [])[parseInt(btn.dataset.index, 10)];
-        if (move && window.MoveTooltip) window.MoveTooltip.attach(btn, move);
+        if (move && window.MoveTooltip) window.MoveTooltip.attach(btn, move, { mouseOnly: true });
       });
       actionPanel.querySelectorAll(".br-mega-toggle").forEach((btn) =>
         btn.addEventListener("click", () => {
@@ -706,24 +802,20 @@
         })
       );
       actionPanel.querySelectorAll(".br-move-option").forEach((btn) =>
-        btn.addEventListener("click", async () => {
-          if (window.MoveTooltip) window.MoveTooltip.hide();
+        btn.addEventListener("click", () => {
+          const move = (active.moves || [])[parseInt(btn.dataset.index, 10)];
           const body = { kind: "move", move_index: parseInt(btn.dataset.index, 10) };
           if (megaChoice) body.mega = megaChoice;
-          const data = await postAction(`/api/proxy/battles/${window.BATTLE_ID}/action`, body);
-          if (data) {
-            megaChoice = null;
-            applyUpdate(data);
-          }
+          const what = move ? move.name : "that move";
+          submitChoice(`/api/proxy/battles/${window.BATTLE_ID}/action`, body,
+            megaChoice ? `Mega Evolving, then ${what}...` : `${active.name} will use ${what}...`);
         })
       );
       actionPanel.querySelectorAll(".br-switch-option").forEach((btn) =>
-        btn.addEventListener("click", async () => {
-          const data = await postAction(`/api/proxy/battles/${window.BATTLE_ID}/action`, {
+        btn.addEventListener("click", () =>
+          submitChoice(`/api/proxy/battles/${window.BATTLE_ID}/action`, {
             kind: "switch", switch_to_index: parseInt(btn.dataset.index, 10),
-          });
-          if (data) applyUpdate(data);
-        })
+          }, `Switching to ${btn.textContent.trim()}...`))
       );
       return;
     }
@@ -932,9 +1024,9 @@
       if (line) lines.push(line);
       if (e.type === "mega_evolution") monBySide[e.side] = e.mega_name;
     }
-    logEl.innerHTML = lines.length
+    setHtml(logEl, lines.length
       ? lines.map((l) => `<div class="battle-log-line">${l}</div>`).reverse().join("")
-      : "<p class='muted'>The battle begins!</p>";
+      : "<p class='muted'>The battle begins!</p>");
   }
 
   function renderMeta() {
@@ -1052,24 +1144,49 @@
     renderMeta();
     BattleFX.caption(currentLineFor(event), false);
 
-    const avatarUrl = isA ? truth.avatar_a : truth.avatar_b;
-    const trainerName = isA ? truth.name_a : truth.name_b;
-    showTrainerStanding(isA ? spriteA : spriteB, isA ? ballA : ballB, avatarUrl, trainerName, isA);
-    await wait(SEND_OUT_THROW_MS);
-
     const roster = isA ? truth.roster_a : truth.roster_b;
     const match = roster.find((m) => sameMon(m, event) && !m.is_fainted) || roster.find((m) => sameMon(m, event));
     const shown = match && match.dex_id !== event.dex_id && match.pre_mega ? { ...match, ...match.pre_mega } : match;
-    // It comes in with no stat changes or confusion; any it gets this turn
-    // (Final Stand, an opponent's Intimidate...) arrive as later events. The
-    // roster entry already includes them, so starting from it double counts.
-    const fresh = shown ? { ...shown, stat_stages: {}, confused: false } : null;
+    const spriteReady = preloadSprite(shown && shown.sprite);
+
+    const avatarUrl = isA ? truth.avatar_a : truth.avatar_b;
+    const trainerName = isA ? truth.name_a : truth.name_b;
+    showTrainerStanding(isA ? spriteA : spriteB, isA ? ballA : ballB, avatarUrl, trainerName, isA);
+    // The throw covers the download; a slow one holds the reveal a moment
+    // rather than revealing an empty spot.
+    await Promise.all([wait(SEND_OUT_THROW_MS), Promise.race([spriteReady, wait(2500)])]);
+
+    // The roster entry is the end-of-turn state, so it comes in as the event
+    // says it was then: otherwise a Pokémon knocked out right after being
+    // sent out shows up already fainted (invisible, 0 HP) and is never seen.
+    // No stat changes or confusion either; any it gets this turn (Final
+    // Stand, an opponent's Intimidate...) arrive as later events.
+    const fresh = shown ? {
+      ...shown, stat_stages: {}, confused: false, is_fainted: false,
+      current_hp: event.hp != null ? event.hp : hpAtSwitchIn(event, shown),
+      status: event.hp != null ? event.status : shown.status,
+    } : null;
     if (isA) visibleA = fresh || visibleA;
     else visibleB = fresh || visibleB;
 
     BattleAudio.handleEvent(event); // the cry plays as the Pokémon itself appears
     renderFrame(isA ? "anim-switch-in" : null, !isA ? "anim-switch-in" : null);
     await wait(SEND_OUT_SETTLE_MS);
+  }
+
+  // For switch-in events recorded before they carried the HP: work it back
+  // from the first HP change that follows for that side this batch.
+  function hpAtSwitchIn(event, mon) {
+    const hurt = new Set(["damage", "confusion_self_hit", "status_damage", "recoil", "weather_damage", "ability_damage", "item_damage"]);
+    const healed = new Set(["heal", "drain", "item_used"]);
+    for (const e of pendingEvents) {
+      if (e.side !== event.side) continue;
+      if (e.type === "switch_in") break;
+      if (e.new_hp == null || !e.amount) continue;
+      if (hurt.has(e.type)) return e.new_hp + e.amount;
+      if (healed.has(e.type)) return e.new_hp - e.amount;
+    }
+    return mon.is_fainted ? mon.max_hp : mon.current_hp;
   }
 
   // Mega Evolution plays as its own beat: the energy gathers around the
@@ -1406,6 +1523,7 @@
   function applyUpdate(battle) {
     handleCheers(battle);
     truth = battle;
+    preloadBattleArt(battle);
     const newEvents = unseenEvents(battle.events);
     markAnimated(battle.events);
 
@@ -1425,12 +1543,13 @@
       visibleWeather = weatherFromTruth();
       renderFrame(null, null);
       renderResultBanner();
-      renderActionPanel(truth);
+      if (!submitting) renderActionPanel(truth);
       syncMusicAndResult();
       return;
     }
 
     pendingEvents.push(...newEvents);
+    lockActionPanel(null);
     if (!playing) {
       playing = true;
       playQueue().finally(() => {
@@ -1449,18 +1568,37 @@
     }
   }
 
+  function isOver() {
+    return truth.status === "finished" || truth.status === "abandoned";
+  }
+
+  function pollDelay() {
+    const you = truth.you || {};
+    return you.can_act || you.needs_forced_switch ? POLL_SLOW_MS : POLL_FAST_MS;
+  }
+
+  let pollGen = 0;
   function startPolling() {
-    if (pollTimer) return;
+    if (pollTimer || isOver()) return;
     connectionStatusEl.textContent = "Live (polling)";
-    pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+    const gen = ++pollGen;
+    const tick = async () => {
+      await poll();
+      if (gen === pollGen && !isOver()) pollTimer = setTimeout(tick, pollDelay());
+      else if (gen === pollGen) pollTimer = null;
+    };
+    pollTimer = setTimeout(tick, pollDelay());
   }
 
   function stopPolling() {
+    pollGen++;
     if (pollTimer) {
-      clearInterval(pollTimer);
+      clearTimeout(pollTimer);
       pollTimer = null;
     }
   }
+
+  let wsRetryMs = 4000;
 
   function connectWs() {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -1476,6 +1614,7 @@
 
     socket.addEventListener("message", (event) => {
       usingWs = true;
+      wsRetryMs = 4000;
       clearTimeout(wsConnectTimer);
       stopPolling();
       connectionStatusEl.textContent = "Live";
@@ -1490,8 +1629,10 @@
       if (truth.status === "finished" || truth.status === "abandoned") return;
       usingWs = false;
       startPolling();
-      // Try to reconnect in the background; if it works we drop back to push updates.
-      setTimeout(connectWs, 4000);
+      // Try to reconnect in the background; if it works we drop back to push
+      // updates. Backs off while it keeps failing.
+      setTimeout(connectWs, wsRetryMs);
+      wsRetryMs = Math.min(wsRetryMs * 2, WS_RETRY_MAX_MS);
     });
 
     socket.addEventListener("error", () => {
@@ -1555,6 +1696,7 @@
   // beat a live switch-in gets, so the very first "X sends out Y!" throw
   // isn't the one send-out in the whole battle that never plays.
   // (Entry abilities like Intimidate or Drought also fire at the start.)
+  preloadBattleArt(truth);
   const OPENING_EVENTS = new Set(["turn_start", "switch_in", "weather_start", "ability_activated", "stat_changed", "stat_change_fizzled"]);
   const onlyOpeningSendOuts = truth.events.length > 0 && truth.events.every((e) => OPENING_EVENTS.has(e.type));
 

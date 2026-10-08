@@ -6598,3 +6598,31 @@ img[src*="/sprites/items/dream-world/"] {
         padding: 16px;
     }
 }
+
+/* ---- Battle: action panel while a choice is being sent / a turn plays ---- */
+#br-action-panel.is-busy button {
+    opacity: 0.55;
+    cursor: progress;
+}
+
+.br-busy-note {
+    margin: 0 0 12px;
+    font-weight: 700;
+}
+
+.br-busy-note::before {
+    content: "";
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 8px;
+    vertical-align: -0.05em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: br-busy-spin 0.7s linear infinite;
+}
+
+@keyframes br-busy-spin {
+    to { transform: rotate(360deg); }
+}

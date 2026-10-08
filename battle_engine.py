@@ -2083,7 +2083,10 @@ def do_switch(side: BattleSide, target_index: int, battle: Optional[BattleState]
     outgoing.confusion_counter = 0
     side.active_index = target_index
     incoming = side.active
-    events.append({"type": "switch_in", "side": side.side_id, "dex_id": incoming.dex_id, "name": incoming.species_name})
+    # Its HP and status as it comes in, so a replay can show it as it was
+    # then even if it's knocked out (or poisoned...) later the same turn.
+    events.append({"type": "switch_in", "side": side.side_id, "dex_id": incoming.dex_id, "name": incoming.species_name,
+                   "hp": incoming.current_hp, "max_hp": incoming.max_hp, "status": incoming.status})
     if wish and not incoming.is_fainted:
         heal = incoming.max_hp - incoming.current_hp
         incoming.current_hp = incoming.max_hp

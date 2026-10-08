@@ -398,6 +398,19 @@ class ConnectionManager:
 
 battle_connections = ConnectionManager(battle_store.serialize_battle_detail)
 trade_connections = ConnectionManager(trade_store.serialize_trade_detail)
+_background_tasks: set[asyncio.Task] = set()
+
+
+def broadcast_soon(manager: ConnectionManager, session_id: int):
+    """Pushes the new state to WebSocket viewers without making the request
+    that changed it wait for every viewer's send first."""
+    task = asyncio.create_task(manager.broadcast(session_id))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
+async def battle_payload(battle_id: int, user_id: int) -> dict:
+    return await asyncio.to_thread(battle_store.serialize_battle_detail, battle_id, user_id)
 
 
 async def _battle_sweep_loop():
@@ -1886,8 +1899,8 @@ async def accept_battle(battle_id: int, user_id: int = Depends(get_current_user_
     ok, battle, row, error = await asyncio.to_thread(battle_store.accept_challenge, battle_id)
     if not ok:
         raise HTTPException(400, error or "Couldn't accept this challenge")
-    await battle_connections.broadcast(battle_id)
-    return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
+    broadcast_soon(battle_connections, battle_id)
+    return await battle_payload(battle_id, user_id)
 
 
 @app.post("/api/battles/{battle_id}/decline")
@@ -1956,8 +1969,8 @@ async def submit_battle_action(battle_id: int, body: BattleActionRequest, user_i
         raise HTTPException(400, error)
     if finished:
         unlock_achievements_for_battle_winner(*finished)
-    await battle_connections.broadcast(battle_id)
-    return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
+    broadcast_soon(battle_connections, battle_id)
+    return await battle_payload(battle_id, user_id)
 
 
 class ForcedSwitchRequest(BaseModel):
@@ -1976,8 +1989,8 @@ async def submit_forced_switch(battle_id: int, body: ForcedSwitchRequest, user_i
     battle, battle_row, events = await asyncio.to_thread(battle_store.handle_forced_switch, battle_id, side, body.team_index)
     if not events:
         raise HTTPException(400, "You don't need to switch right now")
-    await battle_connections.broadcast(battle_id)
-    return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
+    broadcast_soon(battle_connections, battle_id)
+    return await battle_payload(battle_id, user_id)
 
 
 @app.post("/api/battles/{battle_id}/forfeit")
@@ -1992,8 +2005,8 @@ async def forfeit_battle(battle_id: int, user_id: int = Depends(get_current_user
     battle, battle_row, _reward = await asyncio.to_thread(battle_store.apply_forfeit, battle_id, side)
     if battle and battle.status == "finished":
         unlock_achievements_for_battle_winner(battle, battle_row)
-    await battle_connections.broadcast(battle_id)
-    return battle_store.serialize_battle_detail(battle_id, viewer_user_id=user_id)
+    broadcast_soon(battle_connections, battle_id)
+    return await battle_payload(battle_id, user_id)
 
 
 class CheerRequest(BaseModel):

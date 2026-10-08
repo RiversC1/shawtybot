@@ -141,6 +141,16 @@ window.MoveTooltip = (function () {
   function attach(cardEl, move, opts) {
     if (!move) return;
     cardEl.removeAttribute("title");
+    if (opts && opts.mouseOnly) {
+      // For buttons, a tap has to work on the first try. Touch browsers (iOS
+      // Safari above all) treat a first tap that makes hover content appear
+      // as only a hover and drop the click, so only a mouse gets the tooltip.
+      cardEl.addEventListener("pointerenter", (e) => {
+        if (e.pointerType === "mouse") show(move, cardEl, opts);
+      });
+      cardEl.addEventListener("pointerleave", hide);
+      return;
+    }
     cardEl.addEventListener("mouseenter", () => show(move, cardEl, opts));
     cardEl.addEventListener("mouseleave", hide);
   }
