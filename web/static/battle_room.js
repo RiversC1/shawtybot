@@ -153,28 +153,90 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // Sprites are downloaded and decoded ahead of time, so a Pokémon is on
-  // screen the moment it's sent out instead of popping in once its image
-  // arrives (which could be after it was already knocked out).
+  // Battle sprites are animated GIFs (25-115 KB each). On a slow connection
+  // one can still be downloading when its Pokémon is sent out, which left an
+  // empty spot, so each Pokémon first appears as its tiny static sprite
+  // (about 1 KB, loaded up front) and turns animated once its GIF is in.
   const spriteCache = new Map();
   function preloadSprite(url) {
     if (!url) return Promise.resolve();
     if (!spriteCache.has(url)) {
       const img = new Image();
+      const entry = { img, ok: false };
       img.src = url;
-      const ready = img.decode ? img.decode() : new Promise((resolve) => { img.onload = img.onerror = resolve; });
-      spriteCache.set(url, { img, ready: ready.catch(() => {}) });
+      const ready = img.decode ? img.decode() : new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; });
+      entry.ready = ready.then(() => { entry.ok = true; }, () => {});
+      spriteCache.set(url, entry);
     }
     return spriteCache.get(url).ready;
+  }
+
+  function spriteLoaded(url) {
+    const entry = spriteCache.get(url);
+    return Boolean(entry && entry.ok);
+  }
+
+  // Showdown's static sprite for an animated one (ani/x.gif -> gen5/x.png).
+  function stillFor(url) {
+    if (!url || !/\/sprites\/ani(-back)?\//.test(url)) return null;
+    return url.replace("/sprites/ani-back/", "/sprites/gen5-back/").replace("/sprites/ani/", "/sprites/gen5/").replace(/\.gif$/, ".png");
+  }
+
+  // GIFs not needed yet download one at a time, so they don't compete for
+  // bandwidth with the one that's needed right now.
+  const gifQueue = [];
+  let gifQueueBusy = false;
+  function queueGif(url) {
+    if (!url || spriteCache.has(url) || gifQueue.includes(url)) return;
+    gifQueue.push(url);
+    pumpGifQueue();
+  }
+
+  function pumpGifQueue() {
+    if (gifQueueBusy || !gifQueue.length) return;
+    gifQueueBusy = true;
+    preloadSprite(gifQueue.shift()).finally(() => {
+      gifQueueBusy = false;
+      pumpGifQueue();
+    });
   }
 
   function preloadBattleArt(battle) {
     preloadSprite(battle.avatar_a);
     preloadSprite(battle.avatar_b);
-    for (const m of [...(battle.roster_a || []), ...(battle.roster_b || [])]) {
-      preloadSprite(m.sprite);
-      if (m.pre_mega) preloadSprite(m.pre_mega.sprite);
+    const mons = [...(battle.roster_a || []), ...(battle.roster_b || [])];
+    const sprites = mons.flatMap((m) => [m.sprite, m.pre_mega && m.pre_mega.sprite]).filter(Boolean);
+    for (const url of sprites) preloadSprite(stillFor(url));
+    for (const m of mons.filter((m) => m.is_active)) preloadSprite(m.sprite);
+    for (const url of sprites) queueGif(url);
+  }
+
+  // Shows a Pokémon's sprite: the GIF if it's ready, else the static sprite
+  // until the GIF arrives. A missing GIF keeps the static sprite; a missing
+  // static sprite falls back to the GIF, then to the official artwork.
+  function showMonSprite(spriteEl, mon, key) {
+    const gif = mon.sprite;
+    const still = stillFor(gif);
+    const toArtwork = () => {
+      spriteEl.onerror = null;
+      if (mon.artwork) spriteEl.src = mon.artwork;
+    };
+    if (!still || spriteLoaded(gif)) {
+      spriteEl.onerror = toArtwork;
+      spriteEl.src = gif;
+      return;
     }
+    spriteEl.onerror = () => {
+      spriteEl.onerror = toArtwork;
+      spriteEl.src = gif;
+    };
+    spriteEl.src = still;
+    preloadSprite(gif).then(() => {
+      if (spriteEl.dataset.mon === key && spriteLoaded(gif)) {
+        spriteEl.onerror = toArtwork;
+        spriteEl.src = gif;
+      }
+    });
   }
 
   // "Audible" means the user can actually hear the battle right now: sound
@@ -585,14 +647,11 @@
     }
     spriteEl.style.visibility = "visible";
     const desiredSrc = activeMon.is_fainted && animClass !== "anim-faint" ? "" : activeMon.sprite;
-    if (desiredSrc && spriteEl.dataset.mon !== `${activeMon.dex_id}:${activeMon.sprite}`) {
+    const monKey = `${activeMon.dex_id}:${activeMon.sprite}`;
+    if (desiredSrc && spriteEl.dataset.mon !== monKey) {
       spriteEl.dataset.height = activeMon.height || 1;
-      spriteEl.src = activeMon.sprite;
-      spriteEl.onerror = () => {
-        spriteEl.onerror = null;
-        spriteEl.src = activeMon.artwork;
-      };
-      spriteEl.dataset.mon = `${activeMon.dex_id}:${activeMon.sprite}`;
+      spriteEl.dataset.mon = monKey;
+      showMonSprite(spriteEl, activeMon, monKey);
     }
     spriteEl.alt = activeMon.name;
 
@@ -613,6 +672,7 @@
     spriteEl.style.visibility = "visible";
     spriteEl.style.opacity = "1";
     spriteEl.dataset.height = "";
+    spriteEl.onerror = null;
     spriteEl.src = avatarUrl || "";
     spriteEl.alt = name;
     spriteEl.dataset.mon = "";
@@ -1147,14 +1207,17 @@
     const roster = isA ? truth.roster_a : truth.roster_b;
     const match = roster.find((m) => sameMon(m, event) && !m.is_fainted) || roster.find((m) => sameMon(m, event));
     const shown = match && match.dex_id !== event.dex_id && match.pre_mega ? { ...match, ...match.pre_mega } : match;
-    const spriteReady = preloadSprite(shown && shown.sprite);
+    // The GIF starts downloading now, ahead of anything queued; the reveal
+    // only waits for the tiny static sprite.
+    if (shown) preloadSprite(shown.sprite);
+    const spriteReady = preloadSprite(shown && (stillFor(shown.sprite) || shown.sprite));
 
     const avatarUrl = isA ? truth.avatar_a : truth.avatar_b;
     const trainerName = isA ? truth.name_a : truth.name_b;
     showTrainerStanding(isA ? spriteA : spriteB, isA ? ballA : ballB, avatarUrl, trainerName, isA);
     // The throw covers the download; a slow one holds the reveal a moment
     // rather than revealing an empty spot.
-    await Promise.all([wait(SEND_OUT_THROW_MS), Promise.race([spriteReady, wait(2500)])]);
+    await Promise.all([wait(SEND_OUT_THROW_MS), Promise.race([spriteReady, wait(1500)])]);
 
     // The roster entry is the end-of-turn state, so it comes in as the event
     // says it was then: otherwise a Pokémon knocked out right after being
