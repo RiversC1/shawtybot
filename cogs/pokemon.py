@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 import aiohttp
 import sqlite3
+import io
 import json
 import os
 import random
@@ -12,6 +13,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import battle_store
+import legend_card
 import trade_store
 
 log = logging.getLogger("bot")
@@ -262,6 +264,10 @@ SUMMONER_BONUS = 1.3
 # (the retired League Mystery Pokémon, the custom-gym Challenger Pokémon) — never a
 # natural wild spawn, even a rare-weighted one.
 REWARD_ONLY_DEX_IDS = {battle_store.LEAGUE_REWARD_DEX_ID, battle_store.CUSTOM_GYM_REWARD_DEX_ID}
+# Legend-win announcements: how often the bot checks for new ones, and how
+# old one can be and still get posted (after downtime, older ones are skipped).
+ANNOUNCE_POLL_SECONDS = 5
+ANNOUNCE_MAX_AGE = timedelta(hours=6)
 # Odds that any given spawn is shiny — intentionally very rare.
 SHINY_CHANCE = 1 / 200
 # Flat family-candy cost to evolve any Pokémon — a handful of catches, not a grind.
@@ -361,6 +367,10 @@ def format_evolution_line(mon: dict, pokedex: dict[int, dict]) -> str | None:
         else:
             parts.append(target["name"])
     return ", ".join(parts) if parts else None
+
+
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
 
 def roll_spawn_mon(pokedex: dict[int, dict]) -> dict:
@@ -1054,6 +1064,7 @@ class Pokemon(commands.Cog):
         self.tasks = [
             self.bot.loop.create_task(self._startup()),
             self.bot.loop.create_task(self._sweep_loop()),
+            self.bot.loop.create_task(self._announcement_loop()),
         ]
         for coffer_key, cfg in COFFERS.items():
             self.tasks.append(
@@ -1378,6 +1389,7 @@ class Pokemon(commands.Cog):
             # Mega Evolutions are unlocks, not Pokémon (converts the old reward
             # Megas once), and the battle tables' newer columns.
             battle_store.ensure_mega_unlocks(conn)
+            conn.execute(battle_store.ANNOUNCEMENTS_TABLE_SQL)
             battle_store.ensure_form_column(conn)
 
             # ---------- Trading ----------
@@ -1852,6 +1864,136 @@ class Pokemon(commands.Cog):
                 "INSERT OR REPLACE INTO poke_coffer_schedule (coffer_key, next_spawn_at) VALUES (?, ?)",
                 (coffer_key, next_at.isoformat()),
             )
+
+    # ---------- Discord announcements (queued by the web API) ----------
+    # Legend wins finish in the web API, which queues them in
+    # poke_announcements; this loop posts them to every Pokémon channel.
+
+    async def _announcement_loop(self):
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            try:
+                await self._post_announcements()
+            except Exception as e:
+                log.error(f"Announcement loop failed: {e}", exc_info=True)
+            await asyncio.sleep(ANNOUNCE_POLL_SECONDS)
+
+    async def _post_announcements(self):
+        now = datetime.now(timezone.utc)
+        with sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT id, kind, payload, created_at FROM poke_announcements WHERE sent_at IS NULL ORDER BY id LIMIT 10"
+            ).fetchall()
+            claimed = []
+            for row in rows:
+                # Claimed before posting, so a crash mid-post can't repeat it.
+                cur = conn.execute("UPDATE poke_announcements SET sent_at = ? WHERE id = ? AND sent_at IS NULL",
+                                   (now.isoformat(), row[0]))
+                if cur.rowcount:
+                    claimed.append(row)
+        for _id, kind, payload, created_at in claimed:
+            # After a long outage, old news stays unposted rather than flooding the channel.
+            if now - datetime.fromisoformat(created_at) > ANNOUNCE_MAX_AGE:
+                continue
+            if kind == "legend_defeated":
+                await self._announce_legend_win(json.loads(payload))
+
+    async def _announce_legend_win(self, p: dict):
+        entry = battle_store.LEGENDS.get(p["legend_key"])
+        if not entry:
+            return
+        base_url = os.getenv("WEB_BASE_URL", "http://localhost:8080").rstrip("/")
+        superboss = bool(entry.get("superboss"))
+        trainer = discord.utils.escape_markdown(p["trainer"])
+        foe = f"{entry['title']} {entry['name']}" if superboss else entry["name"]
+        team = " · ".join(f"~~{m['name']}~~" if m["fainted"] else f"**{m['name']}**" for m in p["team"])
+        quote = f"\n\n> *“{p['quote']}”*\n> — {entry['name']}" if p.get("quote") else ""
+
+        if superboss:
+            title = f"👑 {p['trainer']} is the TRUE CHAMPION!"
+            if p["first_win"]:
+                lead = (f"<@{p['user_id']}> has done the impossible: **{foe}** has fallen in **{p['turns']} turns**. "
+                        f"Every regional Champion, every Legend, and now her. Bow down. 🙇")
+            else:
+                lead = f"<@{p['user_id']}> crushed **{foe}** again in **{p['turns']} turns**. That's win **#{p['wins']}**."
+            color = 0xF5C542
+        else:
+            if p["first_win"]:
+                title = f"🌟 {p['trainer']} defeated the Legend {entry['name']}!"
+                lead = f"<@{p['user_id']}> beat **{foe}** of {entry['region'].title()} in **{p['turns']} turns**!"
+            else:
+                title = f"⚔️ {p['trainer']} beat {entry['name']} again!"
+                lead = f"<@{p['user_id']}> took down **{foe}** for the **{_ordinal(p['wins'])}** time in **{p['turns']} turns**."
+            color = 0x7C5CFF
+        embed = discord.Embed(title=title[:256], url=f"{base_url}/battles/{p['battle_id']}",
+                              description=lead + quote, color=color, timestamp=datetime.now(timezone.utc))
+        embed.set_thumbnail(url=f"{base_url}{entry['portrait']}")
+        if p.get("reward"):
+            base = battle_store.POKEDEX.get(battle_store.POKEDEX.get(entry["reward_mega"], {}).get("mega_of"), {}).get("name", "their Pokémon")
+            embed.add_field(name="🎁 Unlocked", value=f"**{p['reward']}**: their {base} can now Mega Evolve!", inline=False)
+        embed.add_field(name="Winning team", value=team or "—", inline=False)
+        if not superboss:
+            done, total = p.get("legends_beaten", 0), p.get("legends_total", 5)
+            progress = f"{done} / {total} Legends defeated"
+            if done >= total:
+                progress += " · ☠ True Champion Cynthia awaits..."
+            embed.set_footer(text=progress)
+        else:
+            embed.set_footer(text="Hall of Fame")
+
+        card = await self._render_champion_card(p, entry) if superboss else None
+        if card:
+            embed.set_image(url="attachment://true_champion.png")
+        for channel_id in self._spawn_channels():
+            channel = self.bot.get_channel(channel_id)
+            if not channel:
+                continue
+            try:
+                files = [discord.File(io.BytesIO(card), filename="true_champion.png")] if card else []
+                await channel.send(embed=embed, files=files)
+            except discord.HTTPException as e:
+                log.error(f"Failed to announce legend win in channel {channel_id}: {e}")
+        log.info(f"Announced {p['trainer']} beating {p['legend_key']} (battle {p['battle_id']})")
+
+    async def _render_champion_card(self, p: dict, entry: dict) -> bytes | None:
+        """The True Champion card (legend_card.py), or None if drawing it fails."""
+        try:
+            from PIL import Image
+
+            async def fetch(session, url):
+                try:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                        return Image.open(io.BytesIO(await r.read())) if r.status == 200 else None
+                except Exception:
+                    return None
+
+            async with aiohttp.ClientSession() as session:
+                arts = await asyncio.gather(*(
+                    fetch(session, self.pokedex.get(m["dex_id"], {}).get("artwork") or "") for m in p["team"]
+                ))
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+            def local_image(*candidates):
+                # Portraits and trainer art are this repo's web/static files,
+                # whether given as a path or as their public URL.
+                for rel in candidates:
+                    rel = rel[rel.find("/static/"):] if "/static/" in rel else ""
+                    path = os.path.join(root, "web", rel.lstrip("/").replace("/", os.sep))
+                    if rel and os.path.exists(path):
+                        return Image.open(path)
+                return None
+
+            avatar = p.get("avatar") or ""
+            trainer_art = local_image(avatar.replace("/static/trainers/", "/static/trainers/full/"), avatar)
+            boss_art = local_image(entry.get("portrait") or "")
+            team = [(m["name"], art) for m, art in zip(p["team"], arts)]
+            return await asyncio.to_thread(
+                legend_card.render_true_champion_card, p["trainer"], f"{entry['title']} {entry['name']}",
+                p["turns"], p["wins"], datetime.now(timezone.utc), team, trainer_art, boss_art,
+            )
+        except Exception as e:
+            log.error(f"True Champion card failed: {e}", exc_info=True)
+            return None
 
     async def _sweep_loop(self):
         await self.bot.wait_until_ready()

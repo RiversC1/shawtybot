@@ -7,3 +7,6 @@ anthropic
 fastapi==0.141.1
 uvicorn[standard]==0.53.0
 pyjwt==2.14.0
+
+# Draws the True Champion card posted to Discord (legend_card.py)
+pillow>=10.0

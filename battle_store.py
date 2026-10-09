@@ -1261,19 +1261,67 @@ def grant_legend_first_win(user_id: int, legend_key: str) -> str:
 
 
 def _announce_legend_defeat(battle_row: sqlite3.Row, battle: "be.BattleState", legend_key: str,
-                            reward_name: str | None):
+                            reward_name: str | None) -> str:
+    """Adds the defeat speech to the battle log; returns the quote it picked."""
     entry = LEGENDS.get(legend_key)
     if not entry:
-        return
+        return ""
     quotes = entry.get("defeat_quotes") or []
+    quote = random.choice(quotes) if quotes else ""
     append_battle_events(battle_row["battle_id"], battle.turn_number, [{
         "type": "league_defeated", "side": battle.winner_side,
         "role": "legend", "name": entry["name"], "region": entry["region"],
-        "quote": random.choice(quotes) if quotes else "",
+        "quote": quote,
         "portrait": entry.get("portrait"), "reward": reward_name,
         "reward_base": POKEDEX.get(POKEDEX.get(entry["reward_mega"], {}).get("mega_of"), {}).get("name"),
         "superboss": bool(entry.get("superboss")), "title": entry.get("title"),
     }])
+    return quote
+
+
+# ---------- Discord announcements ----------
+# Battles finish here in the web API, but only the bot can post to Discord,
+# so wins worth shouting about are queued in this table (the bot and the API
+# share the database) and the bot's announcement loop posts them.
+
+ANNOUNCEMENTS_TABLE_SQL = """
+    CREATE TABLE IF NOT EXISTS poke_announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        sent_at TEXT
+    )
+"""
+
+
+def queue_announcement(kind: str, payload: dict):
+    """Never raises: a failed announcement must not cost anyone their reward."""
+    try:
+        with db() as conn:
+            conn.execute(ANNOUNCEMENTS_TABLE_SQL)
+            conn.execute("INSERT INTO poke_announcements (kind, payload, created_at) VALUES (?, ?, ?)",
+                         (kind, json.dumps(payload), datetime.now(timezone.utc).isoformat()))
+    except sqlite3.Error:
+        pass
+
+
+def _queue_legend_announcement(battle_row: sqlite3.Row, battle: "be.BattleState", legend_key: str,
+                               first_win: bool, reward_name: str | None, quote: str):
+    side_id = battle.winner_side
+    user_id = battle_row["side_a_user_id"] if side_id == "A" else battle_row["side_b_user_id"]
+    if not user_id:
+        return
+    wins = get_legend_wins(user_id)
+    queue_announcement("legend_defeated", {
+        "battle_id": battle_row["battle_id"], "user_id": user_id, "legend_key": legend_key,
+        "trainer": display_name_for_side(battle_row, side_id), "avatar": avatar_for_side(battle_row, side_id),
+        "first_win": first_win, "wins": wins.get(legend_key, {}).get("wins", 1),
+        "legends_beaten": len(set(wins) & set(REGULAR_LEGEND_KEYS)), "legends_total": len(REGULAR_LEGEND_KEYS),
+        "reward": reward_name, "quote": quote, "turns": battle.turn_number,
+        "team": [{"dex_id": m.dex_id, "name": m.species_name, "fainted": bool(m.is_fainted)}
+                 for m in battle.side(side_id).roster],
+    })
 
 
 # ---------- Custom (player-run) gyms ----------
@@ -1583,7 +1631,8 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         name = f"{entry['title']} {entry['name']}" if entry.get("superboss") else entry.get("name", "the Legend")
         if legend_key in LEGENDS and record_legend_win(winner_user_id, legend_key):
             reward = grant_legend_first_win(winner_user_id, legend_key)
-            _announce_legend_defeat(battle_row, battle, legend_key, reward)
+            quote = _announce_legend_defeat(battle_row, battle, legend_key, reward)
+            _queue_legend_announcement(battle_row, battle, legend_key, True, reward, quote)
             base = POKEDEX.get(POKEDEX.get(LEGENDS[legend_key]["reward_mega"], {}).get("mega_of"), {}).get("name", "its Pokémon")
             prize = legend_first_win_reward(legend_key)
             balls = "a Master Ball" if prize["masterball"] == 1 else f"{prize['masterball']} Master Balls"
@@ -1593,7 +1642,9 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         else:
             prize = legend_rematch_reward(legend_key)
             add_xp_and_coins(winner_user_id, prize["xp"], prize["coin"])
-            _announce_legend_defeat(battle_row, battle, legend_key, None)
+            quote = _announce_legend_defeat(battle_row, battle, legend_key, None)
+            if legend_key in LEGENDS:
+                _queue_legend_announcement(battle_row, battle, legend_key, False, None, quote)
             summary = f"+{prize['xp']:,} XP, +{prize['coin']:,} coins! You beat {name} again."
     else:
         tclass = TRAINER_CLASS_BY_KEY.get(battle_row["side_b_npc_key"])
