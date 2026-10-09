@@ -374,14 +374,15 @@ async def gyms(request: Request):
     if not session:
         return RedirectResponse("/")
 
-    status, data = await api_get(session, "/api/gyms")
+    (status, data), (_, custom) = await asyncio.gather(
+        api_get(session, "/api/gyms"), api_get(session, "/api/custom-gyms")
+    )
     if status == 401:
         return clear_session(RedirectResponse("/"))
 
     regions = data.get("regions", [])
     all_gyms = [g for group in regions for g in group["gyms"]]
     earned_count = sum(1 for g in all_gyms if g["earned"])
-    _, custom = await api_get(session, "/api/custom-gyms")
     return templates.TemplateResponse(
         request, "gyms.html",
         {"regions": regions, "earned_count": earned_count, "total_count": len(all_gyms), "custom": custom or {}},

@@ -7,6 +7,7 @@ on:
       - "web/**"
       - ".github/workflows/deploy-web.yml"
       - "deploy/nginx_websockets.sh"
+      - "deploy/nginx_http2.sh"
 
 jobs:
   deploy:
@@ -26,6 +27,8 @@ jobs:
             pip install -r web/requirements.txt
             # Let nginx pass WebSocket upgrades through (live battle/trade updates).
             bash deploy/nginx_websockets.sh 8080
+            # HTTP/2: the browser fetches a page's files in parallel over one connection.
+            bash deploy/nginx_http2.sh 8080
             sudo systemctl restart shawtybot-web
             sleep 2
             sudo systemctl is-active shawtybot-web
