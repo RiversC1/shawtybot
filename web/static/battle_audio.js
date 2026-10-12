@@ -17,8 +17,9 @@ window.BattleAudio = (function () {
     champion: "champion_battle.mp3",
     legend: "legend_battle.mp3",
   };
-  // PvP and random-trainer battles keep the original general battle theme.
-  const BATTLE_TRACK = MUSIC_BY_TYPE[window.BATTLE_TYPE] || "battle.mp3";
+  // True Champion Cynthia (the Legends' super-boss) has her own theme; PvP
+  // and random-trainer battles keep the original general battle theme.
+  const BATTLE_TRACK = window.BATTLE_SUPERBOSS ? "cynthia_legend.mp3" : MUSIC_BY_TYPE[window.BATTLE_TYPE] || "battle.mp3";
   const VICTORY_TRACK = "victory.mp3";
   // [loopStart, loopEnd] in seconds, measured from the files themselves:
   // the audio at loopEnd is the same music as at loopStart, so playback
@@ -30,6 +31,7 @@ window.BattleAudio = (function () {
     "elite_battle.mp3": [27.45, 72.79263],
     "champion_battle.mp3": [5.05, 86.88451],
     "legend_battle.mp3": [15.6, 130.81435],
+    "cynthia_legend.mp3": [61.75, 126.93333],
     "victory.mp3": [7.4, 14.78694],
   };
   // The last moments before loopEnd are blended into the music just before

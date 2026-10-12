@@ -2111,6 +2111,7 @@ def serialize_battle_detail(battle_id: int, viewer_user_id: int | None = None) -
         "weather_raw": battle.weather if battle else None,
         "weather_turns": battle.weather_turns if battle else 0,
         "cheers": cheers,
+        "superboss": is_superboss_battle(battle_row),
     }
     if viewer_user_id is not None:
         payload["you"] = get_viewer_info(battle, battle_row, viewer_user_id)
