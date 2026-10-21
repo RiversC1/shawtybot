@@ -1448,7 +1448,7 @@ def build_collection_by_species(conn: sqlite3.Connection, target_id: int, dex_id
             "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if r["is_shiny"] else mon.get("artwork"),
             "is_shiny": bool(r["is_shiny"]),
             "caught_at": r["caught_at"],
-            "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
+            "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1), "iv_stars": battle_store.iv_stars(ivs),
         })
     return result
 
@@ -1475,7 +1475,7 @@ def build_collection_individuals(conn: sqlite3.Connection, target_id: int) -> li
             "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if r["is_shiny"] else mon.get("artwork"),
             "is_shiny": bool(r["is_shiny"]),
             "caught_at": r["caught_at"],
-            "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
+            "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1), "iv_stars": battle_store.iv_stars(ivs),
             "tradeable": not battle_store.is_mega(r["dex_id"]),
         })
     return out
@@ -1563,7 +1563,7 @@ def get_collection_detail(catch_id: int, user_id: int = Depends(get_current_user
         "caught_at": row["caught_at"],
         "count": count,
         "base_stats": resolved_base_stats(mon, ivs),
-        "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1),
+        "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1), "iv_stars": battle_store.iv_stars(ivs),
         "evolution": evolution,
         "transfer_candy": transfer_candy_for(row["dex_id"], bool(row["is_shiny"])),
         "family_name": POKEDEX.get(mon.get("family_id", row["dex_id"]), mon)["name"],

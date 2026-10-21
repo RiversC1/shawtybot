@@ -163,6 +163,20 @@ def get_battle_pokemon_config(user_id: int, dex_id: int) -> tuple[list[str], str
 IV_COLUMNS = ("iv_hp", "iv_attack", "iv_defense", "iv_sp_attack", "iv_sp_defense", "iv_speed")
 
 
+# Pokémon GO-style appraisal stars from the IV total (6 stats x 0-31 = 186
+# here; GO's 3 x 0-15 = 45), on the same percentage bands as GO's
+# 0-22 / 23-29 / 30-36 / 37-44 / 45: 4 stars only for a perfect Pokémon.
+IV_STAR_BANDS = ((45, 4), (37, 3), (30, 2), (23, 1))
+
+
+def iv_stars(ivs: dict) -> int:
+    total, top = sum(ivs.values()), 31 * len(be.IV_STAT_KEYS)
+    for go_sum, stars in IV_STAR_BANDS:
+        if total * 45 >= go_sum * top:
+            return stars
+    return 0
+
+
 def ivs_from_collection_row(row: sqlite3.Row) -> dict:
     """Reads the iv_* columns off a poke_collection row into the {hp, attack,
     ...} shape battle_engine expects. Existing rows caught before IVs existed

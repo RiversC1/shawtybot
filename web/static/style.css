@@ -6626,3 +6626,44 @@ img[src*="/sprites/items/dream-world/"] {
 @keyframes br-busy-spin {
     to { transform: rotate(360deg); }
 }
+
+/* ---- Appraisal stars (IV quality, Pokémon GO style) ---- */
+.collection-card-iv {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.iv-stars {
+    display: inline-flex;
+    gap: 1px;
+    font-size: 1.15em;
+    line-height: 1;
+    vertical-align: -0.1em;
+    letter-spacing: 0;
+}
+
+.iv-star {
+    color: rgba(255, 255, 255, 0.18);
+}
+
+.iv-star.is-on {
+    color: #f5c542;
+    text-shadow: 0 0 6px rgba(245, 197, 66, 0.45);
+}
+
+/* 4 stars: a perfect Pokémon gets red-gold stars that glow, like GO's hundo. */
+.iv-stars-4 .iv-star.is-on {
+    color: #ff6b6b;
+    text-shadow: 0 0 6px rgba(255, 90, 90, 0.8), 0 0 12px rgba(255, 200, 80, 0.6);
+    animation: iv-hundo-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes iv-hundo-glow {
+    50% { text-shadow: 0 0 9px rgba(255, 90, 90, 1), 0 0 18px rgba(255, 200, 80, 0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .iv-stars-4 .iv-star.is-on { animation: none; }
+}

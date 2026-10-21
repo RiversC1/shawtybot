@@ -18,6 +18,7 @@ import hashlib
 import re
 import io
 import httpx
+from markupsafe import Markup
 
 # Production runs "uvicorn web.main:app" from the repo root; local runs from
 # inside web/ use "main:app". Support both.
@@ -113,6 +114,21 @@ def art_thumb(url: str | None) -> str | None:
 
 
 templates.env.filters["thumb"] = art_thumb
+
+# Appraisal stars (the API's iv_stars, 0-4). Kept in step with
+# web/static/collection.js's starsHtml.
+IV_STAR_LABELS = {0: "0★ Poor", 1: "1★ Decent", 2: "2★ Good", 3: "3★ Excellent", 4: "4★ Perfect"}
+
+
+def iv_stars_html(stars) -> Markup:
+    stars = int(stars or 0)
+    filled = 3 if stars == 4 else stars
+    icons = "".join(f'<span class="iv-star{" is-on" if i < filled else ""}">★</span>' for i in range(3))
+    return Markup(f'<span class="iv-stars iv-stars-{stars}" aria-label="{IV_STAR_LABELS[stars]}">{icons}</span>')
+
+
+templates.env.filters["iv_stars_html"] = iv_stars_html
+templates.env.filters["iv_stars_label"] = lambda stars: IV_STAR_LABELS[int(stars or 0)]
 
 
 def _make_thumb(png: bytes, dest: str):

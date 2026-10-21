@@ -5,11 +5,11 @@
 {% set species = collection|map(attribute="dex_id")|unique|list %}
 <p class="muted">{{ collection|length }} Pokémon across {{ species|length }} species. Each catch is listed on its own, since IVs differ between individuals. Click one to see its details.</p>
 
-<input type="text" id="collection-search" class="search-input dex-search" placeholder="Search by name, nickname or type...">
+<input type="text" id="collection-search" class="search-input dex-search" placeholder="Search by name, nickname, type or stars (e.g. 3*)...">
 
 <div class="grid" id="collection-grid">
     {% for mon in collection %}
-    <div class="dex-card collection-card" data-id="{{ mon.id }}"
+    <div class="dex-card collection-card" data-id="{{ mon.id }}" data-stars="{{ mon.iv_stars }}"
          data-name="{{ (mon.nickname or mon.name)|lower }} {{ mon.name|lower }} {{ mon.types|join(' ') }}">
         <img src="{{ mon.artwork|thumb }}" alt="{{ mon.name }}" loading="lazy">
         <div class="dex-name">
@@ -19,7 +19,9 @@
         <div class="collection-card-types">
             {% for t in mon.types %}<span class="type-badge type-{{ t }}">{{ t|capitalize }}</span>{% endfor %}
         </div>
-        <div class="collection-card-iv" title="Overall IV quality of this individual">IV {{ "%.0f"|format(mon.iv_percent) }}%</div>
+        <div class="collection-card-iv" title="{{ mon.iv_stars|iv_stars_label }}: overall IV quality of this individual">
+            {{ mon.iv_stars|iv_stars_html }}<span>IV {{ "%.0f"|format(mon.iv_percent) }}%</span>
+        </div>
     </div>
     {% else %}
     <p>You haven't caught any Pokémon yet!</p>

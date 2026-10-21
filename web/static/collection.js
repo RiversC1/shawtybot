@@ -3,11 +3,13 @@
   const cards = Array.from(document.querySelectorAll("#collection-grid .collection-card"));
   const emptyMsg = document.getElementById("collection-empty");
 
+  // "3*" (or "3★") shows only that star rating, like Pokémon GO's search.
   search.addEventListener("input", () => {
     const q = search.value.trim().toLowerCase();
+    const starQuery = /^([0-4])\s*[*★]$/.exec(q);
     let visible = 0;
     for (const card of cards) {
-      const match = !q || card.dataset.name.includes(q);
+      const match = !q || (starQuery ? card.dataset.stars === starQuery[1] : card.dataset.name.includes(q));
       card.hidden = !match;
       if (match) visible++;
     }
@@ -15,6 +17,14 @@
   });
 
   cards.forEach((card) => card.addEventListener("click", () => openDetail(card.dataset.id)));
+
+  // Same markup as web/main.py's iv_stars_html filter.
+  const STAR_LABELS = ["0★ Poor", "1★ Decent", "2★ Good", "3★ Excellent", "4★ Perfect"];
+  function starsHtml(stars) {
+    const filled = stars === 4 ? 3 : stars;
+    const icons = [0, 1, 2].map((i) => `<span class="iv-star${i < filled ? " is-on" : ""}">★</span>`).join("");
+    return `<span class="iv-stars iv-stars-${stars}" aria-label="${STAR_LABELS[stars]}" title="${STAR_LABELS[stars]}">${icons}</span>`;
+  }
 
   // ---------- Detail modal ----------
 
@@ -96,7 +106,7 @@
                     <div class="favorite-circle"><img src="${mon.artwork}" alt="${mon.name}"></div>
                 </div>
                 <div class="collection-detail-info">
-                    <div class="muted">#${String(mon.dex_id).padStart(3, "0")} · Your catch${mon.count > 1 ? ` · You have ${mon.count}` : ""} · IV Quality ${mon.iv_percent}%</div>
+                    <div class="muted">#${String(mon.dex_id).padStart(3, "0")} · Your catch${mon.count > 1 ? ` · You have ${mon.count}` : ""} · IV Quality ${mon.iv_percent}% ${mon.iv_stars != null ? starsHtml(mon.iv_stars) : ""}</div>
                     <h2 style="margin: 4px 0;">${mon.nickname || mon.name}${mon.is_shiny ? " ✨" : ""}</h2>
                     ${mon.nickname ? `<div class="muted">${mon.name}</div>` : ""}
                     <div class="favorite-types" style="justify-content: flex-start; margin: 8px 0;">${typeBadges(mon.types)}</div>
