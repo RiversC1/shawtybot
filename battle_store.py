@@ -1645,8 +1645,8 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         name = f"{entry['title']} {entry['name']}" if entry.get("superboss") else entry.get("name", "the Legend")
         if legend_key in LEGENDS and record_legend_win(winner_user_id, legend_key):
             reward = grant_legend_first_win(winner_user_id, legend_key)
-            quote = _announce_legend_defeat(battle_row, battle, legend_key, reward)
-            _queue_legend_announcement(battle_row, battle, legend_key, True, reward, quote)
+            defeat_quote = _announce_legend_defeat(battle_row, battle, legend_key, reward)
+            _queue_legend_announcement(battle_row, battle, legend_key, True, reward, defeat_quote)
             base = POKEDEX.get(POKEDEX.get(LEGENDS[legend_key]["reward_mega"], {}).get("mega_of"), {}).get("name", "its Pokémon")
             prize = legend_first_win_reward(legend_key)
             balls = "a Master Ball" if prize["masterball"] == 1 else f"{prize['masterball']} Master Balls"
@@ -1656,9 +1656,9 @@ def grant_battle_rewards(battle_row: sqlite3.Row, battle: "be.BattleState") -> s
         else:
             prize = legend_rematch_reward(legend_key)
             add_xp_and_coins(winner_user_id, prize["xp"], prize["coin"])
-            quote = _announce_legend_defeat(battle_row, battle, legend_key, None)
+            defeat_quote = _announce_legend_defeat(battle_row, battle, legend_key, None)
             if legend_key in LEGENDS:
-                _queue_legend_announcement(battle_row, battle, legend_key, False, None, quote)
+                _queue_legend_announcement(battle_row, battle, legend_key, False, None, defeat_quote)
             summary = f"+{prize['xp']:,} XP, +{prize['coin']:,} coins! You beat {name} again."
     else:
         tclass = TRAINER_CLASS_BY_KEY.get(battle_row["side_b_npc_key"])
