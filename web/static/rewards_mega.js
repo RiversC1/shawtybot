@@ -12,10 +12,6 @@
   let selected = null;
 
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  function esc(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  }
-
   function render() {
     const q = search.value.trim().toLowerCase();
     const shown = options.filter((m) => !q || m.name.toLowerCase().includes(q) || m.types.some((t) => t.startsWith(q)));

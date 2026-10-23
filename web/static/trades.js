@@ -222,12 +222,6 @@
     if (e.target === cardModal) cardModal.hidden = true;
   });
 
-  function typeBadges(types) {
-    return (types || [])
-      .map((t) => `<span class="type-badge type-${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</span>`)
-      .join("");
-  }
-
   function statBars(stats) {
     return stats
       .map(
@@ -263,20 +257,6 @@
   }
 
   // ---------- Trades list ----------
-
-  async function postAction(path, body) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      alert(data.detail || "That action couldn't be completed.");
-      return null;
-    }
-    return data;
-  }
 
   function tradeCard(t) {
     const you = t.you || {};

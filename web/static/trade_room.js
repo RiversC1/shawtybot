@@ -19,30 +19,6 @@
   let wsConnectTimer = null;
   let usingWs = false;
 
-  async function postAction(path, body) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      alert(data.detail || "That action couldn't be completed.");
-      return null;
-    }
-    return data;
-  }
-
-  function escHtml(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  }
-
-  function typeBadges(types) {
-    return (types || [])
-      .map((t) => `<span class="type-badge type-${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</span>`)
-      .join("");
-  }
-
   function statBars(stats) {
     return stats
       .map(
@@ -188,7 +164,7 @@
     } else {
       // Both trainers must offer something before either can confirm.
       const hint = !myMon ? "Pick a Pokémon to offer above."
-        : !theirMon ? `Waiting for ${escHtml(theirName)} to offer a Pokémon...`
+        : !theirMon ? `Waiting for ${esc(theirName)} to offer a Pokémon...`
         : "Confirm when you're happy with the trade.";
       actionPanel.innerHTML = `
           <p class="muted">${hint}</p>

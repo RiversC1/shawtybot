@@ -6,14 +6,7 @@
     <title>{% block title %}ShawtyBot Pokémon{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="{{ static_url('style.css') }}">
-    <script>
-    // Small cached thumbnail for official artwork (see /img/art in main.py);
-    // any other URL is returned unchanged.
-    window.artThumb = function (url) {
-        var m = /^https:\/\/raw\.githubusercontent\.com\/PokeAPI\/sprites\/master\/sprites\/pokemon\/other\/official-artwork\/((?:shiny\/)?\d+)\.png$/.exec(url || "");
-        return m ? "/img/art/" + m[1] + ".webp" : url;
-    };
-    </script>
+    <script src="{{ static_url('common.js') }}"></script>
 </head>
 <body>
 <div id="page-loading-overlay" class="page-loading">

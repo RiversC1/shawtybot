@@ -393,26 +393,6 @@
     }
   });
 
-  async function postAction(path, body) {
-    let res;
-    try {
-      res = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body || {}),
-      });
-    } catch (e) {
-      alert("Couldn't reach the server. Check your connection and try again.");
-      return null;
-    }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      alert(data.detail || "That action couldn't be completed.");
-      return null;
-    }
-    return data;
-  }
-
   function hpClass(cur, max) {
     if (max <= 0) return "hp-low";
     const pct = cur / max;
@@ -531,10 +511,6 @@
   // out — that's renderHpLabel below.
   // Trainer names (and custom gym leaders, who are trainers) are user-chosen
   // text; everything else in the log/HUD comes from the game's own data.
-  function esc(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  }
-
   function renderTrainerPanel(panelEl, name, avatar, roster, isWinner, cheers) {
     name = esc(name);
     const avatarHtml = avatar ? `<img class="battle-trainer-portrait" src="${avatar}" alt="${name}">` : "";

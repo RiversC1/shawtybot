@@ -38,12 +38,6 @@
     if (e.target === modal) modal.hidden = true;
   });
 
-  function typeBadges(types) {
-    return (types || [])
-      .map((t) => `<span class="type-badge type-${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</span>`)
-      .join("");
-  }
-
   function moveGrid(moves) {
     const cells = Array.from({ length: 4 }, (_, i) => {
       const m = moves[i];

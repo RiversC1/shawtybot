@@ -13,10 +13,6 @@
     card.addEventListener("click", () => openLegend(card.dataset.legendKey))
   );
 
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  const typeBadges = (types) => (types || []).map((t) => `<span class="type-badge type-${t}">${cap(t)}</span>`).join("");
-
   async function openLegend(key) {
     modal.hidden = false;
     title.textContent = "Loading...";

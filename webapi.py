@@ -25,7 +25,12 @@ from pydantic import BaseModel
 
 import battle_engine as be
 import battle_store
+import progression
 import trade_store
+from progression import (
+    ACHIEVEMENT_TIERS, ACHIEVEMENTS, BALL_SPRITES, DEFAULT_CHARACTER, EVOLUTION_CANDY_COST, HELD_ITEM_PRICES,
+    ITEM_SPRITE_BASE, STORE_ITEMS, TRAINER_CHARACTERS, XP_PER_EVOLUTION, add_item_sql, compute_level,
+)
 
 log = logging.getLogger("webapi")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -41,165 +46,7 @@ SESSION_DAYS = 7
 
 BALL_KEYS = {"pokeball", "greatball", "ultraball", "masterball"}
 
-# Keep in sync with cogs/pokemon.py — duplicated here so this API has no
-# discord.py dependency and can be deployed/restarted independently of the bot.
-# Self-hosted (web/static/trainers/) since Bulbagarden Archives intermittently
-# 403s hotlinked requests for some of these files — not worth depending on.
-WEB_STATIC_BASE = "https://shawtypoke-web.duckdns.org/static/trainers"
-TRAINER_CHARACTERS = {
-    "red": {"label": "Red", "generation": "Kanto", "sprite": f"{WEB_STATIC_BASE}/red.png"},
-    "leaf": {"label": "Leaf", "generation": "Kanto", "sprite": f"{WEB_STATIC_BASE}/leaf.png"},
-    "gold": {"label": "Gold", "generation": "Johto", "sprite": f"{WEB_STATIC_BASE}/gold.png"},
-    "kris": {"label": "Kris", "generation": "Johto", "sprite": f"{WEB_STATIC_BASE}/kris.png"},
-    "brendan": {"label": "Brendan", "generation": "Hoenn", "sprite": f"{WEB_STATIC_BASE}/brendan.png"},
-    "may": {"label": "May", "generation": "Hoenn", "sprite": f"{WEB_STATIC_BASE}/may.png"},
-    "lucas": {"label": "Lucas", "generation": "Sinnoh", "sprite": f"{WEB_STATIC_BASE}/lucas.png"},
-    "dawn": {"label": "Dawn", "generation": "Sinnoh", "sprite": f"{WEB_STATIC_BASE}/dawn.png"},
-    "rivers": {"label": "Rivers", "generation": "Custom", "sprite": f"{WEB_STATIC_BASE}/rivers.png"},
-    "nowa": {"label": "Nowa", "generation": "Custom", "sprite": f"{WEB_STATIC_BASE}/nowa.png"},
-}
-DEFAULT_CHARACTER = "red"
-
-
-def xp_for_level(level: int) -> int:
-    return 50 + level * 25
-
-
-def compute_level(total_xp: int) -> tuple[int, int, int]:
-    level = 1
-    remaining = total_xp
-    while remaining >= xp_for_level(level):
-        remaining -= xp_for_level(level)
-        level += 1
-    return level, remaining, xp_for_level(level)
-
-
-# Keep in sync with cogs/pokemon.py's ACHIEVEMENTS.
-ACHIEVEMENT_TIERS = ["bronze", "silver", "gold", "platinum", "diamond"]
-
-ACHIEVEMENTS = {
-    "catches": {
-        "label": "Catches", "description": "Catch Pokémon", "stat": "total_caught",
-        "tiers": {
-            "bronze": {"threshold": 10, "rewards": {"pokeball": 5}},
-            "silver": {"threshold": 50, "rewards": {"pokeball": 10, "greatball": 5}},
-            "gold": {"threshold": 150, "rewards": {"greatball": 10, "coin": 50}},
-            "platinum": {"threshold": 300, "rewards": {"ultraball": 10, "coin": 100}},
-            "diamond": {"threshold": 500, "rewards": {"masterball": 1, "coin": 200}},
-        },
-    },
-    "species": {
-        "label": "Pokédex Completion", "description": "Catch unique species", "stat": "unique_species",
-        "tiers": {
-            "bronze": {"threshold": 10, "rewards": {"greatball": 5}},
-            "silver": {"threshold": 50, "rewards": {"greatball": 10, "coin": 50}},
-            "gold": {"threshold": 150, "rewards": {"ultraball": 10, "coin": 100}},
-            "platinum": {"threshold": 300, "rewards": {"masterball": 1, "coin": 150}},
-            "diamond": {"threshold": 493, "rewards": {"masterball": 2, "coin": 500}},
-        },
-    },
-    "shiny": {
-        "label": "Shiny Hunter", "description": "Catch shiny Pokémon", "stat": "shiny_count",
-        "tiers": {
-            "bronze": {"threshold": 1, "rewards": {"coin": 50}},
-            "silver": {"threshold": 3, "rewards": {"ultraball": 5, "coin": 100}},
-            "gold": {"threshold": 5, "rewards": {"masterball": 1}},
-            "platinum": {"threshold": 10, "rewards": {"masterball": 2, "coin": 200}},
-            "diamond": {"threshold": 20, "rewards": {"masterball": 3, "coin": 500}},
-        },
-    },
-    "evolutions": {
-        "label": "Evolver", "description": "Evolve Pokémon", "stat": "evolution_count",
-        "tiers": {
-            "bronze": {"threshold": 1, "rewards": {"coin": 20}},
-            "silver": {"threshold": 5, "rewards": {"greatball": 5, "coin": 50}},
-            "gold": {"threshold": 15, "rewards": {"ultraball": 5, "coin": 100}},
-            "platinum": {"threshold": 30, "rewards": {"masterball": 1, "coin": 200}},
-            "diamond": {"threshold": 50, "rewards": {"masterball": 2, "coin": 300}},
-        },
-    },
-    "level": {
-        "label": "Trainer Level", "description": "Reach trainer levels", "stat": "level",
-        "tiers": {
-            "bronze": {"threshold": 5, "rewards": {"pokeball": 10}},
-            "silver": {"threshold": 10, "rewards": {"greatball": 10}},
-            "gold": {"threshold": 20, "rewards": {"ultraball": 10, "coin": 100}},
-            "platinum": {"threshold": 35, "rewards": {"masterball": 1, "coin": 150}},
-            "diamond": {"threshold": 50, "rewards": {"masterball": 2, "coin": 300}},
-        },
-    },
-    "battles": {
-        "label": "Battler", "description": "Win battles (PvP, gyms, or trainers)", "stat": "battle_wins",
-        "tiers": {
-            "bronze": {"threshold": 5, "rewards": {"coin": 50}},
-            "silver": {"threshold": 20, "rewards": {"greatball": 10, "coin": 100}},
-            "gold": {"threshold": 50, "rewards": {"ultraball": 10, "coin": 200}},
-            "platinum": {"threshold": 100, "rewards": {"masterball": 1, "coin": 300}},
-            "diamond": {"threshold": 250, "rewards": {"masterball": 2, "coin": 500}},
-        },
-    },
-    "legends": {
-        "label": "Legend Slayer", "description": "Defeat the Legends: Red, Silver, Steven, Cyrus and Ash",
-        "stat": "legends_beaten",
-        "tiers": {
-            "bronze": {"threshold": 1, "rewards": {"coin": 500}},
-            "silver": {"threshold": 2, "rewards": {"ultraball": 10, "coin": 1000}},
-            "gold": {"threshold": 3, "rewards": {"masterball": 1, "coin": 1500}},
-            "platinum": {"threshold": 4, "rewards": {"masterball": 2, "coin": 2000}},
-            "diamond": {"threshold": 5, "rewards": {"masterball": 3, "coin": 5000}},
-        },
-    },
-    "true_champion": {
-        "label": "True Champion", "description": "Defeat True Champion Cynthia, the hardest battle in the game",
-        "stat": "true_champion_wins",
-        "tiers": {
-            "bronze": {"threshold": 1, "rewards": {"masterball": 3, "coin": 10000}},
-            "silver": {"threshold": 2, "rewards": {"masterball": 2, "coin": 5000}},
-            "gold": {"threshold": 3, "rewards": {"masterball": 3, "coin": 7500}},
-            "platinum": {"threshold": 5, "rewards": {"masterball": 3, "coin": 10000}},
-            "diamond": {"threshold": 10, "rewards": {"masterball": 5, "coin": 25000}},
-        },
-    },
-}
-
 TOTAL_ACHIEVEMENT_TIERS = sum(len(cat["tiers"]) for cat in ACHIEVEMENTS.values())
-
-# Keep in sync with cogs/pokemon.py's BALLS/STORE_ITEMS/item sprites.
-ITEM_SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items"
-BALL_SPRITES = {
-    "pokeball": f"{ITEM_SPRITE_BASE}/poke-ball.png",
-    "greatball": f"{ITEM_SPRITE_BASE}/great-ball.png",
-    "ultraball": f"{ITEM_SPRITE_BASE}/ultra-ball.png",
-    "masterball": f"{ITEM_SPRITE_BASE}/master-ball.png",
-}
-STORE_ITEMS = {
-    "pokeball": {"label": "Poké Ball", "price": 5},
-    "greatball": {"label": "Great Ball", "price": 15},
-    "ultraball": {"label": "Ultra Ball", "price": 35},
-    "masterball": {"label": "Master Ball", "price": 10000},
-    "meteorite": {"label": "Meteorite", "price": 25000},
-    "fire-stone": {"label": "Fire Stone", "price": 80},
-    "water-stone": {"label": "Water Stone", "price": 80},
-    "thunder-stone": {"label": "Thunder Stone", "price": 80},
-    "leaf-stone": {"label": "Leaf Stone", "price": 80},
-    "moon-stone": {"label": "Moon Stone", "price": 90},
-    "sun-stone": {"label": "Sun Stone", "price": 90},
-    "shiny-stone": {"label": "Shiny Stone", "price": 110},
-    "dusk-stone": {"label": "Dusk Stone", "price": 110},
-    "dawn-stone": {"label": "Dawn Stone", "price": 110},
-}
-
-# Held items (battle_engine.HELD_ITEMS) — cheap on purpose. Keep in sync
-# with cogs/pokemon.py's STORE_ITEMS.
-HELD_ITEM_PRICES = {
-    "leftovers": 300, "life-orb": 350, "choice-band": 350, "choice-specs": 350, "choice-scarf": 350,
-    "focus-sash": 200, "expert-belt": 250, "muscle-band": 150, "wise-glasses": 150,
-    "sitrus-berry": 60, "lum-berry": 80, "quick-claw": 150, "scope-lens": 150, "bright-powder": 150,
-    "heat-rock": 120, "damp-rock": 120, "smooth-rock": 120, "icy-rock": 120,
-}
-STORE_ITEMS.update({
-    key: {"label": be.HELD_ITEMS[key]["label"], "price": price} for key, price in HELD_ITEM_PRICES.items()
-})
 
 HELD_ITEM_KEYS = set(HELD_ITEM_PRICES)
 
@@ -216,9 +63,6 @@ def item_icon(key: str) -> str:
     return f"{ITEM_SPRITE_BASE}/dream-world/{BALL_SLUGS.get(key, key)}.png"
 
 
-# Keep in sync with cogs/pokemon.py.
-EVOLUTION_CANDY_COST = 20
-XP_PER_EVOLUTION = 20
 ITEM_LABELS = {key: cfg["label"] for key, cfg in STORE_ITEMS.items()}
 ITEM_LABELS["candy"] = "Rare Candy"
 ITEM_LABELS["coin"] = "Poké Coin"
@@ -226,48 +70,6 @@ ITEM_LABELS["coin"] = "Poké Coin"
 
 def format_ability_name(raw: str) -> str:
     return raw.replace("-", " ").title()
-
-
-def stat_at_level_100(base: int, iv: int, is_hp: bool) -> int:
-    """A stat at level 100 (no EV investment, neutral nature) using the
-    standard stat formula, with a real per-individual IV (0-31, see
-    poke_collection's iv_* columns). Mirrors battle_engine.py's copy."""
-    if is_hp:
-        return 2 * base + iv + 110
-    return 2 * base + iv + 5
-
-
-def add_item_sql(conn: sqlite3.Connection, user_id: int, item: str, delta: int):
-    conn.execute(
-        "INSERT INTO poke_items (user_id, item, qty) VALUES (?, ?, MAX(?, 0)) "
-        "ON CONFLICT(user_id, item) DO UPDATE SET qty = MAX(qty + ?, 0)",
-        (user_id, item, delta, delta),
-    )
-
-
-def get_battle_wins(conn: sqlite3.Connection, target_id: int) -> int:
-    row = conn.execute(
-        "SELECT COUNT(*) FROM poke_battles WHERE status = 'finished' AND "
-        "((side_a_user_id = ? AND winner_side = 'A') OR (side_b_user_id = ? AND winner_side = 'B'))",
-        (target_id, target_id),
-    ).fetchone()
-    return row[0] if row else 0
-
-
-def legends_beaten(conn: sqlite3.Connection, target_id: int) -> int:
-    """The five Legends beaten (the super-boss has its own achievement)."""
-    battle_store.ensure_legend_table(conn)
-    marks = ",".join("?" * len(battle_store.REGULAR_LEGEND_KEYS))
-    return conn.execute(f"SELECT COUNT(*) FROM poke_legend_wins WHERE user_id = ? AND legend_key IN ({marks})",
-                        (target_id, *battle_store.REGULAR_LEGEND_KEYS)).fetchone()[0]
-
-
-def true_champion_wins(conn: sqlite3.Connection, target_id: int) -> int:
-    battle_store.ensure_legend_table(conn)
-    marks = ",".join("?" * len(battle_store.SUPERBOSS_KEYS)) or "NULL"
-    row = conn.execute(f"SELECT COALESCE(SUM(wins), 0) FROM poke_legend_wins WHERE user_id = ? AND legend_key IN ({marks})",
-                       (target_id, *battle_store.SUPERBOSS_KEYS)).fetchone()
-    return row[0]
 
 
 def unlock_achievements_for_battle_winner(battle: "be.BattleState", battle_row: sqlite3.Row):
@@ -284,70 +86,10 @@ def unlock_achievements_for_battle_winner(battle: "be.BattleState", battle_row: 
 
 
 def check_and_unlock_achievements(conn: sqlite3.Connection, target_id: int) -> list[dict]:
-    """Compares current stats against every achievement tier and unlocks any
-    newly-earned ones, granting rewards exactly once. Mirrors
-    cogs/pokemon.py's check_achievements — called here too so achievements
-    (including ones earned before this feature existed) get backfilled the
-    moment a profile is viewed, not only on the next live gameplay action."""
-    total_caught = conn.execute(
-        "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (target_id,)
-    ).fetchone()[0]
-    unique_species = conn.execute(
-        "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (target_id,)
-    ).fetchone()[0]
-    shiny_count = conn.execute(
-        "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND is_shiny = 1", (target_id,)
-    ).fetchone()[0]
-    evo_row = conn.execute(
-        "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'stat_evolutions'", (target_id,)
-    ).fetchone()
-    evolution_count = evo_row["qty"] if evo_row else 0
-    xp_row = conn.execute(
-        "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (target_id,)
-    ).fetchone()
-    level, _, _ = compute_level(xp_row["qty"] if xp_row else 0)
-
-    stats = {
-        "total_caught": total_caught,
-        "unique_species": unique_species,
-        "shiny_count": shiny_count,
-        "evolution_count": evolution_count,
-        "level": level,
-        "battle_wins": get_battle_wins(conn, target_id),
-        "legends_beaten": legends_beaten(conn, target_id),
-        "true_champion_wins": true_champion_wins(conn, target_id),
-    }
-
-    unlocked = {
-        r["achievement_key"]
-        for r in conn.execute(
-            "SELECT achievement_key FROM poke_achievements WHERE user_id = ?", (target_id,)
-        ).fetchall()
-    }
-
-    newly_unlocked = []
-    for cat_key, cat in ACHIEVEMENTS.items():
-        stat_value = stats[cat["stat"]]
-        for tier_key in ACHIEVEMENT_TIERS:
-            achievement_key = f"{cat_key}_{tier_key}"
-            if achievement_key in unlocked:
-                continue
-            tier = cat["tiers"][tier_key]
-            if stat_value >= tier["threshold"]:
-                # Another request (e.g. the profile page's parallel calls, or
-                # the bot) may unlock the same tier at the same moment; only
-                # the one whose insert lands grants the rewards.
-                cur = conn.execute(
-                    "INSERT OR IGNORE INTO poke_achievements (user_id, achievement_key, unlocked_at) VALUES (?, ?, ?)",
-                    (target_id, achievement_key, datetime.now(timezone.utc).isoformat()),
-                )
-                if cur.rowcount == 0:
-                    continue
-                for item, qty in tier["rewards"].items():
-                    add_item_sql(conn, target_id, item, qty)
-                newly_unlocked.append({"category": cat_key, "tier": tier_key, "rewards": tier["rewards"]})
-
-    return newly_unlocked
+    """Unlocks newly earned achievement tiers (see progression.py). Called here
+    too, not only by the bot, so tiers earned on the web (or before a feature
+    existed) are granted the moment they're met or a profile is viewed."""
+    return progression.unlock_achievements(conn, target_id)
 
 
 with open(DATA_PATH, encoding="utf-8") as f:
@@ -545,7 +287,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
     level, xp_into_level, xp_needed = compute_level(total_xp)
 
     character_key = trainer["character"] or DEFAULT_CHARACTER
-    character = TRAINER_CHARACTERS.get(character_key, TRAINER_CHARACTERS[DEFAULT_CHARACTER])
+    character = progression.character_info(character_key)
 
     favorite = None
     if trainer["favorite_dex_id"] is not None:
@@ -602,7 +344,7 @@ def build_profile_payload(target_id: int, conn: sqlite3.Connection) -> dict | No
             "dex_percent": round(unique_species / dex_total * 100, 1) if dex_total else 0,
         },
         "battle_record": {
-            "wins": get_battle_wins(conn, target_id),
+            "wins": progression.battle_wins(conn, target_id),
             "games": conn.execute(
                 "SELECT COUNT(*) FROM poke_battles WHERE status = 'finished' "
                 "AND (side_a_user_id = ? OR side_b_user_id = ?)",
@@ -643,8 +385,7 @@ def list_trainers(user_id: int = Depends(get_current_user_id)):
             unique_species = conn.execute(
                 "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (row["user_id"],)
             ).fetchone()[0]
-            character_key = row["character"] or DEFAULT_CHARACTER
-            character = TRAINER_CHARACTERS.get(character_key, TRAINER_CHARACTERS[DEFAULT_CHARACTER])
+            character = progression.character_info(row["character"])
             results.append({
                 # Discord snowflake IDs (18-19 digits) exceed JavaScript's safe
                 # integer range (2^53) — serialize as a string so a JS client
@@ -713,7 +454,7 @@ def get_rankings(user_id: int = Depends(get_current_user_id)):
     results = []
     for t in trainers:
         uid = t["user_id"]
-        character = TRAINER_CHARACTERS.get(t["character"] or DEFAULT_CHARACTER, TRAINER_CHARACTERS[DEFAULT_CHARACTER])
+        character = progression.character_info(t["character"])
         level, _, _ = compute_level(xp.get(uid, 0))
         g = games.get(uid, 0)
         w = wins.get(uid, 0)
@@ -761,42 +502,8 @@ def get_trainer(target_id: int, user_id: int = Depends(get_current_user_id)):
 
 def build_achievements_payload(target_id: int, conn: sqlite3.Connection) -> dict:
     check_and_unlock_achievements(conn, target_id)
-
-    total_caught = conn.execute(
-        "SELECT COUNT(*) FROM poke_collection WHERE user_id = ?", (target_id,)
-    ).fetchone()[0]
-    unique_species = conn.execute(
-        "SELECT COUNT(DISTINCT dex_id) FROM poke_collection WHERE user_id = ?", (target_id,)
-    ).fetchone()[0]
-    shiny_count = conn.execute(
-        "SELECT COUNT(*) FROM poke_collection WHERE user_id = ? AND is_shiny = 1", (target_id,)
-    ).fetchone()[0]
-    evo_row = conn.execute(
-        "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'stat_evolutions'", (target_id,)
-    ).fetchone()
-    evolution_count = evo_row["qty"] if evo_row else 0
-    xp_row = conn.execute(
-        "SELECT qty FROM poke_items WHERE user_id = ? AND item = 'xp'", (target_id,)
-    ).fetchone()
-    level, _, _ = compute_level(xp_row["qty"] if xp_row else 0)
-
-    unlocked = {
-        r["achievement_key"]
-        for r in conn.execute(
-            "SELECT achievement_key FROM poke_achievements WHERE user_id = ?", (target_id,)
-        ).fetchall()
-    }
-
-    stats = {
-        "total_caught": total_caught,
-        "unique_species": unique_species,
-        "shiny_count": shiny_count,
-        "evolution_count": evolution_count,
-        "level": level,
-        "battle_wins": get_battle_wins(conn, target_id),
-        "legends_beaten": legends_beaten(conn, target_id),
-        "true_champion_wins": true_champion_wins(conn, target_id),
-    }
+    unlocked = progression.unlocked_achievements(conn, target_id)
+    stats = progression.achievement_stats(conn, target_id)
 
     categories = []
     for cat_key, cat in ACHIEVEMENTS.items():
@@ -1227,7 +934,7 @@ def resolved_base_stats(mon: dict, ivs: dict | None = None) -> list[dict]:
             "key": key, "label": label,
             "base": base_stats.get(key, 0),
             "iv": ivs.get(key, 31),
-            "at_level_100": stat_at_level_100(base_stats.get(key, 0), ivs.get(key, 31), is_hp),
+            "at_level_100": be.stat_at_level_100(base_stats.get(key, 0), ivs.get(key, 31), is_hp),
         }
         for key, label, is_hp in labels
     ]
@@ -1418,7 +1125,7 @@ def build_collection_summary(conn: sqlite3.Connection, target_id: int) -> list[d
             "is_shiny": bool(representative["is_shiny"]),
             "caught_at": representative["caught_at"],
             "count": len(group),
-            "best_iv_percent": round(best_iv_total / (31 * 6) * 100, 1),
+            "best_iv_percent": battle_store.iv_percent(best_iv_total),
         })
 
     result.sort(key=lambda m: m["caught_at"], reverse=True)
@@ -1448,7 +1155,7 @@ def build_collection_by_species(conn: sqlite3.Connection, target_id: int, dex_id
             "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if r["is_shiny"] else mon.get("artwork"),
             "is_shiny": bool(r["is_shiny"]),
             "caught_at": r["caught_at"],
-            "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1), "iv_stars": battle_store.iv_stars(ivs),
+            "iv_percent": battle_store.iv_percent(ivs), "iv_stars": battle_store.iv_stars(ivs),
         })
     return result
 
@@ -1475,7 +1182,7 @@ def build_collection_individuals(conn: sqlite3.Connection, target_id: int) -> li
             "artwork": (mon.get("artwork_shiny") or mon.get("artwork")) if r["is_shiny"] else mon.get("artwork"),
             "is_shiny": bool(r["is_shiny"]),
             "caught_at": r["caught_at"],
-            "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1), "iv_stars": battle_store.iv_stars(ivs),
+            "iv_percent": battle_store.iv_percent(ivs), "iv_stars": battle_store.iv_stars(ivs),
             "tradeable": not battle_store.is_mega(r["dex_id"]),
         })
     return out
@@ -1563,11 +1270,11 @@ def get_collection_detail(catch_id: int, user_id: int = Depends(get_current_user
         "caught_at": row["caught_at"],
         "count": count,
         "base_stats": resolved_base_stats(mon, ivs),
-        "iv_percent": round(sum(ivs.values()) / (31 * 6) * 100, 1), "iv_stars": battle_store.iv_stars(ivs),
+        "iv_percent": battle_store.iv_percent(ivs), "iv_stars": battle_store.iv_stars(ivs),
         "evolution": evolution,
         "transfer_candy": transfer_candy_for(row["dex_id"], bool(row["is_shiny"])),
         "family_name": POKEDEX.get(mon.get("family_id", row["dex_id"]), mon)["name"],
-        "can_transfer": not battle_store.is_mega(row["dex_id"]) and row["dex_id"] not in REWARD_ONLY_DEX_IDS,
+        "can_transfer": not battle_store.is_mega(row["dex_id"]) and row["dex_id"] not in battle_store.REWARD_ONLY_DEX_IDS,
         **config,
     }
 
@@ -1626,7 +1333,7 @@ def transfer_pokemon(body: TransferRequest, user_id: int = Depends(get_current_u
         name = lambda r: r["nickname"] or POKEDEX.get(r["dex_id"], {}).get("name", f"#{r['dex_id']}")  # noqa: E731
 
         for r in rows:
-            if battle_store.is_mega(r["dex_id"]) or r["dex_id"] in REWARD_ONLY_DEX_IDS:
+            if battle_store.is_mega(r["dex_id"]) or r["dex_id"] in battle_store.REWARD_ONLY_DEX_IDS:
                 raise HTTPException(400, f"{name(r)} is a special reward and can't be transferred")
         traded = {x[0] for x in conn.execute(
             f"SELECT side_a_catch_id FROM poke_trades WHERE status IN ('pending', 'active') AND side_a_catch_id IN ({marks}) "
@@ -1915,6 +1622,17 @@ async def decline_battle(battle_id: int, user_id: int = Depends(get_current_user
     return {"ok": True}
 
 
+def battle_participant(battle_id: int, user_id: int) -> tuple[sqlite3.Row, str]:
+    """The battle's row and which side ("A"/"B") this user plays; 404/403 otherwise."""
+    row = battle_store.get_battle_row(battle_id)
+    if not row:
+        raise HTTPException(404, "Battle not found")
+    side = "A" if row["side_a_user_id"] == user_id else ("B" if row["side_b_user_id"] == user_id else None)
+    if side is None:
+        raise HTTPException(403, "You're not a participant in this battle")
+    return row, side
+
+
 class BattleActionRequest(BaseModel):
     kind: str  # "move" | "switch"
     move_index: int | None = None
@@ -1924,12 +1642,7 @@ class BattleActionRequest(BaseModel):
 
 @app.post("/api/battles/{battle_id}/action")
 async def submit_battle_action(battle_id: int, body: BattleActionRequest, user_id: int = Depends(get_current_user_id)):
-    row = battle_store.get_battle_row(battle_id)
-    if not row:
-        raise HTTPException(404, "Battle not found")
-    side = "A" if row["side_a_user_id"] == user_id else ("B" if row["side_b_user_id"] == user_id else None)
-    if side is None:
-        raise HTTPException(403, "You're not a participant in this battle")
+    row, side = battle_participant(battle_id, user_id)
 
     def _do():
         battle, battle_row = battle_store.load_battle_state(battle_id)
@@ -1979,12 +1692,7 @@ class ForcedSwitchRequest(BaseModel):
 
 @app.post("/api/battles/{battle_id}/forced-switch")
 async def submit_forced_switch(battle_id: int, body: ForcedSwitchRequest, user_id: int = Depends(get_current_user_id)):
-    row = battle_store.get_battle_row(battle_id)
-    if not row:
-        raise HTTPException(404, "Battle not found")
-    side = "A" if row["side_a_user_id"] == user_id else ("B" if row["side_b_user_id"] == user_id else None)
-    if side is None:
-        raise HTTPException(403, "You're not a participant in this battle")
+    row, side = battle_participant(battle_id, user_id)
 
     battle, battle_row, events = await asyncio.to_thread(battle_store.handle_forced_switch, battle_id, side, body.team_index)
     if not events:
@@ -1995,12 +1703,7 @@ async def submit_forced_switch(battle_id: int, body: ForcedSwitchRequest, user_i
 
 @app.post("/api/battles/{battle_id}/forfeit")
 async def forfeit_battle(battle_id: int, user_id: int = Depends(get_current_user_id)):
-    row = battle_store.get_battle_row(battle_id)
-    if not row:
-        raise HTTPException(404, "Battle not found")
-    side = "A" if row["side_a_user_id"] == user_id else ("B" if row["side_b_user_id"] == user_id else None)
-    if side is None:
-        raise HTTPException(403, "You're not a participant in this battle")
+    row, side = battle_participant(battle_id, user_id)
 
     battle, battle_row, _reward = await asyncio.to_thread(battle_store.apply_forfeit, battle_id, side)
     if battle and battle.status == "finished":
@@ -2304,7 +2007,6 @@ async def start_gym_battle(gym_key: str, user_id: int = Depends(get_current_user
 CUSTOM_GYM_SHAPES = {"circle", "hexagon", "octagon", "diamond", "shield", "star"}
 CUSTOM_GYM_EMBLEMS = {"star", "bolt", "flame", "drop", "leaf", "snowflake", "heart", "moon", "crown", "gem", "mountain", "wing"}
 POKEMON_TYPES = sorted(be.TYPE_CHART.keys())
-REWARD_ONLY_DEX_IDS = {battle_store.LEAGUE_REWARD_DEX_ID, battle_store.CUSTOM_GYM_REWARD_DEX_ID}
 
 
 def _clean_text(value: str, field: str, min_len: int, max_len: int) -> str:
@@ -2458,7 +2160,7 @@ def save_my_gym(body: CustomGymRequest, user_id: int = Depends(get_current_user_
         owned = {r[0] for r in conn.execute("SELECT DISTINCT dex_id FROM poke_collection WHERE user_id = ?", (user_id,))}
     for dex_id in dex_ids:
         mon = POKEDEX.get(dex_id)
-        if not mon or dex_id in REWARD_ONLY_DEX_IDS:
+        if not mon or dex_id in battle_store.REWARD_ONLY_DEX_IDS:
             raise HTTPException(400, "That Pokémon can't be used in a gym.")
         if dex_id not in owned:
             raise HTTPException(400, f"You don't own a {mon['name']}.")

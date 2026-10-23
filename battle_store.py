@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 import battle_engine as be
+import progression
 
 SHOWDOWN_SPRITE_BASE = "https://play.pokemonshowdown.com/sprites"
 
@@ -169,10 +170,19 @@ IV_COLUMNS = ("iv_hp", "iv_attack", "iv_defense", "iv_sp_attack", "iv_sp_defense
 IV_STAR_BANDS = ((45, 4), (37, 3), (30, 2), (23, 1))
 
 
+IV_TOTAL_MAX = 31 * len(be.IV_STAT_KEYS)
+
+
+def iv_percent(ivs_or_total) -> float:
+    """Overall IV quality, 0-100 to one decimal, from IVs or their total."""
+    total = ivs_or_total if isinstance(ivs_or_total, int) else sum(ivs_or_total.values())
+    return round(total / IV_TOTAL_MAX * 100, 1)
+
+
 def iv_stars(ivs: dict) -> int:
-    total, top = sum(ivs.values()), 31 * len(be.IV_STAT_KEYS)
+    total = sum(ivs.values())
     for go_sum, stars in IV_STAR_BANDS:
-        if total * 45 >= go_sum * top:
+        if total * 45 >= go_sum * IV_TOTAL_MAX:
             return stars
     return 0
 
@@ -1353,6 +1363,10 @@ CUSTOM_GYM_MAX_TEAM = 6
 # League's old Mystery Pokémon: a placeholder until its real design exists, and
 # excluded from wild spawns (cogs/pokemon.py's REWARD_ONLY_DEX_IDS).
 CUSTOM_GYM_REWARD_DEX_ID = 495
+# Species that only ever enter a collection through a specific reward (the
+# retired League Mystery Pokémon, the custom-gym Challenger Pokémon): never a
+# wild spawn, and never transferable or tradeable.
+REWARD_ONLY_DEX_IDS = {LEAGUE_REWARD_DEX_ID, CUSTOM_GYM_REWARD_DEX_ID}
 
 
 def _custom_gym_from_row(row: sqlite3.Row) -> dict:
@@ -1494,8 +1508,7 @@ def _custom_gym_owner(battle_row: sqlite3.Row) -> int | None:
 def trainer_character_sprite(user_id: int) -> str:
     with db() as conn:
         row = conn.execute("SELECT character FROM poke_trainers WHERE user_id = ?", (user_id,)).fetchone()
-    character = row["character"] if row and row["character"] in TRAINER_CHARACTER_KEYS else DEFAULT_TRAINER_CHARACTER
-    return f"{TRAINER_CHARACTER_SPRITE_BASE}/{character}.png"
+    return progression.character_info(row["character"] if row else None)["sprite"]
 
 
 def add_xp_and_coins(user_id: int, xp: int, coin: int):
@@ -1512,13 +1525,6 @@ def add_xp_and_coins(user_id: int, xp: int, coin: int):
             )
 
 
-# Keep in sync with cogs/pokemon.py's / webapi.py's TRAINER_CHARACTERS —
-# duplicated here (this module has zero discord/fastapi deps) so a battle's
-# HUD can show a human trainer's chosen character sprite without either
-# process reaching into the other's constants.
-TRAINER_CHARACTER_SPRITE_BASE = "https://shawtypoke-web.duckdns.org/static/trainers"
-TRAINER_CHARACTER_KEYS = ["red", "leaf", "gold", "kris", "brendan", "may", "lucas", "dawn", "rivers", "nowa"]
-DEFAULT_TRAINER_CHARACTER = "red"
 
 
 def avatar_for_side(battle_row: sqlite3.Row, side: str) -> str | None:

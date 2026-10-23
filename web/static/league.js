@@ -15,12 +15,6 @@
     card.addEventListener("click", () => openMember(card.dataset.generation, card.dataset.memberKey))
   );
 
-  function typeBadges(types) {
-    return (types || [])
-      .map((t) => `<span class="type-badge type-${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</span>`)
-      .join("");
-  }
-
   function titleCase(s) {
     return s.charAt(0).toUpperCase() + s.slice(1);
   }

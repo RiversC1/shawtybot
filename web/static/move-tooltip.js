@@ -155,10 +155,6 @@ window.MoveTooltip = (function () {
     cardEl.addEventListener("mouseleave", hide);
   }
 
-  function esc(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  }
-
   // A simple titled tooltip (abilities, items): { title, kicker, description, note }.
   function showInfo(info, anchorEl) {
     const tip = ensure();

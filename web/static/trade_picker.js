@@ -9,7 +9,6 @@ window.TradePicker = (function () {
     "flying", "psychic", "bug", "rock", "ghost", "dragon", "dark", "steel", "fairy",
   ];
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
   /**
    * root: element to render into. onPick(mon) is called with the chosen

@@ -95,12 +95,6 @@
 
   cards.forEach((card) => card.addEventListener("click", () => openSpecies(card.dataset.id)));
 
-  function typeBadges(types) {
-    return (types || [])
-      .map((t) => `<span class="type-badge type-${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</span>`)
-      .join("");
-  }
-
   function moveGrid(moves) {
     return Array.from({ length: 4 }, (_, i) => {
       const m = moves[i];

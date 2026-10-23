@@ -11,6 +11,7 @@ on:
       - "battle_store.py"
       - "trade_store.py"
       - "legend_card.py"
+      - "progression.py"
       - "assets/**"
       - "data/**"
       - "requirements.txt"

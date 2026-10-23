@@ -78,10 +78,6 @@
     },
   ];
 
-  function esc(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  }
-
   // Sorted entries with competition ranks: equal values share a rank, and
   // the next rank skips accordingly (1, 2, 2, 4).
   function ranked(cat) {

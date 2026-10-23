@@ -17,16 +17,6 @@
   );
 
   // Trainer names, and everything about custom gyms, are user-written.
-  function esc(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  }
-
-  function typeBadges(types) {
-    return (types || [])
-      .map((t) => `<span class="type-badge type-${esc(t)}">${esc(t.charAt(0).toUpperCase() + t.slice(1))}</span>`)
-      .join("");
-  }
-
   function rosterHtml(roster) {
     return roster
       .map(

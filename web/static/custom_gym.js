@@ -39,10 +39,6 @@
   secondaryInput.value = state.design.secondary;
 
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  function esc(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  }
-
   function previewUrl(overrides) {
     const d = { ...state.design, ...overrides };
     const q = new URLSearchParams({ shape: d.shape, emblem: d.emblem, primary: d.primary, secondary: d.secondary });
