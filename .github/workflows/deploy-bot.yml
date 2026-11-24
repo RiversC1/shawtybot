@@ -1,4 +1,7 @@
-name: Deploy Bot & Internal API
+name: Deploy Bot
+
+# The Pokémon game is shut down (its code stays in the repo): the bot no longer
+# loads cogs.pokemon, and the internal game API (shawtybot-api) is stopped.
 
 on:
   push:
@@ -6,17 +9,8 @@ on:
     paths:
       - "cogs/**"
       - "bot.py"
-      - "webapi.py"
-      - "battle_engine.py"
-      - "battle_store.py"
-      - "trade_store.py"
-      - "legend_card.py"
-      - "progression.py"
-      - "assets/**"
-      - "data/**"
       - "requirements.txt"
       - ".github/workflows/deploy-bot.yml"
-      - "deploy/nginx_websockets.sh"
 
 jobs:
   deploy:
@@ -34,21 +28,24 @@ jobs:
             git pull origin main
             source venv/bin/activate
             pip install -r requirements.txt
-            # Let nginx pass WebSocket upgrades through (live battle/trade updates).
-            bash deploy/nginx_websockets.sh 8000
+            # Final copy of the Pokémon game's data, made once before its API
+            # is stopped (the live pokemon.db stays where it is, untouched).
+            mkdir -p backups
+            if [ -f pokemon.db ] && [ ! -f backups/pokemon-final.db ]; then
+              python -c "import sqlite3; s = sqlite3.connect('pokemon.db'); d = sqlite3.connect('backups/pokemon-final.db'); s.backup(d); d.close(); print('Backed up pokemon.db ->', 'backups/pokemon-final.db')"
+            fi
+            ls -la backups/ || true
+            # The game API is no longer used: stop it and keep it from starting on boot.
+            sudo systemctl disable --now shawtybot-api || true
             # On a failed restart, print why (status + recent log) so the
             # Actions log shows the cause without SSHing in.
-            for svc in shawtybot shawtybot-api; do
-              if ! sudo systemctl restart "$svc"; then
-                sudo systemctl status "$svc" --no-pager -l || true
-                exit 1
-              fi
-            done
+            if ! sudo systemctl restart shawtybot; then
+              sudo systemctl status shawtybot --no-pager -l || true
+              exit 1
+            fi
             sleep 3
-            for svc in shawtybot shawtybot-api; do
-              if ! sudo systemctl is-active "$svc"; then
-                sudo journalctl -u "$svc" -n 40 --no-pager || true
-                exit 1
-              fi
-            done
+            if ! sudo systemctl is-active shawtybot; then
+              sudo journalctl -u shawtybot -n 40 --no-pager || true
+              exit 1
+            fi
             echo "Deployed $(git log --oneline -1)"

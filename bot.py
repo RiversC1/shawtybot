@@ -38,7 +38,8 @@ async def hi(interaction: discord.Interaction):
 
 async def main():
     async with bot:
-        for cog in ["cogs.roles", "cogs.fun", "cogs.birthday", "cogs.claude", "cogs.pokemon"]:
+        # cogs.pokemon is shut down; its code stays in the repo.
+        for cog in ["cogs.roles", "cogs.fun", "cogs.birthday", "cogs.claude"]:
             try:
                 await bot.load_extension(cog)
                 log.info(f"Loaded {cog}")
